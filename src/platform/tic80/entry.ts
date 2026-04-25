@@ -30,5 +30,5 @@ export function TIC() {
   renderFrame(state)
 }
 
-;(globalThis as any).TIC = TIC
+;(globalThis as unknown as { TIC: typeof TIC }).TIC = TIC
 

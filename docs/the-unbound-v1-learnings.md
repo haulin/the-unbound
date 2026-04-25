@@ -43,18 +43,21 @@ In practice: new features should usually be “add a new entry / new function”
   - Alternatives considered: IID-per-cell baseline, BLOBS smoothing, DRUNKWALK/carve.
   - We removed the non-chosen generators from the cart to keep iteration focused (can revisit once final tile taxonomy is locked).
 
-- **Minimap as debug view:** the full-terrain minimap (toggle on cell `(2,0)`, sprite `78`) is ideal for feel iteration on map-gen (e.g. NOISE parameters) — you can see spatial structure without inferring it from movement alone. It is not a stand-in for a future “fog of war” or visited-tiles minimap.
-
 ## Workflow note (iteration vs elegance loop)
 
 - For **feel iteration** (UI/UX, tuning counts, copy tone): iterate quickly, keep changes small, and update the design doc when a tweak becomes “the contract”.
 - Once the direction stabilizes: do one “elegance pass” refactor to consolidate geometry/constants and remove accumulated one-off branching.
 
+## Type safety note (avoid `any`)
+
+- Prefer **type guards / discriminated unions** over `: any` or `as any`.
+- If you must weaken types, prefer **`unknown` + narrowing** rather than `any` (keeps “no implicit assumptions” discipline).
+- If the codebase grows, consider adding linting later (e.g. forbid explicit `any`) — but don’t block prototype iteration on tooling.
+
 ## Workflow/meta decisions (v1)
 
-- **Throwaway experiment, intentionally**: v1 optimizes for learning speed and determinism, not long-term repo hygiene.
-- **No git/PR yet**: repo initialization and formal integration happen only after the prototype proves it’s a good foundation for the full game.
+- **Prototype-as-foundation**: optimize for learning speed *and* long-term maintainability. Treat the codebase as something we’ll grow, refactor, and keep readable.
 - **“Don’t assume; ask” norm**: when UI/feel looks wrong, gather the user’s observations before attributing a cause (especially with TIC-80 sprite/rendering quirks).
 - **Doc-as-contract during iteration**: once a tweak becomes stable (layout constants, button semantics, signpost count), capture it in the design doc so future diffs have an explicit baseline.
-- **New behavior ⇒ new mini-cycle**: map-gen alternatives, new encounter modes, or contextual buttons should start with a small design update + plan + tests, then implementation, then verification/review again.
+
 

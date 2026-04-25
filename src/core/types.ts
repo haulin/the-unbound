@@ -11,6 +11,8 @@ export type Vec2 = { x: number; y: number }
 
 export type TileGrid = number[][]
 
+export type Farm = { position: Vec2; name: string }
+
 export type World = {
   seed: number
   width: number
@@ -18,6 +20,7 @@ export type World = {
   mapGenAlgorithm: string
   tiles: TileGrid
   castlePosition: Vec2
+  farms: Farm[]
   rngState: number
 }
 
@@ -43,14 +46,27 @@ export type MoveSlideAnim = {
   params: { fromPos: Vec2; toPos: Vec2; dx: number; dy: number }
 }
 
-export type UiAnim = { nextId: number; active: MoveSlideAnim[] }
+export type FoodDeltaAnim = {
+  id: number
+  kind: 'foodDelta'
+  startFrame: number
+  durationFrames: number
+  blocksInput: boolean
+  params: { delta: number }
+}
+
+export type Anim = MoveSlideAnim | FoodDeltaAnim
+
+export type UiAnim = { nextId: number; active: Anim[] }
 
 export type Ui = { message: string; leftPanel: LeftPanel; clock: UiClock; anim: UiAnim }
 
 export type Player = { position: Vec2 }
 export type Run = { stepCount: number; hasFoundCastle: boolean }
 
-export type State = { world: World; player: Player; run: Run; ui: Ui }
+export type Resources = { food: number; farmNextReadyStep: number[] }
+
+export type State = { world: World; player: Player; run: Run; resources: Resources; ui: Ui }
 
 export type Action =
   | { type: typeof ACTION_NEW_RUN; seed: number }

@@ -20,12 +20,18 @@ This file captures non-v1 ideas discussed during design, kept out of the prototy
 
 ## Economy / combat / encounters
 
-- Resources: army size, food, gold.
-- Food consumption per move; army shrinks via food pressure.
+- Resources: army size, gold. (Food basics implemented in v0.0.5; later tie into army pressure/economy.)
 - Towns sell food and troops.
 - Combat as main encounter type, but not the only one.
 - Cooldowns / anti-farming: revisit fight spots yields diminished/blocked encounters (“spirits are quiet; come back later”).
 - Event spawn probabilities influenced by player stats and time-since-visit (e.g., when poor, more likely to find a chest).
+
+## Prototype follow-ups (post v0.0.5)
+
+- Spawn safety: ensure starting position is at least ~5 tiles away (torus Manhattan) from the Castle (and maybe other PoIs).
+- Food delta UX: consider collapsing `-1` + `+N` into a single animated net delta when both occur on the same move.
+- Spawn-on-signpost: goal narrative concatenates with signpost message and can get clipped; consider prioritizing signpost message (or a shorter goal line) at start.
+- Lore styling: render lore body text in grey, and render place names (Castle / Farm names) in white for emphasis.
 
 ## Win condition structure
 

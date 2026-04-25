@@ -1,12 +1,14 @@
 import {
   ENABLE_ANIMATIONS,
+  FOOD_SPRITE_ID,
+  FOOD_WARNING_THRESHOLD,
   LORE_MAX_CHARS_PER_LINE,
   SPR_BUTTON_GOAL,
   SPR_BUTTON_MINIMAP,
   SPR_BUTTON_RESTART,
 } from '../../core/constants'
 import { getTileIdAt } from '../../core/world'
-import { LEFT_PANEL_KIND_MINIMAP, LEFT_PANEL_KIND_SPRITE, type State } from '../../core/types'
+import { LEFT_PANEL_KIND_MINIMAP, LEFT_PANEL_KIND_SPRITE, type FoodDeltaAnim, type MoveSlideAnim, type State } from '../../core/types'
 import {
   CELL_GAP_PX,
   CELL_SIZE_PX,
@@ -19,11 +21,34 @@ import {
   PANEL_RIGHT_WIDTH,
   SCREEN_HEIGHT,
 } from './layout'
+import {
+  UI_COLOR_BAD,
+  UI_COLOR_BG,
+  UI_COLOR_DIM,
+  UI_COLOR_GOOD,
+  UI_COLOR_TEXT,
+  UI_COLOR_WARN,
+  UI_FOOD_DELTA_GAP_PX,
+  UI_FOOD_DELTA_OFFSET_X,
+  UI_FOOD_DELTA_OFFSET_Y,
+  UI_FOOD_DELTA_RISE_PX,
+  UI_FOOD_ICON_H_PX,
+  UI_FOOD_VALUE_OFFSET_X,
+  UI_FOOD_VALUE_OFFSET_Y,
+  UI_LEFT_PANEL_INNER_GAP,
+  UI_LEFT_PANEL_PADDING,
+  UI_STATUS_ICON_GAP,
+  UI_STATUS_ICON_SIZE,
+  UI_STATUS_LINE_GAP,
+  UI_STATUS_TEXT_OFFSET_Y,
+} from './uiConstants'
 
-// Colors (palette indices)
-const COLOR_BG = 0
-const COLOR_TEXT = 12
-const COLOR_DIM = 15
+const COLOR_BG = UI_COLOR_BG
+const COLOR_TEXT = UI_COLOR_TEXT
+const COLOR_DIM = UI_COLOR_DIM
+const COLOR_GOOD = UI_COLOR_GOOD
+const COLOR_WARN = UI_COLOR_WARN
+const COLOR_BAD = UI_COLOR_BAD
 
 export function renderFrame(s: State) {
   cls(COLOR_BG)
@@ -65,11 +90,8 @@ function wrapText(text: string, maxChars: number) {
       }
     }
     if (line) out.push(line)
-    if (p !== paragraphs.length - 1) out.push('')
   }
 
-  // trim trailing empty lines
-  while (out.length > 0 && out[out.length - 1] === '') out.pop()
   return out
 }
 
@@ -92,49 +114,88 @@ function drawLeftPanel(s: State) {
   const leftPanel = s.ui.leftPanel
 
   const illSize = 16 * ILLUSTRATION_SCALE
-  const illX = 6
-  const illY = 6
+  const illX = UI_LEFT_PANEL_PADDING
+  const illY = UI_LEFT_PANEL_PADDING
   if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
     drawMinimap(s)
   } else {
-    const illustrationId =
-      leftPanel.kind === LEFT_PANEL_KIND_SPRITE && (leftPanel as any).spriteId != null ? (leftPanel as any).spriteId : tileId
+    const illustrationId = leftPanel.kind === LEFT_PANEL_KIND_SPRITE ? leftPanel.spriteId : tileId
     spr(illustrationId, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2)
   }
 
-  const statusX = illX + illSize + 6
+  const statusX = illX + illSize + UI_LEFT_PANEL_INNER_GAP
   const statusY = illY
-  const statusIconSize = 8
-  const statusIconGap = 3
+  const statusIconSize = UI_STATUS_ICON_SIZE
+  const statusIconGap = UI_STATUS_ICON_GAP
   const fontH = 6
-  const statusLineGap = 3
+  const statusLineGap = UI_STATUS_LINE_GAP
   const statusLineH = fontH + statusLineGap
   const messageLineH = fontH + 1
+  const textOffsetY = UI_STATUS_TEXT_OFFSET_Y
 
-  {
-    const y = statusY + 0 * statusLineH
-    spr(SPR_STATUS_SEED, statusX, y, -1)
-    print(`${s.world.seed}`, statusX + statusIconSize + statusIconGap, y + 1, COLOR_TEXT)
-  }
-  {
-    const y = statusY + 1 * statusLineH
-    spr(SPR_STATUS_POS, statusX, y, -1)
-    print(formatA1(pos), statusX + statusIconSize + statusIconGap, y + 1, COLOR_TEXT)
-  }
-  {
-    const y = statusY + 2 * statusLineH
-    spr(SPR_STATUS_STEPS, statusX, y, -1)
-    print(`${s.run.stepCount}`, statusX + statusIconSize + statusIconGap, y + 1, COLOR_TEXT)
-  }
-  const statusLineCount = s.run.hasFoundCastle ? 4 : 3
-  if (s.run.hasFoundCastle) print('FOUND', statusX, statusY + 3 * statusLineH, COLOR_TEXT)
+  // Food gets the hero slot; keep the existing stats compact.
+  const foodX = statusX
+  const foodY = statusY
+  spr(FOOD_SPRITE_ID, foodX, foodY, -1, 1, 0, 0, 2, 2) // 16×16
+  const foodValueX = foodX + UI_FOOD_VALUE_OFFSET_X
+  const foodValueY = foodY + UI_FOOD_VALUE_OFFSET_Y
+  const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? COLOR_WARN : COLOR_TEXT
+  print(`${s.resources.food}`, foodValueX, foodValueY, foodColor)
 
-  const headerBottomY = Math.max(illY + illSize, statusY + statusLineCount * statusLineH)
+  const smallStartY = foodY + UI_FOOD_ICON_H_PX + 4
+  const seedY = smallStartY + 0 * statusLineH
+  const posY = smallStartY + 1 * statusLineH
+  const stepsY = smallStartY + 2 * statusLineH
+
+  // Seed (least important, but still useful)
+  spr(SPR_STATUS_SEED, statusX, seedY, -1)
+  print(`${s.world.seed}`, statusX + statusIconSize + statusIconGap, seedY + textOffsetY, COLOR_TEXT)
+
+  // Position (arguably important, keep it)
+  spr(SPR_STATUS_POS, statusX, posY, -1)
+  print(formatA1(pos), statusX + statusIconSize + statusIconGap, posY + textOffsetY, COLOR_TEXT)
+
+  // Steps
+  spr(SPR_STATUS_STEPS, statusX, stepsY, -1)
+  print(`${s.run.stepCount}`, statusX + statusIconSize + statusIconGap, stepsY + textOffsetY, COLOR_TEXT)
+
+  // Food delta flashes (non-blocking)
+  {
+    const anims = s.ui.anim.active
+    const frame = s.ui.clock.frame | 0
+    let xCursor = foodX + UI_FOOD_DELTA_OFFSET_X
+    for (let i = 0; i < anims.length; i++) {
+      const a = anims[i]!
+      if (a.kind !== 'foodDelta') continue
+      const fa = a as FoodDeltaAnim
+      const start = fa.startFrame | 0
+      const dur = Math.max(1, fa.durationFrames | 0)
+      const t = Math.max(0, Math.min(dur, frame - start))
+      const p = t / dur
+
+      const delta = fa.params.delta | 0
+      if (!delta) continue
+
+      const label = delta > 0 ? `+${delta}` : `${delta}`
+      const color = delta > 0 ? COLOR_GOOD : COLOR_BAD
+
+      // Anchor over the icon, and stack horizontally so +N stays readable.
+      const dy = UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI_FOOD_DELTA_RISE_PX)
+      print(label, xCursor, foodY + dy, color)
+      xCursor += label.length * 6 + UI_FOOD_DELTA_GAP_PX
+    }
+  }
+
+  const foundY = stepsY + statusLineH
+  if (s.run.hasFoundCastle) print('FOUND', statusX, foundY + textOffsetY, COLOR_TEXT)
+
+  const statusBottomY = s.run.hasFoundCastle ? foundY + statusLineH : stepsY + statusLineH
+  const headerBottomY = Math.max(illY + illSize, statusBottomY)
   const msgY = headerBottomY + 4
   const maxLines = Math.max(0, Math.floor((SCREEN_HEIGHT - msgY - 4) / messageLineH))
   const lines = wrapText(s.ui.message, LORE_MAX_CHARS_PER_LINE)
   for (let i = 0; i < lines.length && i < maxLines; i++) {
-    print(lines[i], 6, msgY + i * messageLineH, COLOR_TEXT)
+    print(lines[i], UI_LEFT_PANEL_PADDING, msgY + i * messageLineH, COLOR_TEXT)
   }
 }
 
@@ -144,15 +205,13 @@ function drawLeftPanel(s: State) {
 function drawRightPanel(s: State) {
   if (!ENABLE_ANIMATIONS) return drawRightPanelStatic(s)
 
-  const anims = s.ui.anim && s.ui.anim.active
-  let moveSlide: any = null
-  if (anims && anims.length) {
-    for (let i = 0; i < anims.length; i++) {
-      const a = anims[i]
-      if (a && (a as any).kind === 'moveSlide') {
-        moveSlide = a
-        break
-      }
+  const anims = s.ui.anim.active
+  let moveSlide: MoveSlideAnim | null = null
+  for (let i = 0; i < anims.length; i++) {
+    const a = anims[i]!
+    if (a.kind === 'moveSlide') {
+      moveSlide = a as MoveSlideAnim
+      break
     }
   }
   if (!moveSlide) return drawRightPanelStatic(s)
@@ -277,22 +336,22 @@ function maskGridGaps() {
   rect(col2X, gy1, CELL_SIZE_PX, CELL_GAP_PX, COLOR_BG)
 }
 
-function drawRightPanelMoveSlideCross(s: State, anim: any) {
+function drawRightPanelMoveSlideCross(s: State, anim: MoveSlideAnim) {
   const frame = s.ui.clock.frame | 0
-  const startFrame = typeof anim.startFrame === 'number' ? (anim.startFrame | 0) : frame
-  const durationFrames = typeof anim.durationFrames === 'number' ? Math.max(1, anim.durationFrames | 0) : 1
+  const startFrame = anim.startFrame | 0
+  const durationFrames = Math.max(1, anim.durationFrames | 0)
   const t = Math.max(0, Math.min(durationFrames, frame - startFrame))
 
   const pX = CELL_SIZE_PX + CELL_GAP_PX
-  const dx = anim.params && typeof anim.params.dx === 'number' ? (anim.params.dx | 0) : 0
-  const dy = anim.params && typeof anim.params.dy === 'number' ? (anim.params.dy | 0) : 0
+  const dx = anim.params.dx | 0
+  const dy = anim.params.dy | 0
   const shiftX = -dx * pX
   const shiftY = -dy * pX
   const offX = Math.floor((shiftX * t) / durationFrames)
   const offY = Math.floor((shiftY * t) / durationFrames)
 
-  const fromPos = anim.params && anim.params.fromPos ? anim.params.fromPos : s.player.position
-  const toPos = anim.params && anim.params.toPos ? anim.params.toPos : s.player.position
+  const fromPos = anim.params.fromPos
+  const toPos = anim.params.toPos
 
   // Cross cells: N, W, C, E, S (corners stay UI)
   const cross = [
@@ -383,7 +442,7 @@ function drawMinimap(s: State) {
       present[world.tiles[y]![x]! | 0] = true
     }
   }
-  for (const k in present) getMinimapTilePixels(k as any)
+  for (const k in present) getMinimapTilePixels(Number(k))
 
   for (let y = 0; y < world.height; y++) {
     for (let x = 0; x < world.width; x++) {

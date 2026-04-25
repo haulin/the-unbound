@@ -1,6 +1,6 @@
-// title:  The Unbound (prototype 0.0.4)
+// title:  The Unbound (prototype 0.0.5)
 // author: haulin
-// desc:   Prototype 0.0.4 toward the North Star
+// desc:   Prototype 0.0.5 toward the North Star
 // script: js
 // input:  mouse
 
@@ -17,7 +17,8 @@
   var SIGNPOST_COUNT = 6;
   var TILE_CASTLE = 8;
   var TILE_SIGNPOST = 42;
-  var WALKABLE_COSMETIC_TILE_IDS = [2, 4, 6, 10, 12, 14, 34, 36, 38];
+  var TILE_FARM = 38;
+  var WALKABLE_COSMETIC_TILE_IDS = [2, 4, 6, 10, 12, 14, 34, 36];
   var WALKABLE_TILE_COUNT = WALKABLE_COSMETIC_TILE_IDS.length;
   var MAP_GEN_NOISE = "NOISE";
   var MAP_GEN_ALGORITHM = MAP_GEN_NOISE;
@@ -40,18 +41,44 @@
     // woods
     34: "The light here bends wrong.",
     // rainbow's end
-    36: "The ash is cold. Has been for some time.",
+    36: "The ash is cold. Has been for some time."
     // camp
-    38: "Furrows run to the horizon. No one tends them."
-    // farm
   };
+  var INITIAL_FOOD = 10;
+  var FOOD_MOVE_COST = 1;
+  var FOOD_WARNING_THRESHOLD = 5;
+  var FARM_COUNT = 3;
+  var FARM_COOLDOWN_MOVES = 3;
+  var FOOD_SPRITE_ID = 98;
+  var FOOD_DELTA_FRAMES = 24;
+  var FARM_NAME_POOL = [
+    "The Oast",
+    "Burnt Acre",
+    "Greyfield",
+    "Hob's Reach",
+    "The Stemming",
+    "Fallow End",
+    "Cotter's Rise"
+  ];
+  var FARM_HARVEST_LINES = [
+    "Someone left in a hurry. The stores are still full.",
+    "The cellar is cold and deep. You help yourself.",
+    "Enough here to keep moving. You take what you need.",
+    "Unharvested, but not unwelcome. You gather what you can.",
+    "The farmer is long gone. The food remains."
+  ];
+  var FARM_REVISIT_LINES = [
+    "You already took what there was.",
+    "The stores are empty now. Come back later.",
+    "Nothing left here. It will regrow in time."
+  ];
   var ACTION_NEW_RUN = "NEW_RUN";
   var ACTION_RESTART = "RESTART";
   var ACTION_MOVE = "MOVE";
   var ACTION_SHOW_GOAL = "SHOW_GOAL";
   var ACTION_TOGGLE_MINIMAP = "TOGGLE_MINIMAP";
   var ACTION_TICK = "TICK";
-  var INITIAL_SEED = 1;
+  var INITIAL_SEED = 6;
   var ENABLE_ANIMATIONS = true;
   var MOVE_SLIDE_FRAMES = 15;
   var LORE_MAX_CHARS_PER_LINE = 19;
@@ -89,12 +116,39 @@
   }
 
   // src/core/signpost.ts
-  function formatSignpostMessage(playerPos, castlePos, width, height) {
-    const dx = torusDelta(playerPos.x, castlePos.x, width);
-    const dy = torusDelta(playerPos.y, castlePos.y, height);
-    const dir = dirLabel(dx, dy);
-    const d = manhattan(dx, dy);
-    return `The Castle lies ${dir}, ${d} leagues away.`;
+  function formatNearestPoiSignpostMessage(playerPos, world) {
+    const candidates = [
+      { kind: "castle", name: "The Castle", pos: world.castlePosition },
+      ...world.farms.map((f) => ({ kind: "farm", name: `${f.name} Farm`, pos: f.position }))
+    ];
+    let best = candidates[0];
+    let bestDx = torusDelta(playerPos.x, best.pos.x, world.width);
+    let bestDy = torusDelta(playerPos.y, best.pos.y, world.height);
+    let bestD = manhattan(bestDx, bestDy);
+    for (let i = 1; i < candidates.length; i++) {
+      const c = candidates[i];
+      const dx = torusDelta(playerPos.x, c.pos.x, world.width);
+      const dy = torusDelta(playerPos.y, c.pos.y, world.height);
+      const d = manhattan(dx, dy);
+      if (d < bestD) {
+        best = c;
+        bestDx = dx;
+        bestDy = dy;
+        bestD = d;
+        continue;
+      }
+      if (d === bestD) {
+        if (best.kind !== "castle" && c.kind === "castle") {
+          best = c;
+          bestDx = dx;
+          bestDy = dy;
+          bestD = d;
+        }
+      }
+    }
+    const dir = dirLabel(bestDx, bestDy);
+    return `${best.name}
+${dir}, ${bestD} leagues away.`;
   }
 
   // src/core/prng.ts
@@ -183,6 +237,7 @@
   function placeSpecials({ tiles, rngState }) {
     const t = clone2dTiles(tiles);
     let castlePosition = { x: 0, y: 0 };
+    const farms = [];
     {
       const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
       rngState = r.rngState;
@@ -191,6 +246,26 @@
       t[y][x] = TILE_CASTLE;
       castlePosition = { x, y };
     }
+    const remainingNames = [...FARM_NAME_POOL];
+    let placedFarms = 0;
+    while (placedFarms < FARM_COUNT) {
+      const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
+      rngState = r.rngState;
+      const x = r.value % WORLD_WIDTH;
+      const y = Math.floor(r.value / WORLD_WIDTH);
+      if (x === castlePosition.x && y === castlePosition.y) continue;
+      if (t[y][x] === TILE_FARM) continue;
+      if (t[y][x] === TILE_SIGNPOST) continue;
+      t[y][x] = TILE_FARM;
+      let name = "A Farm";
+      if (remainingNames.length > 0) {
+        const pick = randInt(rngState, remainingNames.length);
+        rngState = pick.rngState;
+        name = remainingNames.splice(pick.value, 1)[0];
+      }
+      farms.push({ position: { x, y }, name });
+      placedFarms++;
+    }
     let placed = 0;
     while (placed < SIGNPOST_COUNT) {
       const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
@@ -198,11 +273,12 @@
       const x = r.value % WORLD_WIDTH;
       const y = Math.floor(r.value / WORLD_WIDTH);
       if (x === castlePosition.x && y === castlePosition.y) continue;
+      if (t[y][x] === TILE_FARM) continue;
       if (t[y][x] === TILE_SIGNPOST) continue;
       t[y][x] = TILE_SIGNPOST;
       placed++;
     }
-    return { tiles: t, castlePosition, rngState };
+    return { tiles: t, castlePosition, farms, rngState };
   }
   function pickStart({ rngState }) {
     const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
@@ -231,9 +307,79 @@
       mapGenAlgorithm: MAP_GEN_ALGORITHM,
       tiles: withSpecials.tiles,
       castlePosition: withSpecials.castlePosition,
+      farms: withSpecials.farms,
       rngState
     };
     return { world, startPosition: startPick.startPosition };
+  }
+
+  // src/core/tiles/onEnterCastle.ts
+  var onEnterCastle = () => ({
+    message: CASTLE_FOUND_MESSAGE,
+    hasFoundCastle: true
+  });
+
+  // src/core/tiles/onEnterDefaultTerrain.ts
+  var onEnterDefaultTerrain = ({ tileId }) => ({
+    message: TERRAIN_MESSAGE_BY_TILE_ID[tileId] || ""
+  });
+
+  // src/core/tiles/onEnterFarm.ts
+  function findFarmIndexAt(world, pos) {
+    for (let i = 0; i < world.farms.length; i++) {
+      const f = world.farms[i];
+      if (f.position.x === pos.x && f.position.y === pos.y) return i;
+    }
+    return -1;
+  }
+  function pickRevisitLine(world, farmIndex, stepCount) {
+    const lines = FARM_REVISIT_LINES;
+    const m = lines.length;
+    const k = (world.seed | 0) + (farmIndex | 0) * 7 + (stepCount | 0) | 0;
+    const idx = (k % m + m) % m;
+    return lines[idx] || lines[0] || "";
+  }
+  var onEnterFarm = ({ tileId, world, pos, stepCount, resources }) => {
+    if (tileId !== TILE_FARM) return { message: "" };
+    const farmIndex = findFarmIndexAt(world, pos);
+    if (farmIndex < 0) return { message: "" };
+    const farmName = world.farms[farmIndex].name || "A Farm";
+    const readyAt = (resources.farmNextReadyStep[farmIndex] ?? 0) | 0 || 0;
+    if (stepCount < readyAt) {
+      return { message: `${farmName} Farm
+${pickRevisitLine(world, farmIndex, stepCount)}` };
+    }
+    let rngState = (world.rngState | 0) >>> 0;
+    const rGain = randInt(rngState, 8);
+    rngState = rGain.rngState;
+    const gain = (rGain.value | 0) + 3;
+    const rLine = randInt(rngState, FARM_HARVEST_LINES.length);
+    rngState = rLine.rngState;
+    const harvestLine = FARM_HARVEST_LINES[rLine.value | 0] || FARM_HARVEST_LINES[0] || "";
+    const nextFarmNextReadyStep = resources.farmNextReadyStep.slice();
+    nextFarmNextReadyStep[farmIndex] = (stepCount | 0) + FARM_COOLDOWN_MOVES;
+    return {
+      world: { ...world, rngState },
+      resources: { food: (resources.food | 0) + gain, farmNextReadyStep: nextFarmNextReadyStep },
+      foodDeltas: [gain],
+      message: `${farmName} Farm
+${harvestLine}`
+    };
+  };
+
+  // src/core/tiles/onEnterSignpost.ts
+  var onEnterSignpost = ({ world, pos }) => ({
+    message: formatNearestPoiSignpostMessage(pos, world)
+  });
+
+  // src/core/tiles/registry.ts
+  var onEnterByTileId = {
+    [TILE_FARM]: onEnterFarm,
+    [TILE_SIGNPOST]: onEnterSignpost,
+    [TILE_CASTLE]: onEnterCastle
+  };
+  function getOnEnterHandler(tileId) {
+    return onEnterByTileId[tileId] || onEnterDefaultTerrain;
   }
 
   // src/core/types.ts
@@ -243,8 +389,18 @@
 
   // src/core/reducer.ts
   function getLeftPanel(ui) {
-    const lp = ui && ui.leftPanel;
-    if (lp && typeof lp.kind === "string") return lp;
+    if (!ui || typeof ui !== "object") return { kind: LEFT_PANEL_KIND_AUTO };
+    const root = ui;
+    const lp = root.leftPanel;
+    if (!lp || typeof lp !== "object") return { kind: LEFT_PANEL_KIND_AUTO };
+    const o = lp;
+    const kind = o.kind;
+    if (kind === LEFT_PANEL_KIND_AUTO) return { kind: LEFT_PANEL_KIND_AUTO };
+    if (kind === LEFT_PANEL_KIND_MINIMAP) return { kind: LEFT_PANEL_KIND_MINIMAP };
+    if (kind === LEFT_PANEL_KIND_SPRITE) {
+      const spriteId = o.spriteId;
+      if (typeof spriteId === "number") return { kind: LEFT_PANEL_KIND_SPRITE, spriteId: spriteId | 0 };
+    }
     return { kind: LEFT_PANEL_KIND_AUTO };
   }
   function getUi(ui) {
@@ -259,11 +415,12 @@
     const u = ui;
     const message = typeof u.message === "string" ? u.message : "";
     const leftPanel = getLeftPanel(u);
-    const hasClock = u.clock && typeof u.clock.frame === "number";
-    const clock = { frame: hasClock ? u.clock.frame | 0 : 0 };
-    const hasAnim = u.anim && typeof u.anim === "object";
-    const active = hasAnim && Array.isArray(u.anim.active) ? u.anim.active : [];
-    const nextId = hasAnim && typeof u.anim.nextId === "number" ? u.anim.nextId | 0 : 1;
+    const clockObj = u.clock && typeof u.clock === "object" ? u.clock : null;
+    const clockFrame = clockObj && typeof clockObj.frame === "number" ? clockObj.frame | 0 : 0;
+    const clock = { frame: clockFrame };
+    const animObj = u.anim && typeof u.anim === "object" ? u.anim : null;
+    const active = animObj && Array.isArray(animObj.active) ? animObj.active : [];
+    const nextId = animObj && typeof animObj.nextId === "number" ? animObj.nextId | 0 : 1;
     return {
       message,
       leftPanel,
@@ -283,13 +440,12 @@
   function pruneExpiredAnims(ui) {
     const u = getUi(ui);
     const frame = u.clock.frame | 0;
-    const active = u.anim && u.anim.active || [];
+    const active = u.anim.active;
     const kept = [];
     for (let i = 0; i < active.length; i++) {
       const a = active[i];
-      if (!a || typeof a !== "object") continue;
-      const startFrame = typeof a.startFrame === "number" ? a.startFrame | 0 : 0;
-      const durationFrames = typeof a.durationFrames === "number" ? a.durationFrames | 0 : 0;
+      const startFrame = a.startFrame | 0;
+      const durationFrames = a.durationFrames | 0;
       const endFrame = startFrame + Math.max(0, durationFrames);
       if (frame < endFrame) kept.push(a);
     }
@@ -303,20 +459,17 @@
   }
   function hasBlockingAnim(ui) {
     const u = getUi(ui);
-    const active = u.anim && u.anim.active || [];
+    const active = u.anim.active;
     for (let i = 0; i < active.length; i++) {
-      const a = active[i];
-      if (a && a.blocksInput) return true;
+      if (active[i].blocksInput) return true;
     }
     return false;
   }
   function enqueueAnim(ui, anim) {
     const u = getUi(ui);
     const id = u.anim.nextId | 0;
-    const a = { id };
-    const src = anim && typeof anim === "object" ? anim : {};
-    for (const k in src) a[k] = src[k];
-    const nextActive = (u.anim.active || []).concat([a]);
+    const a = { id, ...anim };
+    const nextActive = u.anim.active.concat([a]);
     return {
       message: u.message,
       leftPanel: u.leftPanel,
@@ -332,18 +485,11 @@
   function initialMessageForStart(tileId, playerPos, world) {
     let msg = GOAL_NARRATIVE;
     if (tileId === TILE_SIGNPOST) {
-      msg += "\n" + formatSignpostMessage(playerPos, world.castlePosition, world.width, world.height);
+      msg += "\n" + formatNearestPoiSignpostMessage(playerPos, world);
     } else if (tileId === TILE_CASTLE) {
       msg += "\n" + CASTLE_FOUND_MESSAGE;
     }
     return msg;
-  }
-  function tileMessage(tileId, playerPos, world) {
-    if (tileId === TILE_SIGNPOST) {
-      return formatSignpostMessage(playerPos, world.castlePosition, world.width, world.height);
-    }
-    if (tileId === TILE_CASTLE) return CASTLE_FOUND_MESSAGE;
-    return TERRAIN_MESSAGE_BY_TILE_ID[tileId] || "";
   }
   function reduceGoal(s) {
     const prevUi = getUi(s.ui);
@@ -353,6 +499,7 @@
       world: s.world,
       player: s.player,
       run: s.run,
+      resources: s.resources,
       ui: {
         clock: prevUi.clock,
         anim: prevUi.anim,
@@ -369,6 +516,7 @@
       world: s.world,
       player: s.player,
       run: s.run,
+      resources: s.resources,
       ui: {
         clock: prevUi.clock,
         anim: prevUi.anim,
@@ -385,27 +533,57 @@
       y: (prevPos.y + dy + world.height) % world.height
     };
     const tileId = world.tiles[nextPos.y][nextPos.x];
-    const nextHasFoundCastle = prevState.run.hasFoundCastle || tileId === TILE_CASTLE;
+    const nextStepCount = (prevState.run.stepCount | 0) + 1;
+    const prevRes = prevState.resources || { food: INITIAL_FOOD, farmNextReadyStep: [] };
+    const prevFood = typeof prevRes.food === "number" ? prevRes.food | 0 : 0;
+    const paidMoveCost = prevFood > 0 && FOOD_MOVE_COST > 0;
+    let food = paidMoveCost ? Math.max(0, prevFood - FOOD_MOVE_COST) : prevFood;
+    const farmNextReadyStep = Array.isArray(prevRes.farmNextReadyStep) ? prevRes.farmNextReadyStep.slice() : [];
+    const farmCount = world.farms && world.farms.length || 0;
+    while (farmNextReadyStep.length < farmCount) farmNextReadyStep.push(0);
+    const baseResources = { food, farmNextReadyStep };
+    const foodDeltas = paidMoveCost ? [-FOOD_MOVE_COST] : [];
+    const handler = getOnEnterHandler(tileId);
+    const outcome = handler({ tileId, world, pos: nextPos, stepCount: nextStepCount, resources: baseResources });
+    const nextWorld = outcome.world || world;
+    const nextResources = outcome.resources || baseResources;
+    const message = outcome.message;
+    if (outcome.foodDeltas && outcome.foodDeltas.length) foodDeltas.push(...outcome.foodDeltas);
+    const nextHasFoundCastle = prevState.run.hasFoundCastle || tileId === TILE_CASTLE || !!outcome.hasFoundCastle;
     const prevUi = getUi(prevState.ui);
     const baseUi = {
-      message: tileMessage(tileId, nextPos, world),
+      message,
       leftPanel: clearSpriteFocusIfAny(prevUi),
       clock: prevUi.clock,
       anim: prevUi.anim
     };
     const baseState = {
-      world,
+      world: nextWorld,
       player: { position: nextPos },
-      run: { stepCount: prevState.run.stepCount + 1, hasFoundCastle: nextHasFoundCastle },
+      run: { stepCount: nextStepCount, hasFoundCastle: nextHasFoundCastle },
+      resources: nextResources,
       ui: baseUi
     };
     if (!ENABLE_ANIMATIONS) return baseState;
     const startFrame = (baseUi.clock && typeof baseUi.clock.frame === "number" ? baseUi.clock.frame : 0) | 0;
+    let uiWith = baseState.ui;
+    for (let i = 0; i < foodDeltas.length; i++) {
+      const delta = foodDeltas[i];
+      if (!delta) continue;
+      uiWith = enqueueAnim(uiWith, {
+        kind: "foodDelta",
+        startFrame,
+        durationFrames: FOOD_DELTA_FRAMES,
+        blocksInput: false,
+        params: { delta }
+      });
+    }
     return {
       world: baseState.world,
       player: baseState.player,
       run: baseState.run,
-      ui: enqueueAnim(baseState.ui, {
+      resources: baseState.resources,
+      ui: enqueueAnim(uiWith, {
         kind: "moveSlide",
         startFrame,
         durationFrames: MOVE_SLIDE_FRAMES,
@@ -419,12 +597,11 @@
     return next || s;
   }
   function processAction(prevState, action) {
-    const a = action || {};
     if (prevState == null) {
-      if (a.type !== ACTION_NEW_RUN) return null;
+      if (action.type !== ACTION_NEW_RUN) return null;
     }
-    if (a.type === ACTION_NEW_RUN) {
-      const seed = a.seed | 0;
+    if (action.type === ACTION_NEW_RUN) {
+      const seed = action.seed | 0;
       const generated = generateWorld(seed);
       const world = generated.world;
       const playerPos = generated.startPosition;
@@ -434,6 +611,7 @@
         world,
         player: { position: { x: playerPos.x, y: playerPos.y } },
         run: { stepCount: 0, hasFoundCastle },
+        resources: { food: INITIAL_FOOD, farmNextReadyStep: new Array(world.farms.length).fill(0) },
         ui: {
           message: initialMessageForStart(startTileId, playerPos, world),
           leftPanel: { kind: LEFT_PANEL_KIND_AUTO },
@@ -443,13 +621,13 @@
       };
     }
     if (prevState == null) return null;
-    if (a.type === ACTION_RESTART) return reduceRestart(prevState);
-    if (a.type === ACTION_SHOW_GOAL) return reduceGoal(prevState);
-    if (a.type === ACTION_TOGGLE_MINIMAP) return reduceToggleMinimap(prevState);
-    if (a.type === ACTION_MOVE) return reduceMove(prevState, a.dx | 0, a.dy | 0);
-    if (a.type === ACTION_TICK) {
+    if (action.type === ACTION_RESTART) return reduceRestart(prevState);
+    if (action.type === ACTION_SHOW_GOAL) return reduceGoal(prevState);
+    if (action.type === ACTION_TOGGLE_MINIMAP) return reduceToggleMinimap(prevState);
+    if (action.type === ACTION_MOVE) return reduceMove(prevState, action.dx | 0, action.dy | 0);
+    if (action.type === ACTION_TICK) {
       const tickedUi = ENABLE_ANIMATIONS ? pruneExpiredAnims(tickClock(getUi(prevState.ui))) : getUi(prevState.ui);
-      return { world: prevState.world, player: prevState.player, run: prevState.run, ui: tickedUi };
+      return { world: prevState.world, player: prevState.player, run: prevState.run, resources: prevState.resources, ui: tickedUi };
     }
     return prevState;
   }
@@ -505,10 +683,35 @@
     return null;
   }
 
+  // src/platform/tic80/uiConstants.ts
+  var UI_COLOR_BG = 0;
+  var UI_COLOR_TEXT = 12;
+  var UI_COLOR_DIM = 15;
+  var UI_COLOR_GOOD = 5;
+  var UI_COLOR_WARN = 4;
+  var UI_COLOR_BAD = 2;
+  var UI_LEFT_PANEL_PADDING = 6;
+  var UI_LEFT_PANEL_INNER_GAP = 6;
+  var UI_STATUS_ICON_SIZE = 8;
+  var UI_STATUS_ICON_GAP = 3;
+  var UI_STATUS_LINE_GAP = 3;
+  var UI_STATUS_TEXT_OFFSET_Y = 1;
+  var UI_FOOD_ICON_W_PX = 16;
+  var UI_FOOD_ICON_H_PX = 16;
+  var UI_FOOD_VALUE_OFFSET_X = UI_FOOD_ICON_W_PX + 3;
+  var UI_FOOD_VALUE_OFFSET_Y = 5;
+  var UI_FOOD_DELTA_OFFSET_X = 2;
+  var UI_FOOD_DELTA_OFFSET_Y = -2;
+  var UI_FOOD_DELTA_RISE_PX = 6;
+  var UI_FOOD_DELTA_GAP_PX = -4;
+
   // src/platform/tic80/render.ts
-  var COLOR_BG = 0;
-  var COLOR_TEXT = 12;
-  var COLOR_DIM = 15;
+  var COLOR_BG = UI_COLOR_BG;
+  var COLOR_TEXT = UI_COLOR_TEXT;
+  var COLOR_DIM = UI_COLOR_DIM;
+  var COLOR_GOOD = UI_COLOR_GOOD;
+  var COLOR_WARN = UI_COLOR_WARN;
+  var COLOR_BAD = UI_COLOR_BAD;
   function renderFrame(s) {
     cls(COLOR_BG);
     drawRightPanel(s);
@@ -535,9 +738,7 @@
         }
       }
       if (line) out.push(line);
-      if (p !== paragraphs.length - 1) out.push("");
     }
-    while (out.length > 0 && out[out.length - 1] === "") out.pop();
     return out;
   }
   var BUTTON_SPRITE_SCALE = 2;
@@ -552,58 +753,81 @@
     const tileId = getTileIdAt(s.world, pos.x, pos.y);
     const leftPanel = s.ui.leftPanel;
     const illSize = 16 * ILLUSTRATION_SCALE;
-    const illX = 6;
-    const illY = 6;
+    const illX = UI_LEFT_PANEL_PADDING;
+    const illY = UI_LEFT_PANEL_PADDING;
     if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
       drawMinimap(s);
     } else {
-      const illustrationId = leftPanel.kind === LEFT_PANEL_KIND_SPRITE && leftPanel.spriteId != null ? leftPanel.spriteId : tileId;
+      const illustrationId = leftPanel.kind === LEFT_PANEL_KIND_SPRITE ? leftPanel.spriteId : tileId;
       spr(illustrationId, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2);
     }
-    const statusX = illX + illSize + 6;
+    const statusX = illX + illSize + UI_LEFT_PANEL_INNER_GAP;
     const statusY = illY;
-    const statusIconSize = 8;
-    const statusIconGap = 3;
+    const statusIconSize = UI_STATUS_ICON_SIZE;
+    const statusIconGap = UI_STATUS_ICON_GAP;
     const fontH = 6;
-    const statusLineGap = 3;
+    const statusLineGap = UI_STATUS_LINE_GAP;
     const statusLineH = fontH + statusLineGap;
     const messageLineH = fontH + 1;
+    const textOffsetY = UI_STATUS_TEXT_OFFSET_Y;
+    const foodX = statusX;
+    const foodY = statusY;
+    spr(FOOD_SPRITE_ID, foodX, foodY, -1, 1, 0, 0, 2, 2);
+    const foodValueX = foodX + UI_FOOD_VALUE_OFFSET_X;
+    const foodValueY = foodY + UI_FOOD_VALUE_OFFSET_Y;
+    const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? COLOR_WARN : COLOR_TEXT;
+    print(`${s.resources.food}`, foodValueX, foodValueY, foodColor);
+    const smallStartY = foodY + UI_FOOD_ICON_H_PX + 4;
+    const seedY = smallStartY + 0 * statusLineH;
+    const posY = smallStartY + 1 * statusLineH;
+    const stepsY = smallStartY + 2 * statusLineH;
+    spr(SPR_STATUS_SEED, statusX, seedY, -1);
+    print(`${s.world.seed}`, statusX + statusIconSize + statusIconGap, seedY + textOffsetY, COLOR_TEXT);
+    spr(SPR_STATUS_POS, statusX, posY, -1);
+    print(formatA1(pos), statusX + statusIconSize + statusIconGap, posY + textOffsetY, COLOR_TEXT);
+    spr(SPR_STATUS_STEPS, statusX, stepsY, -1);
+    print(`${s.run.stepCount}`, statusX + statusIconSize + statusIconGap, stepsY + textOffsetY, COLOR_TEXT);
     {
-      const y = statusY + 0 * statusLineH;
-      spr(SPR_STATUS_SEED, statusX, y, -1);
-      print(`${s.world.seed}`, statusX + statusIconSize + statusIconGap, y + 1, COLOR_TEXT);
+      const anims = s.ui.anim.active;
+      const frame = s.ui.clock.frame | 0;
+      let xCursor = foodX + UI_FOOD_DELTA_OFFSET_X;
+      for (let i = 0; i < anims.length; i++) {
+        const a = anims[i];
+        if (a.kind !== "foodDelta") continue;
+        const fa = a;
+        const start = fa.startFrame | 0;
+        const dur = Math.max(1, fa.durationFrames | 0);
+        const t = Math.max(0, Math.min(dur, frame - start));
+        const p = t / dur;
+        const delta = fa.params.delta | 0;
+        if (!delta) continue;
+        const label = delta > 0 ? `+${delta}` : `${delta}`;
+        const color = delta > 0 ? COLOR_GOOD : COLOR_BAD;
+        const dy = UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI_FOOD_DELTA_RISE_PX);
+        print(label, xCursor, foodY + dy, color);
+        xCursor += label.length * 6 + UI_FOOD_DELTA_GAP_PX;
+      }
     }
-    {
-      const y = statusY + 1 * statusLineH;
-      spr(SPR_STATUS_POS, statusX, y, -1);
-      print(formatA1(pos), statusX + statusIconSize + statusIconGap, y + 1, COLOR_TEXT);
-    }
-    {
-      const y = statusY + 2 * statusLineH;
-      spr(SPR_STATUS_STEPS, statusX, y, -1);
-      print(`${s.run.stepCount}`, statusX + statusIconSize + statusIconGap, y + 1, COLOR_TEXT);
-    }
-    const statusLineCount = s.run.hasFoundCastle ? 4 : 3;
-    if (s.run.hasFoundCastle) print("FOUND", statusX, statusY + 3 * statusLineH, COLOR_TEXT);
-    const headerBottomY = Math.max(illY + illSize, statusY + statusLineCount * statusLineH);
+    const foundY = stepsY + statusLineH;
+    if (s.run.hasFoundCastle) print("FOUND", statusX, foundY + textOffsetY, COLOR_TEXT);
+    const statusBottomY = s.run.hasFoundCastle ? foundY + statusLineH : stepsY + statusLineH;
+    const headerBottomY = Math.max(illY + illSize, statusBottomY);
     const msgY = headerBottomY + 4;
     const maxLines = Math.max(0, Math.floor((SCREEN_HEIGHT - msgY - 4) / messageLineH));
     const lines = wrapText(s.ui.message, LORE_MAX_CHARS_PER_LINE);
     for (let i = 0; i < lines.length && i < maxLines; i++) {
-      print(lines[i], 6, msgY + i * messageLineH, COLOR_TEXT);
+      print(lines[i], UI_LEFT_PANEL_PADDING, msgY + i * messageLineH, COLOR_TEXT);
     }
   }
   function drawRightPanel(s) {
     if (!ENABLE_ANIMATIONS) return drawRightPanelStatic(s);
-    const anims = s.ui.anim && s.ui.anim.active;
+    const anims = s.ui.anim.active;
     let moveSlide = null;
-    if (anims && anims.length) {
-      for (let i = 0; i < anims.length; i++) {
-        const a = anims[i];
-        if (a && a.kind === "moveSlide") {
-          moveSlide = a;
-          break;
-        }
+    for (let i = 0; i < anims.length; i++) {
+      const a = anims[i];
+      if (a.kind === "moveSlide") {
+        moveSlide = a;
+        break;
       }
     }
     if (!moveSlide) return drawRightPanelStatic(s);
@@ -698,18 +922,18 @@
   }
   function drawRightPanelMoveSlideCross(s, anim) {
     const frame = s.ui.clock.frame | 0;
-    const startFrame = typeof anim.startFrame === "number" ? anim.startFrame | 0 : frame;
-    const durationFrames = typeof anim.durationFrames === "number" ? Math.max(1, anim.durationFrames | 0) : 1;
+    const startFrame = anim.startFrame | 0;
+    const durationFrames = Math.max(1, anim.durationFrames | 0);
     const t = Math.max(0, Math.min(durationFrames, frame - startFrame));
     const pX = CELL_SIZE_PX + CELL_GAP_PX;
-    const dx = anim.params && typeof anim.params.dx === "number" ? anim.params.dx | 0 : 0;
-    const dy = anim.params && typeof anim.params.dy === "number" ? anim.params.dy | 0 : 0;
+    const dx = anim.params.dx | 0;
+    const dy = anim.params.dy | 0;
     const shiftX = -dx * pX;
     const shiftY = -dy * pX;
     const offX = Math.floor(shiftX * t / durationFrames);
     const offY = Math.floor(shiftY * t / durationFrames);
-    const fromPos = anim.params && anim.params.fromPos ? anim.params.fromPos : s.player.position;
-    const toPos = anim.params && anim.params.toPos ? anim.params.toPos : s.player.position;
+    const fromPos = anim.params.fromPos;
+    const toPos = anim.params.toPos;
     const cross = [
       { row: 0, col: 1, ox: 0, oy: -1 },
       { row: 1, col: 0, ox: -1, oy: 0 },
@@ -773,7 +997,7 @@
         present[world.tiles[y][x] | 0] = true;
       }
     }
-    for (const k in present) getMinimapTilePixels(k);
+    for (const k in present) getMinimapTilePixels(Number(k));
     for (let y = 0; y < world.height; y++) {
       for (let x = 0; x < world.width; x++) {
         const tid = world.tiles[y][x];
@@ -815,9 +1039,9 @@
   globalThis.TIC = TIC;
 })();
 
-// title:  The Unbound (prototype 0.0.4)
+// title:  The Unbound (prototype 0.0.5)
 // author: haulin
-// desc:   Prototype 0.0.4 toward the North Star
+// desc:   Prototype 0.0.5 toward the North Star
 // script: js
 // input:  mouse
 
