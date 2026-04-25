@@ -1,0 +1,19 @@
+{
+  "name": "the-unbound",
+  "private": true,
+  "version": "0.0.0",
+  "description": "The Unbound — TIC-80 prototype cart (TypeScript source, bundled to the-unbound.js).",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit && node scripts/build-cart.mjs",
+    "dev": "node scripts/dev.mjs",
+    "test": "vitest run",
+    "verify": "npm run build && npm run test"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "tic80-typescript": "^2.2.0",
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.5"
+  }
+}
