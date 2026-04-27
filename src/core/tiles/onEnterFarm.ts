@@ -3,37 +3,24 @@ import {
   FARM_COOLDOWN_MOVES,
   FARM_HARVEST_LINES,
   FARM_REVISIT_LINES,
-  TILE_FARM,
 } from '../constants'
-import type { Vec2, World } from '../types'
+import { getCellAt, setCellAt } from '../cells'
 import type { TileEnterHandler } from './types'
+import { pickDeterministicLine } from './poiUtils'
+import type { FarmCell } from '../types'
 
-function findFarmIndexAt(world: World, pos: Vec2) {
-  for (let i = 0; i < world.farms.length; i++) {
-    const f = world.farms[i]!
-    if (f.position.x === pos.x && f.position.y === pos.y) return i
-  }
-  return -1
-}
+export const onEnterFarm: TileEnterHandler = ({ cell, world, pos, stepCount, resources }) => {
+  if (cell.kind !== 'farm') return { message: '' }
 
-function pickRevisitLine(world: World, farmIndex: number, stepCount: number) {
-  const lines = FARM_REVISIT_LINES
-  const m = lines.length
-  const k = ((world.seed | 0) + (farmIndex | 0) * 7 + (stepCount | 0)) | 0
-  const idx = ((k % m) + m) % m
-  return lines[idx] || lines[0] || ''
-}
+  const farmCell = getCellAt(world, pos)
+  if (!farmCell || farmCell.kind !== 'farm') return { message: '' }
 
-export const onEnterFarm: TileEnterHandler = ({ tileId, world, pos, stepCount, resources }) => {
-  if (tileId !== TILE_FARM) return { message: '' }
-
-  const farmIndex = findFarmIndexAt(world, pos)
-  if (farmIndex < 0) return { message: '' }
-
-  const farmName = world.farms[farmIndex]!.name || 'A Farm'
-  const readyAt = ((resources.farmNextReadyStep[farmIndex] ?? 0) | 0) || 0
+  const farmName = farmCell.name || 'A Farm'
+  const readyAt = (farmCell.nextReadyStep | 0) || 0
   if (stepCount < readyAt) {
-    return { message: `${farmName} Farm\n${pickRevisitLine(world, farmIndex, stepCount)}` }
+    return {
+      message: `${farmName} Farm\n${pickDeterministicLine(FARM_REVISIT_LINES, world.seed, farmCell.id, stepCount)}`,
+    }
   }
 
   let rngState = (world.rngState | 0) >>> 0
@@ -45,12 +32,15 @@ export const onEnterFarm: TileEnterHandler = ({ tileId, world, pos, stepCount, r
   rngState = rLine.rngState
   const harvestLine = FARM_HARVEST_LINES[rLine.value | 0] || FARM_HARVEST_LINES[0] || ''
 
-  const nextFarmNextReadyStep = resources.farmNextReadyStep.slice()
-  nextFarmNextReadyStep[farmIndex] = (stepCount | 0) + FARM_COOLDOWN_MOVES
+  const nextFarmCell: FarmCell = { ...farmCell, nextReadyStep: (stepCount | 0) + FARM_COOLDOWN_MOVES }
+  const nextWorld = setCellAt({ ...world, rngState }, pos, nextFarmCell)
 
   return {
-    world: { ...world, rngState },
-    resources: { food: (resources.food | 0) + gain, farmNextReadyStep: nextFarmNextReadyStep },
+    world: nextWorld,
+    resources: {
+      ...resources,
+      food: (resources.food | 0) + gain,
+    },
     foodDeltas: [gain],
     message: `${farmName} Farm\n${harvestLine}`,
   }

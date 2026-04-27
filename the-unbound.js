@@ -1,6 +1,6 @@
-// title:  The Unbound (prototype 0.0.5)
+// title:  The Unbound (prototype 0.0.6)
 // author: haulin
-// desc:   Prototype 0.0.5 toward the North Star
+// desc:   Prototype 0.0.6 toward the North Star
 // script: js
 // input:  mouse
 
@@ -18,8 +18,14 @@
   var TILE_CASTLE = 8;
   var TILE_SIGNPOST = 42;
   var TILE_FARM = 38;
-  var WALKABLE_COSMETIC_TILE_IDS = [2, 4, 6, 10, 12, 14, 34, 36];
-  var WALKABLE_TILE_COUNT = WALKABLE_COSMETIC_TILE_IDS.length;
+  var TILE_CAMP = 36;
+  var TILE_MOUNTAIN = 6;
+  var TILE_SWAMP = 12;
+  var CAMP_COUNT = 3;
+  var CAMP_COOLDOWN_MOVES = 3;
+  var CAMP_FOOD_GAIN = 2;
+  var INITIAL_ARMY_SIZE = 5;
+  var ARMY_SPRITE_ID = 100;
   var MAP_GEN_NOISE = "NOISE";
   var MAP_GEN_ALGORITHM = MAP_GEN_NOISE;
   var NOISE_SMOOTH_PASSES = 2;
@@ -31,24 +37,101 @@
     // grass
     4: "The road here remembers other feet.",
     // road / gravel
-    6: "The peaks ahead do not look closer.",
+    6: "The peaks ahead do not look closer. Stone and thin air. Your supplies will feel it.",
     // mountains
     10: "The water is still. Something moves beneath.",
     // lake
-    12: "The ground gives underfoot. It keeps giving.",
+    12: "Crossing the bog is harder than it looks. You'll need to eat well tonight.",
     // swamp
     14: "A path that isn't quite a path.",
     // woods
-    34: "The light here bends wrong.",
+    34: "The light here bends wrong."
     // rainbow's end
-    36: "The ash is cold. Has been for some time."
-    // camp
   };
-  var INITIAL_FOOD = 10;
-  var FOOD_MOVE_COST = 1;
+  var INITIAL_FOOD = 15;
+  var FOOD_COST_DEFAULT = 1;
+  var FOOD_COST_MOUNTAIN = 2;
+  var FOOD_COST_SWAMP = 2;
   var FOOD_WARNING_THRESHOLD = 5;
   var FARM_COUNT = 3;
   var FARM_COOLDOWN_MOVES = 3;
+  var TERRAIN_KINDS = ["grass", "road", "mountain", "lake", "swamp", "woods", "rainbow"];
+  var TERRAIN = {
+    grass: { spriteId: 2, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[2] || "" },
+    road: { spriteId: 4, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[4] || "" },
+    mountain: {
+      spriteId: TILE_MOUNTAIN,
+      enterFoodCost: FOOD_COST_MOUNTAIN,
+      message: TERRAIN_MESSAGE_BY_TILE_ID[TILE_MOUNTAIN] || ""
+    },
+    lake: { spriteId: 10, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[10] || "" },
+    swamp: { spriteId: TILE_SWAMP, enterFoodCost: FOOD_COST_SWAMP, message: TERRAIN_MESSAGE_BY_TILE_ID[TILE_SWAMP] || "" },
+    woods: { spriteId: 14, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[14] || "" },
+    rainbow: { spriteId: 34, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[34] || "" }
+  };
+  var FEATURES = {
+    castle: { spriteId: TILE_CASTLE, enterFoodCost: FOOD_COST_DEFAULT },
+    signpost: { spriteId: TILE_SIGNPOST, enterFoodCost: FOOD_COST_DEFAULT, count: SIGNPOST_COUNT },
+    farm: { spriteId: TILE_FARM, enterFoodCost: FOOD_COST_DEFAULT, count: FARM_COUNT, cooldownMoves: FARM_COOLDOWN_MOVES },
+    camp: {
+      spriteId: TILE_CAMP,
+      enterFoodCost: FOOD_COST_DEFAULT,
+      count: CAMP_COUNT,
+      cooldownMoves: CAMP_COOLDOWN_MOVES,
+      foodGain: CAMP_FOOD_GAIN
+    }
+  };
+  function spriteIdForKind(kind) {
+    switch (kind) {
+      case "grass":
+      case "road":
+      case "mountain":
+      case "lake":
+      case "swamp":
+      case "woods":
+      case "rainbow":
+        return TERRAIN[kind].spriteId;
+      case "castle":
+      case "signpost":
+      case "farm":
+      case "camp":
+        return FEATURES[kind].spriteId;
+    }
+  }
+  function enterFoodCostForKind(kind) {
+    switch (kind) {
+      case "grass":
+      case "road":
+      case "mountain":
+      case "lake":
+      case "swamp":
+      case "woods":
+      case "rainbow":
+        return TERRAIN[kind].enterFoodCost;
+      case "castle":
+      case "signpost":
+      case "farm":
+      case "camp":
+        return FEATURES[kind].enterFoodCost;
+    }
+  }
+  function terrainMessageForKind(kind) {
+    switch (kind) {
+      case "grass":
+      case "road":
+      case "mountain":
+      case "lake":
+      case "swamp":
+      case "woods":
+      case "rainbow":
+        return TERRAIN[kind].message;
+      case "castle":
+      case "signpost":
+      case "farm":
+      case "camp":
+        return "";
+    }
+  }
   var FOOD_SPRITE_ID = 98;
   var FOOD_DELTA_FRAMES = 24;
   var FARM_NAME_POOL = [
@@ -72,13 +155,39 @@
     "The stores are empty now. Come back later.",
     "Nothing left here. It will regrow in time."
   ];
+  var CAMP_NAME_POOL = [
+    "The Wayrest",
+    "Ember Cross",
+    "The Muster",
+    "Cold Haven",
+    "Ashford",
+    "Dusk Halt",
+    "The Holdfast"
+  ];
+  var CAMP_RECRUIT_LINES = [
+    "Stragglers around a dying fire. They fall in without a word.",
+    "A few souls with nowhere better to be. They join you.",
+    "They were waiting for someone. You'll do.",
+    "No questions asked. No names given. Your ranks grow.",
+    "They look like they've found something. So have you."
+  ];
+  var CAMP_EMPTY_LINES = [
+    "The fire is cold. Give it time.",
+    "Not yet. The road brings more, but not today.",
+    "The word hasn't spread far enough yet. Return later."
+  ];
+  var GAME_OVER_LINES = [
+    "The last of them fell somewhere you won't remember. The world keeps turning.",
+    "You came with an army. You leave with nothing.\nThe gate remains closed.",
+    "Alone now. The road goes on without you."
+  ];
   var ACTION_NEW_RUN = "NEW_RUN";
   var ACTION_RESTART = "RESTART";
   var ACTION_MOVE = "MOVE";
   var ACTION_SHOW_GOAL = "SHOW_GOAL";
   var ACTION_TOGGLE_MINIMAP = "TOGGLE_MINIMAP";
   var ACTION_TICK = "TICK";
-  var INITIAL_SEED = 6;
+  var INITIAL_SEED = 14;
   var ENABLE_ANIMATIONS = true;
   var MOVE_SLIDE_FRAMES = 15;
   var LORE_MAX_CHARS_PER_LINE = 19;
@@ -117,10 +226,33 @@
 
   // src/core/signpost.ts
   function formatNearestPoiSignpostMessage(playerPos, world) {
-    const candidates = [
-      { kind: "castle", name: "The Castle", pos: world.castlePosition },
-      ...world.farms.map((f) => ({ kind: "farm", name: `${f.name} Farm`, pos: f.position }))
-    ];
+    const candidates = [];
+    const cells = world.cells;
+    for (let y = 0; y < cells.length; y++) {
+      const row = cells[y];
+      for (let x = 0; x < row.length; x++) {
+        const cell = row[x];
+        if (cell.kind === "castle") {
+          candidates.push({ kind: "castle", id: y * world.width + x, name: "The Castle", pos: { x, y } });
+        } else if (cell.kind === "farm") {
+          candidates.push({
+            kind: "farm",
+            id: cell.id | 0,
+            name: `${cell.name || "A Farm"} Farm`,
+            pos: { x, y }
+          });
+        } else if (cell.kind === "camp") {
+          candidates.push({
+            kind: "camp",
+            id: cell.id | 0,
+            name: `${cell.name || "A Camp"} Camp`,
+            pos: { x, y }
+          });
+        }
+      }
+    }
+    if (candidates.length === 0) return "";
+    const kindRank = (k) => k === "castle" ? 0 : k === "farm" ? 1 : 2;
     let best = candidates[0];
     let bestDx = torusDelta(playerPos.x, best.pos.x, world.width);
     let bestDy = torusDelta(playerPos.y, best.pos.y, world.height);
@@ -138,7 +270,9 @@
         continue;
       }
       if (d === bestD) {
-        if (best.kind !== "castle" && c.kind === "castle") {
+        const ar = kindRank(c.kind);
+        const br = kindRank(best.kind);
+        if (ar < br || ar === br && (c.id | 0) < (best.id | 0)) {
           best = c;
           bestDx = dx;
           bestDy = dy;
@@ -170,11 +304,6 @@ ${dir}, ${bestD} leagues away.`;
   }
 
   // src/core/world.ts
-  function clone2dTiles(tiles) {
-    const out = [];
-    for (let y = 0; y < tiles.length; y++) out.push(tiles[y].slice());
-    return out;
-  }
   function boxBlurIntGridWrap(grid, w, h) {
     const out = [];
     for (let y = 0; y < h; y++) {
@@ -194,7 +323,7 @@ ${dir}, ${bestD} leagues away.`;
     }
     return out;
   }
-  function generateBaseTerrain(rngState) {
+  function generateBaseTerrainCells(rngState) {
     const vals = [];
     for (let y = 0; y < WORLD_HEIGHT; y++) {
       const row = [];
@@ -219,66 +348,87 @@ ${dir}, ${bestD} leagues away.`;
       }
     }
     const span = maxV - minV || 1;
-    const qtile = WALKABLE_COSMETIC_TILE_IDS;
-    const bucketCount = WALKABLE_TILE_COUNT;
-    const tiles = [];
+    const kindByBucket = TERRAIN_KINDS;
+    const bucketCount = kindByBucket.length;
+    const cells = [];
     for (let y = 0; y < WORLD_HEIGHT; y++) {
       const row = [];
       for (let x = 0; x < WORLD_WIDTH; x++) {
         let bucket = bucketCount * (V[y][x] - minV) / span | 0;
         if (bucket < 0) bucket = 0;
         if (bucket >= bucketCount) bucket = bucketCount - 1;
-        row.push(qtile[bucket]);
+        row.push({ kind: kindByBucket[bucket] });
       }
-      tiles.push(row);
+      cells.push(row);
     }
-    return { tiles, rngState };
+    return { cells, rngState };
   }
-  function placeSpecials({ tiles, rngState }) {
-    const t = clone2dTiles(tiles);
-    let castlePosition = { x: 0, y: 0 };
-    const farms = [];
-    {
-      const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
-      rngState = r.rngState;
-      const x = r.value % WORLD_WIDTH;
-      const y = Math.floor(r.value / WORLD_WIDTH);
-      t[y][x] = TILE_CASTLE;
-      castlePosition = { x, y };
-    }
+  function placeCastle(cells, rngState) {
+    const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
+    rngState = r.rngState;
+    const x = r.value % WORLD_WIDTH;
+    const y = Math.floor(r.value / WORLD_WIDTH);
+    cells[y][x] = { kind: "castle" };
+    return { castlePos: { x, y }, rngState };
+  }
+  function placeNamedFarms(cells, rngState, castlePos) {
     const remainingNames = [...FARM_NAME_POOL];
-    let placedFarms = 0;
-    while (placedFarms < FARM_COUNT) {
+    let placed = 0;
+    while (placed < FARM_COUNT) {
       const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
       rngState = r.rngState;
       const x = r.value % WORLD_WIDTH;
       const y = Math.floor(r.value / WORLD_WIDTH);
-      if (x === castlePosition.x && y === castlePosition.y) continue;
-      if (t[y][x] === TILE_FARM) continue;
-      if (t[y][x] === TILE_SIGNPOST) continue;
-      t[y][x] = TILE_FARM;
+      if (x === castlePos.x && y === castlePos.y) continue;
+      const here = cells[y][x];
+      if (here.kind === "farm" || here.kind === "camp" || here.kind === "signpost") continue;
       let name = "A Farm";
       if (remainingNames.length > 0) {
         const pick = randInt(rngState, remainingNames.length);
         rngState = pick.rngState;
         name = remainingNames.splice(pick.value, 1)[0];
       }
-      farms.push({ position: { x, y }, name });
-      placedFarms++;
+      cells[y][x] = { kind: "farm", id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 };
+      placed++;
     }
+    return rngState;
+  }
+  function placeNamedCamps(cells, rngState, castlePos) {
+    const remainingNames = [...CAMP_NAME_POOL];
+    let placed = 0;
+    while (placed < CAMP_COUNT) {
+      const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
+      rngState = r.rngState;
+      const x = r.value % WORLD_WIDTH;
+      const y = Math.floor(r.value / WORLD_WIDTH);
+      if (x === castlePos.x && y === castlePos.y) continue;
+      const here = cells[y][x];
+      if (here.kind === "farm" || here.kind === "camp" || here.kind === "signpost") continue;
+      let name = "A Camp";
+      if (remainingNames.length > 0) {
+        const pick = randInt(rngState, remainingNames.length);
+        rngState = pick.rngState;
+        name = remainingNames.splice(pick.value, 1)[0];
+      }
+      cells[y][x] = { kind: "camp", id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 };
+      placed++;
+    }
+    return rngState;
+  }
+  function placeSignposts(cells, rngState, castlePos) {
     let placed = 0;
     while (placed < SIGNPOST_COUNT) {
       const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
       rngState = r.rngState;
       const x = r.value % WORLD_WIDTH;
       const y = Math.floor(r.value / WORLD_WIDTH);
-      if (x === castlePosition.x && y === castlePosition.y) continue;
-      if (t[y][x] === TILE_FARM) continue;
-      if (t[y][x] === TILE_SIGNPOST) continue;
-      t[y][x] = TILE_SIGNPOST;
+      if (x === castlePos.x && y === castlePos.y) continue;
+      const here = cells[y][x];
+      if (here.kind === "farm" || here.kind === "camp" || here.kind === "signpost") continue;
+      cells[y][x] = { kind: "signpost" };
       placed++;
     }
-    return { tiles: t, castlePosition, farms, rngState };
+    return rngState;
   }
   function pickStart({ rngState }) {
     const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
@@ -287,17 +437,22 @@ ${dir}, ${bestD} leagues away.`;
     const y = Math.floor(r.value / WORLD_WIDTH);
     return { startPosition: { x, y }, rngState };
   }
-  function getTileIdAt(world, x, y) {
+  function getSpriteIdAt(world, x, y) {
     const tx = wrapIndex(x, world.width);
     const ty = wrapIndex(y, world.height);
-    return world.tiles[ty][tx];
+    const cell = world.cells[ty][tx];
+    return spriteIdForKind(cell.kind);
   }
   function generateWorld(seed) {
     let rngState = seedToRngState(seed);
-    const base = generateBaseTerrain(rngState);
+    const base = generateBaseTerrainCells(rngState);
     rngState = base.rngState;
-    const withSpecials = placeSpecials({ tiles: base.tiles, rngState });
-    rngState = withSpecials.rngState;
+    const cells = base.cells;
+    const castle = placeCastle(cells, rngState);
+    rngState = castle.rngState;
+    rngState = placeNamedFarms(cells, rngState, castle.castlePos);
+    rngState = placeNamedCamps(cells, rngState, castle.castlePos);
+    rngState = placeSignposts(cells, rngState, castle.castlePos);
     const startPick = pickStart({ rngState });
     rngState = startPick.rngState;
     const world = {
@@ -305,9 +460,7 @@ ${dir}, ${bestD} leagues away.`;
       width: WORLD_WIDTH,
       height: WORLD_HEIGHT,
       mapGenAlgorithm: MAP_GEN_ALGORITHM,
-      tiles: withSpecials.tiles,
-      castlePosition: withSpecials.castlePosition,
-      farms: withSpecials.farms,
+      cells,
       rngState
     };
     return { world, startPosition: startPick.startPosition };
@@ -319,35 +472,82 @@ ${dir}, ${bestD} leagues away.`;
     hasFoundCastle: true
   });
 
-  // src/core/tiles/onEnterDefaultTerrain.ts
-  var onEnterDefaultTerrain = ({ tileId }) => ({
-    message: TERRAIN_MESSAGE_BY_TILE_ID[tileId] || ""
-  });
-
-  // src/core/tiles/onEnterFarm.ts
-  function findFarmIndexAt(world, pos) {
-    for (let i = 0; i < world.farms.length; i++) {
-      const f = world.farms[i];
-      if (f.position.x === pos.x && f.position.y === pos.y) return i;
-    }
-    return -1;
+  // src/core/cells.ts
+  function getCellAt(world, pos) {
+    return world.cells[pos.y][pos.x];
   }
-  function pickRevisitLine(world, farmIndex, stepCount) {
-    const lines = FARM_REVISIT_LINES;
+  function setCellAt(world, pos, nextCell) {
+    const cells = world.cells;
+    const row = cells[pos.y];
+    const nextRow = row.slice();
+    nextRow[pos.x] = nextCell;
+    const nextCells = cells.slice();
+    nextCells[pos.y] = nextRow;
+    return { ...world, cells: nextCells };
+  }
+
+  // src/core/tiles/poiUtils.ts
+  function pickDeterministicLine(lines, seed, poiIndex, stepCount) {
     const m = lines.length;
-    const k = (world.seed | 0) + (farmIndex | 0) * 7 + (stepCount | 0) | 0;
+    if (m <= 0) return "";
+    const k = (seed | 0) + (poiIndex | 0) * 7 + (stepCount | 0) | 0;
     const idx = (k % m + m) % m;
     return lines[idx] || lines[0] || "";
   }
-  var onEnterFarm = ({ tileId, world, pos, stepCount, resources }) => {
-    if (tileId !== TILE_FARM) return { message: "" };
-    const farmIndex = findFarmIndexAt(world, pos);
-    if (farmIndex < 0) return { message: "" };
-    const farmName = world.farms[farmIndex].name || "A Farm";
-    const readyAt = (resources.farmNextReadyStep[farmIndex] ?? 0) | 0 || 0;
+
+  // src/core/tiles/onEnterCamp.ts
+  var onEnterCamp = ({ cell, world, pos, stepCount, resources }) => {
+    if (cell.kind !== "camp") return { message: "" };
+    const campCell = getCellAt(world, pos);
+    if (!campCell || campCell.kind !== "camp") return { message: "" };
+    const campName = campCell.name || "A Camp";
+    const readyAt = campCell.nextReadyStep | 0 || 0;
     if (stepCount < readyAt) {
-      return { message: `${farmName} Farm
-${pickRevisitLine(world, farmIndex, stepCount)}` };
+      return {
+        message: `${campName} Camp
+${pickDeterministicLine(CAMP_EMPTY_LINES, world.seed, campCell.id, stepCount)}`
+      };
+    }
+    let rngState = (world.rngState | 0) >>> 0;
+    const rGain = randInt(rngState, 2);
+    rngState = rGain.rngState;
+    const gain = (rGain.value | 0) + 1;
+    const rLine = randInt(rngState, CAMP_RECRUIT_LINES.length);
+    rngState = rLine.rngState;
+    const line = CAMP_RECRUIT_LINES[rLine.value | 0] || CAMP_RECRUIT_LINES[0] || "";
+    const nextCampCell = { ...campCell, nextReadyStep: (stepCount | 0) + CAMP_COOLDOWN_MOVES };
+    const nextWorld = setCellAt({ ...world, rngState }, pos, nextCampCell);
+    return {
+      world: nextWorld,
+      resources: {
+        ...resources,
+        food: (resources.food | 0) + CAMP_FOOD_GAIN,
+        armySize: (resources.armySize | 0) + gain
+      },
+      armyDeltas: [gain],
+      foodDeltas: [CAMP_FOOD_GAIN],
+      message: `${campName} Camp
+${line}`
+    };
+  };
+
+  // src/core/tiles/onEnterDefaultTerrain.ts
+  var onEnterDefaultTerrain = ({ cell }) => ({
+    message: terrainMessageForKind(cell.kind)
+  });
+
+  // src/core/tiles/onEnterFarm.ts
+  var onEnterFarm = ({ cell, world, pos, stepCount, resources }) => {
+    if (cell.kind !== "farm") return { message: "" };
+    const farmCell = getCellAt(world, pos);
+    if (!farmCell || farmCell.kind !== "farm") return { message: "" };
+    const farmName = farmCell.name || "A Farm";
+    const readyAt = farmCell.nextReadyStep | 0 || 0;
+    if (stepCount < readyAt) {
+      return {
+        message: `${farmName} Farm
+${pickDeterministicLine(FARM_REVISIT_LINES, world.seed, farmCell.id, stepCount)}`
+      };
     }
     let rngState = (world.rngState | 0) >>> 0;
     const rGain = randInt(rngState, 8);
@@ -356,11 +556,14 @@ ${pickRevisitLine(world, farmIndex, stepCount)}` };
     const rLine = randInt(rngState, FARM_HARVEST_LINES.length);
     rngState = rLine.rngState;
     const harvestLine = FARM_HARVEST_LINES[rLine.value | 0] || FARM_HARVEST_LINES[0] || "";
-    const nextFarmNextReadyStep = resources.farmNextReadyStep.slice();
-    nextFarmNextReadyStep[farmIndex] = (stepCount | 0) + FARM_COOLDOWN_MOVES;
+    const nextFarmCell = { ...farmCell, nextReadyStep: (stepCount | 0) + FARM_COOLDOWN_MOVES };
+    const nextWorld = setCellAt({ ...world, rngState }, pos, nextFarmCell);
     return {
-      world: { ...world, rngState },
-      resources: { food: (resources.food | 0) + gain, farmNextReadyStep: nextFarmNextReadyStep },
+      world: nextWorld,
+      resources: {
+        ...resources,
+        food: (resources.food | 0) + gain
+      },
       foodDeltas: [gain],
       message: `${farmName} Farm
 ${harvestLine}`
@@ -373,13 +576,14 @@ ${harvestLine}`
   });
 
   // src/core/tiles/registry.ts
-  var onEnterByTileId = {
-    [TILE_FARM]: onEnterFarm,
-    [TILE_SIGNPOST]: onEnterSignpost,
-    [TILE_CASTLE]: onEnterCastle
+  var onEnterByKind = {
+    camp: onEnterCamp,
+    farm: onEnterFarm,
+    signpost: onEnterSignpost,
+    castle: onEnterCastle
   };
-  function getOnEnterHandler(tileId) {
-    return onEnterByTileId[tileId] || onEnterDefaultTerrain;
+  function getOnEnterHandler(kind) {
+    return onEnterByKind[kind] || onEnterDefaultTerrain;
   }
 
   // src/core/types.ts
@@ -482,11 +686,22 @@ ${harvestLine}`
     if (lp.kind === LEFT_PANEL_KIND_SPRITE) return { kind: LEFT_PANEL_KIND_AUTO };
     return lp;
   }
-  function initialMessageForStart(tileId, playerPos, world) {
+  function normalizeResources(_world, raw) {
+    const food = raw && typeof raw.food === "number" ? raw.food | 0 : INITIAL_FOOD;
+    const armySize = raw && typeof raw.armySize === "number" ? raw.armySize | 0 : INITIAL_ARMY_SIZE;
+    return { food, armySize };
+  }
+  function gameOverMessage(seed, stepCount) {
+    const k = (seed | 0) + (stepCount | 0) | 0;
+    const m = GAME_OVER_LINES.length;
+    const idx = (k % m + m) % m;
+    return GAME_OVER_LINES[idx] || "";
+  }
+  function initialMessageForStart(cellKind, playerPos, world) {
     let msg = GOAL_NARRATIVE;
-    if (tileId === TILE_SIGNPOST) {
+    if (cellKind === "signpost") {
       msg += "\n" + formatNearestPoiSignpostMessage(playerPos, world);
-    } else if (tileId === TILE_CASTLE) {
+    } else if (cellKind === "castle") {
       msg += "\n" + CASTLE_FOUND_MESSAGE;
     }
     return msg;
@@ -526,30 +741,45 @@ ${harvestLine}`
     };
   }
   function reduceMove(prevState, dx, dy) {
+    if (prevState.run.isGameOver || prevState.run.hasFoundCastle) return prevState;
     const world = prevState.world;
     const prevPos = prevState.player.position;
     const nextPos = {
       x: (prevPos.x + dx + world.width) % world.width,
       y: (prevPos.y + dy + world.height) % world.height
     };
-    const tileId = world.tiles[nextPos.y][nextPos.x];
+    const cell = world.cells[nextPos.y][nextPos.x];
     const nextStepCount = (prevState.run.stepCount | 0) + 1;
-    const prevRes = prevState.resources || { food: INITIAL_FOOD, farmNextReadyStep: [] };
-    const prevFood = typeof prevRes.food === "number" ? prevRes.food | 0 : 0;
-    const paidMoveCost = prevFood > 0 && FOOD_MOVE_COST > 0;
-    let food = paidMoveCost ? Math.max(0, prevFood - FOOD_MOVE_COST) : prevFood;
-    const farmNextReadyStep = Array.isArray(prevRes.farmNextReadyStep) ? prevRes.farmNextReadyStep.slice() : [];
-    const farmCount = world.farms && world.farms.length || 0;
-    while (farmNextReadyStep.length < farmCount) farmNextReadyStep.push(0);
-    const baseResources = { food, farmNextReadyStep };
-    const foodDeltas = paidMoveCost ? [-FOOD_MOVE_COST] : [];
-    const handler = getOnEnterHandler(tileId);
-    const outcome = handler({ tileId, world, pos: nextPos, stepCount: nextStepCount, resources: baseResources });
+    const prevRes = normalizeResources(world, prevState.resources);
+    const prevFood = prevRes.food | 0;
+    const cost = enterFoodCostForKind(cell.kind);
+    const foodDeltas = [];
+    const armyDeltas = [];
+    let food;
+    let armySize;
+    if (prevFood >= cost) {
+      food = prevFood - cost;
+      foodDeltas.push(-cost);
+      armySize = prevRes.armySize | 0;
+    } else {
+      food = 0;
+      if (prevFood > 0) foodDeltas.push(-prevFood);
+      armySize = (prevRes.armySize | 0) - 1;
+      armyDeltas.push(-1);
+    }
+    const baseResources = { ...prevRes, food, armySize };
+    const handler = getOnEnterHandler(cell.kind);
+    const outcome = handler({ cell, world, pos: nextPos, stepCount: nextStepCount, resources: baseResources });
     const nextWorld = outcome.world || world;
-    const nextResources = outcome.resources || baseResources;
-    const message = outcome.message;
+    let nextResources = outcome.resources || baseResources;
     if (outcome.foodDeltas && outcome.foodDeltas.length) foodDeltas.push(...outcome.foodDeltas);
-    const nextHasFoundCastle = prevState.run.hasFoundCastle || tileId === TILE_CASTLE || !!outcome.hasFoundCastle;
+    if (outcome.armyDeltas && outcome.armyDeltas.length) armyDeltas.push(...outcome.armyDeltas);
+    const nextHasFoundCastle = prevState.run.hasFoundCastle || cell.kind === "castle" || !!outcome.hasFoundCastle;
+    const isGameOver = (nextResources.armySize | 0) <= 0;
+    let message = outcome.message;
+    if (isGameOver) {
+      message = gameOverMessage(nextWorld.seed, nextStepCount);
+    }
     const prevUi = getUi(prevState.ui);
     const baseUi = {
       message,
@@ -560,7 +790,7 @@ ${harvestLine}`
     const baseState = {
       world: nextWorld,
       player: { position: nextPos },
-      run: { stepCount: nextStepCount, hasFoundCastle: nextHasFoundCastle },
+      run: { stepCount: nextStepCount, hasFoundCastle: nextHasFoundCastle, isGameOver },
       resources: nextResources,
       ui: baseUi
     };
@@ -572,6 +802,17 @@ ${harvestLine}`
       if (!delta) continue;
       uiWith = enqueueAnim(uiWith, {
         kind: "foodDelta",
+        startFrame,
+        durationFrames: FOOD_DELTA_FRAMES,
+        blocksInput: false,
+        params: { delta }
+      });
+    }
+    for (let i = 0; i < armyDeltas.length; i++) {
+      const delta = armyDeltas[i];
+      if (!delta) continue;
+      uiWith = enqueueAnim(uiWith, {
+        kind: "armyDelta",
         startFrame,
         durationFrames: FOOD_DELTA_FRAMES,
         blocksInput: false,
@@ -605,15 +846,18 @@ ${harvestLine}`
       const generated = generateWorld(seed);
       const world = generated.world;
       const playerPos = generated.startPosition;
-      const startTileId = world.tiles[playerPos.y][playerPos.x];
-      const hasFoundCastle = startTileId === TILE_CASTLE;
+      const startCellKind = world.cells[playerPos.y][playerPos.x].kind;
+      const hasFoundCastle = startCellKind === "castle";
       return {
         world,
         player: { position: { x: playerPos.x, y: playerPos.y } },
-        run: { stepCount: 0, hasFoundCastle },
-        resources: { food: INITIAL_FOOD, farmNextReadyStep: new Array(world.farms.length).fill(0) },
+        run: { stepCount: 0, hasFoundCastle, isGameOver: false },
+        resources: {
+          food: INITIAL_FOOD,
+          armySize: INITIAL_ARMY_SIZE
+        },
         ui: {
-          message: initialMessageForStart(startTileId, playerPos, world),
+          message: initialMessageForStart(startCellKind, playerPos, world),
           leftPanel: { kind: LEFT_PANEL_KIND_AUTO },
           clock: { frame: 0 },
           anim: { nextId: 1, active: [] }
@@ -696,14 +940,25 @@ ${harvestLine}`
   var UI_STATUS_ICON_GAP = 3;
   var UI_STATUS_LINE_GAP = 3;
   var UI_STATUS_TEXT_OFFSET_Y = 1;
+  var UI_HERO_RESOURCE_GAP_PX = 2;
+  var UI_AFTER_RESOURCES_GAP_PX = 2;
+  var UI_ARMY_ICON_W_PX = 16;
+  var UI_ARMY_ICON_H_PX = 16;
+  var UI_ARMY_VALUE_OFFSET_X = UI_ARMY_ICON_W_PX + 3;
+  var UI_ARMY_VALUE_OFFSET_Y = 5;
+  var UI_ARMY_DELTA_OFFSET_X = 2;
+  var UI_ARMY_DELTA_OFFSET_Y = 2;
+  var UI_ARMY_DELTA_RISE_PX = 6;
+  var UI_ARMY_DELTA_GAP_PX = -4;
   var UI_FOOD_ICON_W_PX = 16;
   var UI_FOOD_ICON_H_PX = 16;
   var UI_FOOD_VALUE_OFFSET_X = UI_FOOD_ICON_W_PX + 3;
   var UI_FOOD_VALUE_OFFSET_Y = 5;
   var UI_FOOD_DELTA_OFFSET_X = 2;
-  var UI_FOOD_DELTA_OFFSET_Y = -2;
+  var UI_FOOD_DELTA_OFFSET_Y = 2;
   var UI_FOOD_DELTA_RISE_PX = 6;
   var UI_FOOD_DELTA_GAP_PX = -4;
+  var UI_SMALL_STATS_START_OFFSET_Y = UI_ARMY_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX + UI_FOOD_ICON_H_PX + UI_AFTER_RESOURCES_GAP_PX;
 
   // src/platform/tic80/render.ts
   var COLOR_BG = UI_COLOR_BG;
@@ -750,15 +1005,17 @@ ${harvestLine}`
     rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, COLOR_BG);
     rectb(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, COLOR_DIM);
     const pos = s.player.position;
-    const tileId = getTileIdAt(s.world, pos.x, pos.y);
+    const spriteIdAtPos = getSpriteIdAt(s.world, pos.x, pos.y);
     const leftPanel = s.ui.leftPanel;
     const illSize = 16 * ILLUSTRATION_SCALE;
     const illX = UI_LEFT_PANEL_PADDING;
     const illY = UI_LEFT_PANEL_PADDING;
-    if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
+    if (s.run.isGameOver) {
+      spr(40, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2);
+    } else if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
       drawMinimap(s);
     } else {
-      const illustrationId = leftPanel.kind === LEFT_PANEL_KIND_SPRITE ? leftPanel.spriteId : tileId;
+      const illustrationId = leftPanel.kind === LEFT_PANEL_KIND_SPRITE ? leftPanel.spriteId : spriteIdAtPos;
       spr(illustrationId, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2);
     }
     const statusX = illX + illSize + UI_LEFT_PANEL_INNER_GAP;
@@ -770,14 +1027,21 @@ ${harvestLine}`
     const statusLineH = fontH + statusLineGap;
     const messageLineH = fontH + 1;
     const textOffsetY = UI_STATUS_TEXT_OFFSET_Y;
+    const armyX = statusX;
+    const armyY = statusY;
+    spr(ARMY_SPRITE_ID, armyX, armyY, -1, 1, 0, 0, 2, 2);
+    const armyValueX = armyX + UI_ARMY_VALUE_OFFSET_X;
+    const armyValueY = armyY + UI_ARMY_VALUE_OFFSET_Y;
+    const armyColor = s.resources.armySize < INITIAL_ARMY_SIZE ? COLOR_WARN : COLOR_TEXT;
+    print(`${s.resources.armySize}`, armyValueX, armyValueY, armyColor);
     const foodX = statusX;
-    const foodY = statusY;
+    const foodY = armyY + UI_ARMY_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX;
     spr(FOOD_SPRITE_ID, foodX, foodY, -1, 1, 0, 0, 2, 2);
     const foodValueX = foodX + UI_FOOD_VALUE_OFFSET_X;
     const foodValueY = foodY + UI_FOOD_VALUE_OFFSET_Y;
     const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? COLOR_WARN : COLOR_TEXT;
     print(`${s.resources.food}`, foodValueX, foodValueY, foodColor);
-    const smallStartY = foodY + UI_FOOD_ICON_H_PX + 4;
+    const smallStartY = statusY + UI_SMALL_STATS_START_OFFSET_Y;
     const seedY = smallStartY + 0 * statusLineH;
     const posY = smallStartY + 1 * statusLineH;
     const stepsY = smallStartY + 2 * statusLineH;
@@ -787,6 +1051,27 @@ ${harvestLine}`
     print(formatA1(pos), statusX + statusIconSize + statusIconGap, posY + textOffsetY, COLOR_TEXT);
     spr(SPR_STATUS_STEPS, statusX, stepsY, -1);
     print(`${s.run.stepCount}`, statusX + statusIconSize + statusIconGap, stepsY + textOffsetY, COLOR_TEXT);
+    {
+      const anims = s.ui.anim.active;
+      const frame = s.ui.clock.frame | 0;
+      let xCursor = armyX + UI_ARMY_DELTA_OFFSET_X;
+      for (let i = 0; i < anims.length; i++) {
+        const a = anims[i];
+        if (a.kind !== "armyDelta") continue;
+        const aa = a;
+        const start = aa.startFrame | 0;
+        const dur = Math.max(1, aa.durationFrames | 0);
+        const t = Math.max(0, Math.min(dur, frame - start));
+        const p = t / dur;
+        const delta = aa.params.delta | 0;
+        if (!delta) continue;
+        const label = delta > 0 ? `+${delta}` : `${delta}`;
+        const color = delta > 0 ? COLOR_GOOD : COLOR_BAD;
+        const dy = UI_ARMY_DELTA_OFFSET_Y - Math.floor(p * UI_ARMY_DELTA_RISE_PX);
+        print(label, xCursor, armyY + dy, color);
+        xCursor += label.length * 6 + UI_ARMY_DELTA_GAP_PX;
+      }
+    }
     {
       const anims = s.ui.anim.active;
       const frame = s.ui.clock.frame | 0;
@@ -808,15 +1093,17 @@ ${harvestLine}`
         xCursor += label.length * 6 + UI_FOOD_DELTA_GAP_PX;
       }
     }
-    const foundY = stepsY + statusLineH;
-    if (s.run.hasFoundCastle) print("FOUND", statusX, foundY + textOffsetY, COLOR_TEXT);
-    const statusBottomY = s.run.hasFoundCastle ? foundY + statusLineH : stepsY + statusLineH;
+    const statusBottomY = stepsY + statusLineH;
     const headerBottomY = Math.max(illY + illSize, statusBottomY);
     const msgY = headerBottomY + 4;
-    const maxLines = Math.max(0, Math.floor((SCREEN_HEIGHT - msgY - 4) / messageLineH));
+    const headline = s.run.isGameOver ? { text: "GAME OVER", color: COLOR_BAD } : s.run.hasFoundCastle ? { text: "YOU WIN", color: COLOR_GOOD } : null;
+    const headlineRows = headline ? 1 : 0;
+    const maxLines = Math.max(0, Math.floor((SCREEN_HEIGHT - msgY - 4) / messageLineH) - headlineRows);
     const lines = wrapText(s.ui.message, LORE_MAX_CHARS_PER_LINE);
+    const textStartY = headline ? msgY + messageLineH : msgY;
+    if (headline) print(headline.text, UI_LEFT_PANEL_PADDING, msgY, headline.color);
     for (let i = 0; i < lines.length && i < maxLines; i++) {
-      print(lines[i], UI_LEFT_PANEL_PADDING, msgY + i * messageLineH, COLOR_TEXT);
+      print(lines[i], UI_LEFT_PANEL_PADDING, textStartY + i * messageLineH, COLOR_TEXT);
     }
   }
   function drawRightPanel(s) {
@@ -839,11 +1126,11 @@ ${harvestLine}`
     if (row === 2 && col === 2) return SPR_BUTTON_RESTART;
     if (row === 0 && col === 2) return null;
     const p = s.player.position;
-    if (row === 0 && col === 1) return getTileIdAt(s.world, p.x, p.y - 1);
-    if (row === 1 && col === 0) return getTileIdAt(s.world, p.x - 1, p.y);
-    if (row === 1 && col === 1) return getTileIdAt(s.world, p.x, p.y);
-    if (row === 1 && col === 2) return getTileIdAt(s.world, p.x + 1, p.y);
-    if (row === 2 && col === 1) return getTileIdAt(s.world, p.x, p.y + 1);
+    if (row === 0 && col === 1) return getSpriteIdAt(s.world, p.x, p.y - 1);
+    if (row === 1 && col === 0) return getSpriteIdAt(s.world, p.x - 1, p.y);
+    if (row === 1 && col === 1) return getSpriteIdAt(s.world, p.x, p.y);
+    if (row === 1 && col === 2) return getSpriteIdAt(s.world, p.x + 1, p.y);
+    if (row === 2 && col === 1) return getSpriteIdAt(s.world, p.x, p.y + 1);
     return null;
   }
   function drawRightPanelStatic(s) {
@@ -943,13 +1230,13 @@ ${harvestLine}`
     ];
     for (let i = 0; i < cross.length; i++) {
       const c = cross[i];
-      const tileId = getTileIdAt(s.world, fromPos.x + c.ox, fromPos.y + c.oy);
-      drawSpriteInCell(c.row, c.col, tileId, offX, offY);
+      const spriteId = getSpriteIdAt(s.world, fromPos.x + c.ox, fromPos.y + c.oy);
+      drawSpriteInCell(c.row, c.col, spriteId, offX, offY);
     }
     for (let i = 0; i < cross.length; i++) {
       const c = cross[i];
-      const tileId = getTileIdAt(s.world, toPos.x + c.ox, toPos.y + c.oy);
-      drawSpriteInCell(c.row, c.col, tileId, offX - shiftX, offY - shiftY);
+      const spriteId = getSpriteIdAt(s.world, toPos.x + c.ox, toPos.y + c.oy);
+      drawSpriteInCell(c.row, c.col, spriteId, offX - shiftX, offY - shiftY);
     }
     maskOutsideGridInRightPanel();
     maskGridGaps();
@@ -967,8 +1254,8 @@ ${harvestLine}`
     const k = tileId | 0;
     const cached = MINIMAP_TILE_CACHE[k];
     if (cached) return cached;
-    const scratchX = 6;
-    const scratchY = 6;
+    const scratchX = UI_LEFT_PANEL_PADDING;
+    const scratchY = UI_LEFT_PANEL_PADDING;
     spr(k, scratchX, scratchY, -1, 1, 0, 0, 2, 2);
     const out = [];
     for (let py = 0; py < MINIMAP_CELL_PX; py++) {
@@ -985,8 +1272,8 @@ ${harvestLine}`
   }
   function drawMinimap(s) {
     const world = s.world;
-    const illX = 6;
-    const illY = 6;
+    const illX = UI_LEFT_PANEL_PADDING;
+    const illY = UI_LEFT_PANEL_PADDING;
     const margin = 2;
     const cellPx = MINIMAP_CELL_PX;
     const originX = illX + margin;
@@ -994,14 +1281,14 @@ ${harvestLine}`
     const present = {};
     for (let y = 0; y < world.height; y++) {
       for (let x = 0; x < world.width; x++) {
-        present[world.tiles[y][x] | 0] = true;
+        present[getSpriteIdAt(world, x, y) | 0] = true;
       }
     }
     for (const k in present) getMinimapTilePixels(Number(k));
     for (let y = 0; y < world.height; y++) {
       for (let x = 0; x < world.width; x++) {
-        const tid = world.tiles[y][x];
-        const mini = getMinimapTilePixels(tid);
+        const spriteId = getSpriteIdAt(world, x, y);
+        const mini = getMinimapTilePixels(spriteId);
         const dx = originX + x * cellPx;
         const dy = originY + y * cellPx;
         let i = 0;
@@ -1039,9 +1326,9 @@ ${harvestLine}`
   globalThis.TIC = TIC;
 })();
 
-// title:  The Unbound (prototype 0.0.5)
+// title:  The Unbound (prototype 0.0.6)
 // author: haulin
-// desc:   Prototype 0.0.5 toward the North Star
+// desc:   Prototype 0.0.6 toward the North Star
 // script: js
 // input:  mouse
 

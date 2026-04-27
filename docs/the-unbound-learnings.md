@@ -9,7 +9,7 @@ In practice: new features should usually be “add a new entry / new function”
 ## What worked well (keep for future phases)
 
 - **Single plain state + pure reducer**: `processAction(prevState, action) -> nextState` kept gameplay deterministic and iteration safe.
-- **World immutable after generation**: `world.tiles` treated as persistent data prevented accidental nondeterminism.
+- **World updates are explicit + localized**: the world is a grid of cells (`world.cells`), and feature state (e.g. cooldowns) is updated immutably by cloning only the touched row + cell.
 - **Input edge detection inside reducer**: `TICK` owning `mouseLeftDown` prevented “held click repeats” bugs and avoids globals.
 - **Button-as-data (extension point)**: representing the 3×3 grid as a mapping of “cell → definition” (preview + onPress) reduces edit sites when buttons change.
 
@@ -47,6 +47,18 @@ In practice: new features should usually be “add a new entry / new function”
 
 - For **feel iteration** (UI/UX, tuning counts, copy tone): iterate quickly, keep changes small, and update the design doc when a tweak becomes “the contract”.
 - Once the direction stabilizes: do one “elegance pass” refactor to consolidate geometry/constants and remove accumulated one-off branching.
+
+## Refactor philosophy (boy scout rule)
+
+- **Optimize for the reader**: the cost of writing is not the constraint here — the cost of reading is.
+- **Code churn isn’t the enemy**: refactor freely when it improves clarity and reduces parallel bookkeeping.
+- **“From scratch” test**: ask “Would I design this feature this way from scratch, knowing what I know now?” If not, refactor toward that shape.
+- **Prefer fewer sources of truth**: if data belongs to a thing, store it on the thing (e.g. cooldown on a cell), not in a parallel array “somewhere else”.
+
+## Roadmap architecture note (cell objects)
+
+- World state uses cell objects (`world.cells: Cell[][]`) with a string `kind` per coordinate (e.g. `grass`, `farm`, `camp`).
+- Feature-specific state (like farm/camp cooldowns) lives on the cell itself (`nextReadyStep`) instead of parallel arrays, so adding more PoIs (or richer tiles like towns) doesn’t multiply bookkeeping.
 
 ## Type safety note (avoid `any`)
 

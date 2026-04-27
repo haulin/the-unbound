@@ -1,38 +1,20 @@
 import {
+  CAMP_COUNT,
+  CAMP_NAME_POOL,
   FARM_COUNT,
   FARM_NAME_POOL,
   MAP_GEN_ALGORITHM,
   NOISE_SMOOTH_PASSES,
   NOISE_VALUE_MAX,
   SIGNPOST_COUNT,
-  TILE_CASTLE,
-  TILE_FARM,
-  TILE_SIGNPOST,
-  WALKABLE_COSMETIC_TILE_IDS,
-  WALKABLE_TILE_COUNT,
+  TERRAIN_KINDS,
   WORLD_HEIGHT,
   WORLD_WIDTH,
+  spriteIdForKind,
 } from './constants'
 import { wrapIndex } from './math'
 import { randInt, seedToRngState } from './prng'
-import type { Farm, GeneratedWorld, TileGrid, Vec2, World } from './types'
-
-export function countTiles(tiles: TileGrid, tileId: number) {
-  let n = 0
-  for (let y = 0; y < tiles.length; y++) {
-    const row = tiles[y]!
-    for (let x = 0; x < row.length; x++) {
-      if (row[x]! === tileId) n++
-    }
-  }
-  return n
-}
-
-function clone2dTiles(tiles: TileGrid) {
-  const out: TileGrid = []
-  for (let y = 0; y < tiles.length; y++) out.push(tiles[y]!.slice())
-  return out
-}
+import type { Cell, CellGrid, GeneratedWorld, Vec2, World } from './types'
 
 function boxBlurIntGridWrap(grid: number[][], w: number, h: number) {
   const out: number[][] = []
@@ -54,7 +36,7 @@ function boxBlurIntGridWrap(grid: number[][], w: number, h: number) {
   return out
 }
 
-function generateBaseTerrain(rngState: number) {
+function generateBaseTerrainCells(rngState: number): { cells: CellGrid; rngState: number } {
   const vals: number[][] = []
   for (let y = 0; y < WORLD_HEIGHT; y++) {
     const row: number[] = []
@@ -82,51 +64,45 @@ function generateBaseTerrain(rngState: number) {
   }
 
   const span = maxV - minV || 1
-  const qtile = WALKABLE_COSMETIC_TILE_IDS
-  const bucketCount = WALKABLE_TILE_COUNT
-  const tiles: TileGrid = []
+  const kindByBucket = TERRAIN_KINDS
+  const bucketCount = kindByBucket.length
+  const cells: CellGrid = []
 
   for (let y = 0; y < WORLD_HEIGHT; y++) {
-    const row: number[] = []
+    const row: Cell[] = []
     for (let x = 0; x < WORLD_WIDTH; x++) {
       let bucket = ((bucketCount * (V[y]![x]! - minV)) / span) | 0
       if (bucket < 0) bucket = 0
       if (bucket >= bucketCount) bucket = bucketCount - 1
-      row.push(qtile[bucket]!)
+      row.push({ kind: kindByBucket[bucket]! })
     }
-    tiles.push(row)
+    cells.push(row)
   }
 
-  return { tiles, rngState }
+  return { cells, rngState }
 }
 
-function placeSpecials({ tiles, rngState }: { tiles: TileGrid; rngState: number }) {
-  const t = clone2dTiles(tiles)
-  let castlePosition: Vec2 = { x: 0, y: 0 }
-  const farms: Farm[] = []
+function placeCastle(cells: CellGrid, rngState: number): { castlePos: Vec2; rngState: number } {
+  const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT)
+  rngState = r.rngState
+  const x = r.value % WORLD_WIDTH
+  const y = Math.floor(r.value / WORLD_WIDTH)
+  cells[y]![x] = { kind: 'castle' }
+  return { castlePos: { x, y }, rngState }
+}
 
-  {
-    const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT)
-    rngState = r.rngState
-    const x = r.value % WORLD_WIDTH
-    const y = Math.floor(r.value / WORLD_WIDTH)
-    t[y]![x] = TILE_CASTLE
-    castlePosition = { x, y }
-  }
-
+function placeNamedFarms(cells: CellGrid, rngState: number, castlePos: Vec2): number {
   const remainingNames: string[] = [...FARM_NAME_POOL]
-  let placedFarms = 0
-  while (placedFarms < FARM_COUNT) {
+  let placed = 0
+  while (placed < FARM_COUNT) {
     const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT)
     rngState = r.rngState
     const x = r.value % WORLD_WIDTH
     const y = Math.floor(r.value / WORLD_WIDTH)
 
-    if (x === castlePosition.x && y === castlePosition.y) continue
-    if (t[y]![x] === TILE_FARM) continue
-    if (t[y]![x] === TILE_SIGNPOST) continue
-
-    t[y]![x] = TILE_FARM
+    if (x === castlePos.x && y === castlePos.y) continue
+    const here = cells[y]![x]!
+    if (here.kind === 'farm' || here.kind === 'camp' || here.kind === 'signpost') continue
 
     let name = 'A Farm'
     if (remainingNames.length > 0) {
@@ -135,10 +111,39 @@ function placeSpecials({ tiles, rngState }: { tiles: TileGrid; rngState: number 
       name = remainingNames.splice(pick.value, 1)[0]!
     }
 
-    farms.push({ position: { x, y }, name })
-    placedFarms++
+    cells[y]![x] = { kind: 'farm', id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 }
+    placed++
   }
+  return rngState
+}
 
+function placeNamedCamps(cells: CellGrid, rngState: number, castlePos: Vec2): number {
+  const remainingNames: string[] = [...CAMP_NAME_POOL]
+  let placed = 0
+  while (placed < CAMP_COUNT) {
+    const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT)
+    rngState = r.rngState
+    const x = r.value % WORLD_WIDTH
+    const y = Math.floor(r.value / WORLD_WIDTH)
+
+    if (x === castlePos.x && y === castlePos.y) continue
+    const here = cells[y]![x]!
+    if (here.kind === 'farm' || here.kind === 'camp' || here.kind === 'signpost') continue
+
+    let name = 'A Camp'
+    if (remainingNames.length > 0) {
+      const pick = randInt(rngState, remainingNames.length)
+      rngState = pick.rngState
+      name = remainingNames.splice(pick.value, 1)[0]!
+    }
+
+    cells[y]![x] = { kind: 'camp', id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 }
+    placed++
+  }
+  return rngState
+}
+
+function placeSignposts(cells: CellGrid, rngState: number, castlePos: Vec2): number {
   let placed = 0
   while (placed < SIGNPOST_COUNT) {
     const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT)
@@ -146,15 +151,14 @@ function placeSpecials({ tiles, rngState }: { tiles: TileGrid; rngState: number 
     const x = r.value % WORLD_WIDTH
     const y = Math.floor(r.value / WORLD_WIDTH)
 
-    if (x === castlePosition.x && y === castlePosition.y) continue
-    if (t[y]![x] === TILE_FARM) continue
-    if (t[y]![x] === TILE_SIGNPOST) continue
+    if (x === castlePos.x && y === castlePos.y) continue
+    const here = cells[y]![x]!
+    if (here.kind === 'farm' || here.kind === 'camp' || here.kind === 'signpost') continue
 
-    t[y]![x] = TILE_SIGNPOST
+    cells[y]![x] = { kind: 'signpost' }
     placed++
   }
-
-  return { tiles: t, castlePosition, farms, rngState }
+  return rngState
 }
 
 function pickStart({ rngState }: { rngState: number }) {
@@ -165,19 +169,24 @@ function pickStart({ rngState }: { rngState: number }) {
   return { startPosition: { x, y }, rngState }
 }
 
-export function getTileIdAt(world: World, x: number, y: number) {
+export function getSpriteIdAt(world: World, x: number, y: number) {
   const tx = wrapIndex(x, world.width)
   const ty = wrapIndex(y, world.height)
-  return world.tiles[ty]![tx]!
+  const cell = world.cells[ty]![tx]!
+  return spriteIdForKind(cell.kind)
 }
 
 export function generateWorld(seed: number): GeneratedWorld {
   let rngState = seedToRngState(seed)
-  const base = generateBaseTerrain(rngState)
+  const base = generateBaseTerrainCells(rngState)
   rngState = base.rngState
 
-  const withSpecials = placeSpecials({ tiles: base.tiles, rngState })
-  rngState = withSpecials.rngState
+  const cells = base.cells
+  const castle = placeCastle(cells, rngState)
+  rngState = castle.rngState
+  rngState = placeNamedFarms(cells, rngState, castle.castlePos)
+  rngState = placeNamedCamps(cells, rngState, castle.castlePos)
+  rngState = placeSignposts(cells, rngState, castle.castlePos)
 
   const startPick = pickStart({ rngState })
   rngState = startPick.rngState
@@ -187,9 +196,7 @@ export function generateWorld(seed: number): GeneratedWorld {
     width: WORLD_WIDTH,
     height: WORLD_HEIGHT,
     mapGenAlgorithm: MAP_GEN_ALGORITHM,
-    tiles: withSpecials.tiles,
-    castlePosition: withSpecials.castlePosition,
-    farms: withSpecials.farms,
+    cells,
     rngState,
   }
 

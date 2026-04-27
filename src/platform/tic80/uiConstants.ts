@@ -19,6 +19,22 @@ export const UI_STATUS_ICON_GAP = 3
 export const UI_STATUS_LINE_GAP = 3
 export const UI_STATUS_TEXT_OFFSET_Y = 1
 
+// Resource + stats stack spacing (tweak to tighten the column).
+export const UI_HERO_RESOURCE_GAP_PX = 2
+export const UI_AFTER_RESOURCES_GAP_PX = 2
+
+// Army line (hero)
+export const UI_ARMY_ICON_W_PX = 16
+export const UI_ARMY_ICON_H_PX = 16
+export const UI_ARMY_VALUE_OFFSET_X = UI_ARMY_ICON_W_PX + 3
+export const UI_ARMY_VALUE_OFFSET_Y = 5
+
+// Army delta overlay (relative to army icon origin)
+export const UI_ARMY_DELTA_OFFSET_X = 2
+export const UI_ARMY_DELTA_OFFSET_Y = 2
+export const UI_ARMY_DELTA_RISE_PX = 6
+export const UI_ARMY_DELTA_GAP_PX = -4
+
 // Food line (hero)
 export const UI_FOOD_ICON_W_PX = 16
 export const UI_FOOD_ICON_H_PX = 16
@@ -27,7 +43,11 @@ export const UI_FOOD_VALUE_OFFSET_Y = 5
 
 // Food delta overlay (relative to food icon origin)
 export const UI_FOOD_DELTA_OFFSET_X = 2
-export const UI_FOOD_DELTA_OFFSET_Y = -2
+export const UI_FOOD_DELTA_OFFSET_Y = 2
 export const UI_FOOD_DELTA_RISE_PX = 6
 export const UI_FOOD_DELTA_GAP_PX = -4
+
+// Small stats (seed/pos/steps) are placed relative to the hero block (army+food).
+export const UI_SMALL_STATS_START_OFFSET_Y =
+  UI_ARMY_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX + UI_FOOD_ICON_H_PX + UI_AFTER_RESOURCES_GAP_PX
 

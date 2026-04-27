@@ -9,18 +9,25 @@ import type {
 
 export type Vec2 = { x: number; y: number }
 
-export type TileGrid = number[][]
+export type TerrainKind = 'grass' | 'road' | 'mountain' | 'lake' | 'swamp' | 'woods' | 'rainbow'
+export type FeatureKind = 'castle' | 'signpost' | 'farm' | 'camp'
+export type CellKind = TerrainKind | FeatureKind
 
-export type Farm = { position: Vec2; name: string }
+export type TerrainCell = { kind: TerrainKind }
+export type CastleCell = { kind: 'castle' }
+export type SignpostCell = { kind: 'signpost' }
+export type FarmCell = { kind: 'farm'; id: number; name: string; nextReadyStep: number }
+export type CampCell = { kind: 'camp'; id: number; name: string; nextReadyStep: number }
+export type Cell = TerrainCell | CastleCell | SignpostCell | FarmCell | CampCell
+
+export type CellGrid = Cell[][]
 
 export type World = {
   seed: number
   width: number
   height: number
   mapGenAlgorithm: string
-  tiles: TileGrid
-  castlePosition: Vec2
-  farms: Farm[]
+  cells: CellGrid
   rngState: number
 }
 
@@ -37,34 +44,41 @@ export type LeftPanel =
 
 export type UiClock = { frame: number }
 
-export type MoveSlideAnim = {
+export type BaseAnim = {
   id: number
-  kind: 'moveSlide'
   startFrame: number
   durationFrames: number
   blocksInput: boolean
+}
+
+export type MoveSlideAnim = BaseAnim & {
+  kind: 'moveSlide'
   params: { fromPos: Vec2; toPos: Vec2; dx: number; dy: number }
 }
 
-export type FoodDeltaAnim = {
-  id: number
+export type FoodDeltaAnim = BaseAnim & {
   kind: 'foodDelta'
-  startFrame: number
-  durationFrames: number
-  blocksInput: boolean
   params: { delta: number }
 }
 
-export type Anim = MoveSlideAnim | FoodDeltaAnim
+export type ArmyDeltaAnim = BaseAnim & {
+  kind: 'armyDelta'
+  params: { delta: number }
+}
+
+export type Anim = MoveSlideAnim | FoodDeltaAnim | ArmyDeltaAnim
 
 export type UiAnim = { nextId: number; active: Anim[] }
 
 export type Ui = { message: string; leftPanel: LeftPanel; clock: UiClock; anim: UiAnim }
 
 export type Player = { position: Vec2 }
-export type Run = { stepCount: number; hasFoundCastle: boolean }
+export type Run = { stepCount: number; hasFoundCastle: boolean; isGameOver: boolean }
 
-export type Resources = { food: number; farmNextReadyStep: number[] }
+export type Resources = {
+  food: number
+  armySize: number
+}
 
 export type State = { world: World; player: Player; run: Run; resources: Resources; ui: Ui }
 

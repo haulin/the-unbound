@@ -1,7 +1,7 @@
-import type { Resources, World } from '../types'
+import type { Cell, Resources, World } from '../types'
 
 export type TileEnterCtx = {
-  tileId: number
+  cell: Cell
   world: World
   pos: { x: number; y: number }
   stepCount: number
@@ -13,6 +13,7 @@ export type TileEnterOutcome = {
   resources?: Resources
   message: string
   foodDeltas?: number[]
+  armyDeltas?: number[]
   hasFoundCastle?: boolean
 }
 

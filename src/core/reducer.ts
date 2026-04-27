@@ -8,13 +8,13 @@ import {
   CASTLE_FOUND_MESSAGE,
   ENABLE_ANIMATIONS,
   FOOD_DELTA_FRAMES,
-  FOOD_MOVE_COST,
+  GAME_OVER_LINES,
   GOAL_NARRATIVE,
+  INITIAL_ARMY_SIZE,
   INITIAL_FOOD,
   MOVE_SLIDE_FRAMES,
   SPR_BUTTON_GOAL,
-  TILE_CASTLE,
-  TILE_SIGNPOST,
+  enterFoodCostForKind,
 } from './constants'
 import { formatNearestPoiSignpostMessage } from './signpost'
 import { generateWorld } from './world'
@@ -29,6 +29,8 @@ import {
   type Resources,
   type State,
   type Ui,
+  type CellKind,
+  type Cell,
   type World,
 } from './types'
 
@@ -139,11 +141,24 @@ function clearSpriteFocusIfAny(ui: Ui): LeftPanel {
   return lp
 }
 
-function initialMessageForStart(tileId: number, playerPos: { x: number; y: number }, world: World): string {
+function normalizeResources(_world: World, raw: Resources | null | undefined): Resources {
+  const food = raw && typeof raw.food === 'number' ? (raw.food | 0) : INITIAL_FOOD
+  const armySize = raw && typeof raw.armySize === 'number' ? (raw.armySize | 0) : INITIAL_ARMY_SIZE
+  return { food, armySize }
+}
+
+function gameOverMessage(seed: number, stepCount: number): string {
+  const k = ((seed | 0) + (stepCount | 0)) | 0
+  const m = GAME_OVER_LINES.length
+  const idx = ((k % m) + m) % m
+  return GAME_OVER_LINES[idx] || ''
+}
+
+function initialMessageForStart(cellKind: CellKind, playerPos: { x: number; y: number }, world: World): string {
   let msg = GOAL_NARRATIVE
-  if (tileId === TILE_SIGNPOST) {
+  if (cellKind === 'signpost') {
     msg += '\n' + formatNearestPoiSignpostMessage(playerPos, world)
-  } else if (tileId === TILE_CASTLE) {
+  } else if (cellKind === 'castle') {
     msg += '\n' + CASTLE_FOUND_MESSAGE
   }
   return msg
@@ -190,6 +205,8 @@ function reduceToggleMinimap(s: State): State {
 }
 
 function reduceMove(prevState: State, dx: number, dy: number): State {
+  if (prevState.run.isGameOver || prevState.run.hasFoundCastle) return prevState
+
   const world = prevState.world
   const prevPos = prevState.player.position
   const nextPos = {
@@ -197,30 +214,44 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
     y: (prevPos.y + dy + world.height) % world.height,
   }
 
-  const tileId = world.tiles[nextPos.y]![nextPos.x]!
+  const cell: Cell = world.cells[nextPos.y]![nextPos.x]!
   const nextStepCount = (prevState.run.stepCount | 0) + 1
 
-  const prevRes = (prevState.resources || { food: INITIAL_FOOD, farmNextReadyStep: [] }) as Resources
-  const prevFood = typeof prevRes.food === 'number' ? (prevRes.food | 0) : 0
-  const paidMoveCost = prevFood > 0 && FOOD_MOVE_COST > 0
-  let food = paidMoveCost ? Math.max(0, prevFood - FOOD_MOVE_COST) : prevFood
+  const prevRes = normalizeResources(world, prevState.resources)
+  const prevFood = prevRes.food | 0
+  const cost = enterFoodCostForKind(cell.kind)
 
-  const farmNextReadyStep = Array.isArray(prevRes.farmNextReadyStep) ? prevRes.farmNextReadyStep.slice() : []
-  const farmCount = (world.farms && world.farms.length) || 0
-  while (farmNextReadyStep.length < farmCount) farmNextReadyStep.push(0)
+  const foodDeltas: number[] = []
+  const armyDeltas: number[] = []
+  let food: number
+  let armySize: number
+  if (prevFood >= cost) {
+    food = prevFood - cost
+    foodDeltas.push(-cost)
+    armySize = prevRes.armySize | 0
+  } else {
+    food = 0
+    if (prevFood > 0) foodDeltas.push(-prevFood)
+    armySize = (prevRes.armySize | 0) - 1
+    armyDeltas.push(-1)
+  }
 
-  const baseResources: Resources = { food, farmNextReadyStep }
+  const baseResources: Resources = { ...prevRes, food, armySize }
 
-  const foodDeltas: number[] = paidMoveCost ? [-FOOD_MOVE_COST] : []
-
-  const handler = getOnEnterHandler(tileId)
-  const outcome = handler({ tileId, world, pos: nextPos, stepCount: nextStepCount, resources: baseResources })
+  const handler = getOnEnterHandler(cell.kind)
+  const outcome = handler({ cell, world, pos: nextPos, stepCount: nextStepCount, resources: baseResources })
 
   const nextWorld = outcome.world || world
-  const nextResources = outcome.resources || baseResources
-  const message = outcome.message
+  let nextResources = outcome.resources || baseResources
   if (outcome.foodDeltas && outcome.foodDeltas.length) foodDeltas.push(...outcome.foodDeltas)
-  const nextHasFoundCastle = prevState.run.hasFoundCastle || tileId === TILE_CASTLE || !!outcome.hasFoundCastle
+  if (outcome.armyDeltas && outcome.armyDeltas.length) armyDeltas.push(...outcome.armyDeltas)
+  const nextHasFoundCastle = prevState.run.hasFoundCastle || cell.kind === 'castle' || !!outcome.hasFoundCastle
+
+  const isGameOver = (nextResources.armySize | 0) <= 0
+  let message = outcome.message
+  if (isGameOver) {
+    message = gameOverMessage(nextWorld.seed, nextStepCount)
+  }
 
   const prevUi = getUi(prevState.ui)
   const baseUi: Ui = {
@@ -233,7 +264,7 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
   const baseState: State = {
     world: nextWorld,
     player: { position: nextPos },
-    run: { stepCount: nextStepCount, hasFoundCastle: nextHasFoundCastle },
+    run: { stepCount: nextStepCount, hasFoundCastle: nextHasFoundCastle, isGameOver },
     resources: nextResources,
     ui: baseUi,
   }
@@ -247,6 +278,17 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
     if (!delta) continue
     uiWith = enqueueAnim(uiWith, {
       kind: 'foodDelta',
+      startFrame,
+      durationFrames: FOOD_DELTA_FRAMES,
+      blocksInput: false,
+      params: { delta },
+    })
+  }
+  for (let i = 0; i < armyDeltas.length; i++) {
+    const delta = armyDeltas[i]!
+    if (!delta) continue
+    uiWith = enqueueAnim(uiWith, {
+      kind: 'armyDelta',
       startFrame,
       durationFrames: FOOD_DELTA_FRAMES,
       blocksInput: false,
@@ -284,16 +326,19 @@ export function processAction(prevState: State | null, action: Action): State | 
     const world = generated.world
     const playerPos = generated.startPosition
 
-    const startTileId = world.tiles[playerPos.y]![playerPos.x]!
-    const hasFoundCastle = startTileId === TILE_CASTLE
+    const startCellKind = world.cells[playerPos.y]![playerPos.x]!.kind
+    const hasFoundCastle = startCellKind === 'castle'
 
     return {
       world,
       player: { position: { x: playerPos.x, y: playerPos.y } },
-      run: { stepCount: 0, hasFoundCastle },
-      resources: { food: INITIAL_FOOD, farmNextReadyStep: new Array(world.farms.length).fill(0) },
+      run: { stepCount: 0, hasFoundCastle, isGameOver: false },
+      resources: {
+        food: INITIAL_FOOD,
+        armySize: INITIAL_ARMY_SIZE,
+      },
       ui: {
-        message: initialMessageForStart(startTileId, playerPos, world),
+        message: initialMessageForStart(startCellKind, playerPos, world),
         leftPanel: { kind: LEFT_PANEL_KIND_AUTO },
         clock: { frame: 0 },
         anim: { nextId: 1, active: [] },

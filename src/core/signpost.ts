@@ -1,17 +1,46 @@
 import { dirLabel, manhattan, torusDelta } from './math'
+import type { CellGrid } from './types'
 
 export type PoiWorldView = {
   width: number
   height: number
-  castlePosition: { x: number; y: number }
-  farms: { position: { x: number; y: number }; name: string }[]
+  cells: CellGrid
 }
 
 export function formatNearestPoiSignpostMessage(playerPos: { x: number; y: number }, world: PoiWorldView) {
-  const candidates: { kind: 'castle' | 'farm'; name: string; pos: { x: number; y: number } }[] = [
-    { kind: 'castle', name: 'The Castle', pos: world.castlePosition },
-    ...world.farms.map((f) => ({ kind: 'farm' as const, name: `${f.name} Farm`, pos: f.position })),
-  ]
+  type PoiKind = 'castle' | 'farm' | 'camp'
+  type Candidate = { kind: PoiKind; id: number; name: string; pos: { x: number; y: number } }
+
+  const candidates: Candidate[] = []
+
+  const cells = world.cells
+  for (let y = 0; y < cells.length; y++) {
+    const row = cells[y]!
+    for (let x = 0; x < row.length; x++) {
+      const cell = row[x]!
+      if (cell.kind === 'castle') {
+        candidates.push({ kind: 'castle', id: y * world.width + x, name: 'The Castle', pos: { x, y } })
+      } else if (cell.kind === 'farm') {
+        candidates.push({
+          kind: 'farm',
+          id: cell.id | 0,
+          name: `${cell.name || 'A Farm'} Farm`,
+          pos: { x, y },
+        })
+      } else if (cell.kind === 'camp') {
+        candidates.push({
+          kind: 'camp',
+          id: cell.id | 0,
+          name: `${cell.name || 'A Camp'} Camp`,
+          pos: { x, y },
+        })
+      }
+    }
+  }
+
+  if (candidates.length === 0) return ''
+
+  const kindRank = (k: PoiKind) => (k === 'castle' ? 0 : k === 'farm' ? 1 : 2)
 
   let best = candidates[0]!
   let bestDx = torusDelta(playerPos.x, best.pos.x, world.width)
@@ -33,8 +62,9 @@ export function formatNearestPoiSignpostMessage(playerPos: { x: number; y: numbe
     }
 
     if (d === bestD) {
-      // Tie-break: prefer castle, otherwise keep earlier farm order.
-      if (best.kind !== 'castle' && c.kind === 'castle') {
+      const ar = kindRank(c.kind)
+      const br = kindRank(best.kind)
+      if (ar < br || (ar === br && (c.id | 0) < (best.id | 0))) {
         best = c
         bestDx = dx
         bestDy = dy
@@ -46,4 +76,3 @@ export function formatNearestPoiSignpostMessage(playerPos: { x: number; y: numbe
   const dir = dirLabel(bestDx, bestDy)
   return `${best.name}\n${dir}, ${bestD} leagues away.`
 }
-
