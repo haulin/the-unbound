@@ -3,6 +3,8 @@ import {
   CAMP_NAME_POOL,
   FARM_COUNT,
   FARM_NAME_POOL,
+  HENGE_COUNT,
+  HENGE_NAME_POOL,
   MAP_GEN_ALGORITHM,
   NOISE_SMOOTH_PASSES,
   NOISE_VALUE_MAX,
@@ -29,7 +31,7 @@ function boxBlurIntGridWrap(grid: number[][], w: number, h: number) {
           sum += grid[ny]![nx]!
         }
       }
-      row.push((sum / 9) | 0)
+      row.push(Math.floor(sum / 9))
     }
     out.push(row)
   }
@@ -71,7 +73,7 @@ function generateBaseTerrainCells(rngState: number): { cells: CellGrid; rngState
   for (let y = 0; y < WORLD_HEIGHT; y++) {
     const row: Cell[] = []
     for (let x = 0; x < WORLD_WIDTH; x++) {
-      let bucket = ((bucketCount * (V[y]![x]! - minV)) / span) | 0
+      let bucket = Math.floor((bucketCount * (V[y]![x]! - minV)) / span)
       if (bucket < 0) bucket = 0
       if (bucket >= bucketCount) bucket = bucketCount - 1
       row.push({ kind: kindByBucket[bucket]! })
@@ -91,10 +93,18 @@ function placeCastle(cells: CellGrid, rngState: number): { castlePos: Vec2; rngS
   return { castlePos: { x, y }, rngState }
 }
 
-function placeNamedFarms(cells: CellGrid, rngState: number, castlePos: Vec2): number {
-  const remainingNames: string[] = [...FARM_NAME_POOL]
+type PlaceNamedFeatureOpts = {
+  count: number
+  namePool: readonly string[]
+  fallbackName: string
+  canPlaceAt: (here: Cell) => boolean
+  buildCell: (x: number, y: number, name: string) => Cell
+}
+
+function placeNamedFeature(cells: CellGrid, rngState: number, castlePos: Vec2, opts: PlaceNamedFeatureOpts): number {
+  const remainingNames: string[] = [...opts.namePool]
   let placed = 0
-  while (placed < FARM_COUNT) {
+  while (placed < opts.count) {
     const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT)
     rngState = r.rngState
     const x = r.value % WORLD_WIDTH
@@ -102,45 +112,56 @@ function placeNamedFarms(cells: CellGrid, rngState: number, castlePos: Vec2): nu
 
     if (x === castlePos.x && y === castlePos.y) continue
     const here = cells[y]![x]!
-    if (here.kind === 'farm' || here.kind === 'camp' || here.kind === 'signpost') continue
+    if (!opts.canPlaceAt(here)) continue
 
-    let name = 'A Farm'
+    let name = opts.fallbackName
     if (remainingNames.length > 0) {
       const pick = randInt(rngState, remainingNames.length)
       rngState = pick.rngState
       name = remainingNames.splice(pick.value, 1)[0]!
     }
 
-    cells[y]![x] = { kind: 'farm', id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 }
+    cells[y]![x] = opts.buildCell(x, y, name)
     placed++
   }
   return rngState
 }
 
+function placeNamedFarms(cells: CellGrid, rngState: number, castlePos: Vec2): number {
+  return placeNamedFeature(cells, rngState, castlePos, {
+    count: FARM_COUNT,
+    namePool: FARM_NAME_POOL,
+    fallbackName: 'A Farm',
+    canPlaceAt: (here) => !(here.kind === 'farm' || here.kind === 'camp' || here.kind === 'signpost'),
+    buildCell: (x, y, name) => ({ kind: 'farm', id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 }),
+  })
+}
+
 function placeNamedCamps(cells: CellGrid, rngState: number, castlePos: Vec2): number {
-  const remainingNames: string[] = [...CAMP_NAME_POOL]
-  let placed = 0
-  while (placed < CAMP_COUNT) {
-    const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT)
-    rngState = r.rngState
-    const x = r.value % WORLD_WIDTH
-    const y = Math.floor(r.value / WORLD_WIDTH)
+  return placeNamedFeature(cells, rngState, castlePos, {
+    count: CAMP_COUNT,
+    namePool: CAMP_NAME_POOL,
+    fallbackName: 'A Camp',
+    canPlaceAt: (here) => !(here.kind === 'farm' || here.kind === 'camp' || here.kind === 'signpost'),
+    buildCell: (x, y, name) => ({ kind: 'camp', id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 }),
+  })
+}
 
-    if (x === castlePos.x && y === castlePos.y) continue
-    const here = cells[y]![x]!
-    if (here.kind === 'farm' || here.kind === 'camp' || here.kind === 'signpost') continue
-
-    let name = 'A Camp'
-    if (remainingNames.length > 0) {
-      const pick = randInt(rngState, remainingNames.length)
-      rngState = pick.rngState
-      name = remainingNames.splice(pick.value, 1)[0]!
-    }
-
-    cells[y]![x] = { kind: 'camp', id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 }
-    placed++
-  }
-  return rngState
+function placeHenges(cells: CellGrid, rngState: number, castlePos: Vec2): number {
+  return placeNamedFeature(cells, rngState, castlePos, {
+    count: HENGE_COUNT,
+    namePool: HENGE_NAME_POOL,
+    fallbackName: 'A Henge',
+    canPlaceAt: (here) =>
+      !(
+        here.kind === 'castle' ||
+        here.kind === 'farm' ||
+        here.kind === 'camp' ||
+        here.kind === 'henge' ||
+        here.kind === 'signpost'
+      ),
+    buildCell: (x, y, name) => ({ kind: 'henge', id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 }),
+  })
 }
 
 function placeSignposts(cells: CellGrid, rngState: number, castlePos: Vec2): number {
@@ -153,7 +174,7 @@ function placeSignposts(cells: CellGrid, rngState: number, castlePos: Vec2): num
 
     if (x === castlePos.x && y === castlePos.y) continue
     const here = cells[y]![x]!
-    if (here.kind === 'farm' || here.kind === 'camp' || here.kind === 'signpost') continue
+    if (here.kind === 'farm' || here.kind === 'camp' || here.kind === 'henge' || here.kind === 'signpost') continue
 
     cells[y]![x] = { kind: 'signpost' }
     placed++
@@ -186,6 +207,7 @@ export function generateWorld(seed: number): GeneratedWorld {
   rngState = castle.rngState
   rngState = placeNamedFarms(cells, rngState, castle.castlePos)
   rngState = placeNamedCamps(cells, rngState, castle.castlePos)
+  rngState = placeHenges(cells, rngState, castle.castlePos)
   rngState = placeSignposts(cells, rngState, castle.castlePos)
 
   const startPick = pickStart({ rngState })

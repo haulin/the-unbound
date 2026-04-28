@@ -1,5 +1,5 @@
 export const CartMeta = {
-  version: '0.0.6',
+  version: '0.0.7',
   author: 'haulin',
   script: 'js',
   input: 'mouse',

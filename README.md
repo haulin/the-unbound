@@ -21,7 +21,7 @@ npm install
 npm run build
 ```
 
-Before making gameplay/architecture changes, read `docs/the-unbound-v1-learnings.md`.
+Before making gameplay/architecture changes, read `docs/the-unbound-learnings.md`.
 
 Watch mode (keeps running through temporary errors and rebuilds on fix):
 

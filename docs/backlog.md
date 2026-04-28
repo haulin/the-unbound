@@ -9,9 +9,11 @@ This file captures ideas discussed during design, kept out of the current phase'
 
 ## UI interaction model (future)
 
-- Contextual action pad: most gameplay is choosing among ~5 buttons; at most 9 shown.
-- Event “beats” that remap the 3×3 grid temporarily (fight → Attack/Flee; loot → Collect/Leave; goal → OK), potentially with consistent corner/meta placement.
+- Contextual action pad: extend beyond v0.0.7 combat (farm/shop/town “beats”, loot flows, etc.); combat uses fight/return + corners today.
+- Event “beats” that remap the 3×3 grid for non-combat encounters (loot → Collect/Leave; etc.), potentially with consistent corner/meta placement.
 - “Sprites for all buttons” to avoid text-heavy UI; placeholders acceptable early.
+- Left panel: reuse combat-style mode transitions for other modes (town, shop) if/when added.
+- Animation scheduling: consider extracting reducer-side animation enqueueing into a dedicated pure helper once iteration stabilizes.
 
 ## Visibility / navigation
 
@@ -20,9 +22,9 @@ This file captures ideas discussed during design, kept out of the current phase'
 
 ## Economy / combat / encounters
 
-- Resources: gold. (Food basics implemented in v0.0.5; hunger→army pressure implemented in v0.0.6; gold comes later.)
+- Resources: gold. (Food basics: v0.0.5; hunger→army: v0.0.6; combat food rewards + encounters: v0.0.7; gold economy later.)
 - Towns sell food and troops.
-- Combat as main encounter type, but not the only one.
+- Richer encounter types beyond current combat (traps, loot beats, etc.).
 - Mountains/swamps can cluster: if we increase their food cost, they should also carry “opportunity” (bonus events/loot/higher encounter odds) so they feel like risk/reward.
 - Cooldowns / anti-farming: revisit fight spots yields diminished/blocked encounters (“spirits are quiet; come back later”).
 - Event spawn probabilities influenced by player stats and time-since-visit (e.g., when poor, more likely to find a chest).

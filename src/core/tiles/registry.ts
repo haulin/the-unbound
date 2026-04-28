@@ -2,6 +2,7 @@ import { onEnterCastle } from './onEnterCastle'
 import { onEnterCamp } from './onEnterCamp'
 import { onEnterDefaultTerrain } from './onEnterDefaultTerrain'
 import { onEnterFarm } from './onEnterFarm'
+import { onEnterHenge } from './onEnterHenge'
 import { onEnterSignpost } from './onEnterSignpost'
 import type { TileEnterHandler } from './types'
 import type { CellKind } from '../types'
@@ -9,6 +10,7 @@ import type { CellKind } from '../types'
 const onEnterByKind: Partial<Record<CellKind, TileEnterHandler>> = {
   camp: onEnterCamp,
   farm: onEnterFarm,
+  henge: onEnterHenge,
   signpost: onEnterSignpost,
   castle: onEnterCastle,
 }

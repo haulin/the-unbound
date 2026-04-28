@@ -3,18 +3,21 @@ import {
   ENABLE_ANIMATIONS,
   FOOD_SPRITE_ID,
   FOOD_WARNING_THRESHOLD,
-  INITIAL_ARMY_SIZE,
+  GRID_TRANSITION_STEP_FRAMES,
   LORE_MAX_CHARS_PER_LINE,
   SPR_BUTTON_GOAL,
   SPR_BUTTON_MINIMAP,
   SPR_BUTTON_RESTART,
 } from '../../core/constants'
+import { getRightGridCellDef } from '../../core/rightGrid'
 import { getSpriteIdAt } from '../../core/world'
 import {
   LEFT_PANEL_KIND_MINIMAP,
   LEFT_PANEL_KIND_SPRITE,
   type ArmyDeltaAnim,
+  type EnemyArmyDeltaAnim,
   type FoodDeltaAnim,
+  type GridTransitionAnim,
   type MoveSlideAnim,
   type State,
 } from '../../core/types'
@@ -118,6 +121,10 @@ function wrapText(text: string, maxChars: number) {
 const BUTTON_SPRITE_SCALE = 2 // 16->32
 const ILLUSTRATION_SCALE = 4 // 16->64
 
+const COMBAT_PREVIEW_PLATE_PAD = 2
+const COMBAT_PREVIEW_PLATE_W = 42
+const COMBAT_PREVIEW_PLATE_INSET = 2
+
 const SPR_STATUS_STEPS = 130
 const SPR_STATUS_POS = 131
 const SPR_STATUS_SEED = 132
@@ -126,6 +133,7 @@ function drawLeftPanel(s: State) {
   rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, COLOR_BG)
   rectb(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, COLOR_DIM)
 
+  const isCombat = !!(s.encounter && s.encounter.kind === 'combat')
   const pos = s.player.position
   const spriteIdAtPos = getSpriteIdAt(s.world, pos.x, pos.y)
   const leftPanel = s.ui.leftPanel
@@ -138,9 +146,60 @@ function drawLeftPanel(s: State) {
     spr(40, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2)
   } else if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
     drawMinimap(s)
+  } else if (leftPanel.kind === LEFT_PANEL_KIND_SPRITE) {
+    spr(leftPanel.spriteId, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2)
   } else {
-    const illustrationId = leftPanel.kind === LEFT_PANEL_KIND_SPRITE ? leftPanel.spriteId : spriteIdAtPos
-    spr(illustrationId, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2)
+    if (!isCombat) {
+      spr(spriteIdAtPos, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2)
+    } else {
+      // Combat preview: use the 64×64 illustration space as a composite.
+      // - Render the underlying tile as a full 64×64 preview.
+      // - Overlay a small "enemy stats" plate on top (filled + bordered),
+      //   using the same icon/value/delta layout constants as the player stats.
+      spr(spriteIdAtPos, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2)
+
+      const platePad = COMBAT_PREVIEW_PLATE_PAD
+      const plateW = COMBAT_PREVIEW_PLATE_W
+      const plateH = 16 + platePad * 2
+      const plateX = illX + illSize - plateW - COMBAT_PREVIEW_PLATE_INSET
+      const plateY = illY + COMBAT_PREVIEW_PLATE_INSET
+      rect(plateX, plateY, plateW, plateH, COLOR_BG)
+      rectb(plateX, plateY, plateW, plateH, COLOR_DIM)
+
+      const enemyIconX = plateX + platePad
+      const enemyIconY = plateY + platePad
+      // Use color 0 as transparent for UI-like overlay sprites.
+      spr(SPR_ENEMY, enemyIconX, enemyIconY, 0, 1, 0, 0, 2, 2)
+
+      const enemyArmy = s.encounter && s.encounter.kind === 'combat' ? (s.encounter.enemyArmySize | 0) : 0
+      const enemyCountX = enemyIconX + UI_FOOD_VALUE_OFFSET_X
+      const enemyCountY = enemyIconY + UI_FOOD_VALUE_OFFSET_Y
+      print(`${enemyArmy}`, enemyCountX, enemyCountY, COLOR_TEXT)
+
+      // Enemy delta overlay near the count.
+      if (ENABLE_ANIMATIONS) {
+        const anims = s.ui.anim.active
+        const frame = s.ui.clock.frame | 0
+        let xCursor = enemyIconX + UI_FOOD_DELTA_OFFSET_X
+        for (let i = 0; i < anims.length; i++) {
+          const a = anims[i]!
+          if (a.kind !== 'enemyArmyDelta') continue
+          const ea = a as EnemyArmyDeltaAnim
+          const start = ea.startFrame | 0
+          const dur = Math.max(1, ea.durationFrames | 0)
+          const t = Math.max(0, Math.min(dur, frame - start))
+          const p = t / dur
+          const delta = ea.params.delta | 0
+          if (!delta) continue
+
+          const label = delta > 0 ? `+${delta}` : `${delta}`
+          const color = delta < 0 ? COLOR_GOOD : COLOR_BAD
+          const dy = UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI_FOOD_DELTA_RISE_PX)
+          print(label, xCursor, enemyIconY + dy, color)
+          xCursor += label.length * 6 + UI_FOOD_DELTA_GAP_PX
+        }
+      }
+    }
   }
 
   const statusX = illX + illSize + UI_LEFT_PANEL_INNER_GAP
@@ -159,7 +218,7 @@ function drawLeftPanel(s: State) {
   spr(ARMY_SPRITE_ID, armyX, armyY, -1, 1, 0, 0, 2, 2) // 16×16
   const armyValueX = armyX + UI_ARMY_VALUE_OFFSET_X
   const armyValueY = armyY + UI_ARMY_VALUE_OFFSET_Y
-  const armyColor = s.resources.armySize < INITIAL_ARMY_SIZE ? COLOR_WARN : COLOR_TEXT
+  const armyColor = s.resources.armySize < 6 ? COLOR_WARN : COLOR_TEXT
   print(`${s.resources.armySize}`, armyValueX, armyValueY, armyColor)
 
   const foodX = statusX
@@ -276,21 +335,94 @@ function drawRightPanel(s: State) {
   return drawRightPanelMoveSlideCross(s, moveSlide)
 }
 
-function previewSpriteIdForCell(s: State, row: number, col: number): number | null {
-  // Corners: goal/minimap/restart/disabled
-  if (row === 0 && col === 0) return SPR_BUTTON_GOAL
-  if (row === 2 && col === 0) return SPR_BUTTON_MINIMAP
-  if (row === 2 && col === 2) return SPR_BUTTON_RESTART
-  if (row === 0 && col === 2) return null
+const SPR_FIGHT = 74
+const SPR_RETURN = 76
+const SPR_ENEMY = 102
 
+function spriteIdForIconKey(iconKey: string): number | null {
+  switch (iconKey) {
+    case 'goal':
+      return SPR_BUTTON_GOAL
+    case 'minimap':
+      return SPR_BUTTON_MINIMAP
+    case 'restart':
+      return SPR_BUTTON_RESTART
+    case 'fight':
+      return SPR_FIGHT
+    case 'return':
+      return SPR_RETURN
+    case 'enemy':
+      return SPR_ENEMY
+    default:
+      return null
+  }
+}
+
+function crossRevealIndex(row: number, col: number): number {
+  // Reveal order: N, W, S, E, C
+  if (row === 0 && col === 1) return 0
+  if (row === 1 && col === 0) return 1
+  if (row === 2 && col === 1) return 2
+  if (row === 1 && col === 2) return 3
+  if (row === 1 && col === 1) return 4
+  return -1
+}
+
+function spriteIdForModeCrossCell(s: State, mode: 'overworld' | 'combat', row: number, col: number): number | null {
+  if (mode === 'combat') {
+    // Combat layout: W=fight, E=return, C=enemy, N/S empty.
+    if (row === 1 && col === 0) return SPR_FIGHT
+    if (row === 1 && col === 2) return SPR_RETURN
+    if (row === 1 && col === 1) return SPR_ENEMY
+    return null
+  }
+
+  // Overworld: show tile previews (relative to player).
   const p = s.player.position
-  // Cross: N/W/C/E/S show the tile sprite you’d see if you moved there (or stayed on C).
   if (row === 0 && col === 1) return getSpriteIdAt(s.world, p.x, p.y - 1)
   if (row === 1 && col === 0) return getSpriteIdAt(s.world, p.x - 1, p.y)
-  if (row === 1 && col === 1) return getSpriteIdAt(s.world, p.x, p.y)
-  if (row === 1 && col === 2) return getSpriteIdAt(s.world, p.x + 1, p.y)
   if (row === 2 && col === 1) return getSpriteIdAt(s.world, p.x, p.y + 1)
+  if (row === 1 && col === 2) return getSpriteIdAt(s.world, p.x + 1, p.y)
+  if (row === 1 && col === 1) return getSpriteIdAt(s.world, p.x, p.y)
+  return null
+}
 
+function previewSpriteIdForCell(s: State, row: number, col: number): number | null {
+  // During a grid transition, we render a hybrid from-mode → to-mode layout.
+  let transition: GridTransitionAnim | null = null
+  if (ENABLE_ANIMATIONS) {
+    const anims = s.ui.anim.active
+    for (let i = 0; i < anims.length; i++) {
+      const a = anims[i]!
+      if (a.kind === 'gridTransition') {
+        transition = a as GridTransitionAnim
+        break
+      }
+    }
+  }
+
+  if (transition) {
+    const frame = s.ui.clock.frame | 0
+    const start = transition.startFrame | 0
+    if (frame >= start) {
+      const stepFrames = Math.max(1, GRID_TRANSITION_STEP_FRAMES | 0)
+      const t = Math.max(0, frame - start)
+      const phase = Math.floor(t / stepFrames)
+
+      const idx = crossRevealIndex(row, col)
+      if (idx >= 0) {
+        const mode = phase >= idx ? transition.params.to : transition.params.from
+        return spriteIdForModeCrossCell(s, mode, row, col)
+      }
+    }
+  }
+
+  const def = getRightGridCellDef(s, row, col)
+  if (def.iconKey) return spriteIdForIconKey(def.iconKey) ?? null
+  if (def.tilePreview && def.tilePreview.kind === 'relativeToPlayer') {
+    const p = s.player.position
+    return getSpriteIdAt(s.world, p.x + def.tilePreview.dx, p.y + def.tilePreview.dy)
+  }
   return null
 }
 

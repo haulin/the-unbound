@@ -12,7 +12,7 @@ export const onEnterCamp: TileEnterHandler = ({ cell, world, pos, stepCount, res
   if (!campCell || campCell.kind !== 'camp') return { message: '' }
 
   const campName = campCell.name || 'A Camp'
-  const readyAt = (campCell.nextReadyStep | 0) || 0
+  const readyAt = campCell.nextReadyStep ?? 0
 
   if (stepCount < readyAt) {
     return {
@@ -20,24 +20,24 @@ export const onEnterCamp: TileEnterHandler = ({ cell, world, pos, stepCount, res
     }
   }
 
-  let rngState = (world.rngState | 0) >>> 0
+  let rngState = world.rngState
   const rGain = randInt(rngState, 2)
   rngState = rGain.rngState
-  const gain = (rGain.value | 0) + 1
+  const gain = rGain.value + 1
 
   const rLine = randInt(rngState, CAMP_RECRUIT_LINES.length)
   rngState = rLine.rngState
-  const line = CAMP_RECRUIT_LINES[rLine.value | 0] || CAMP_RECRUIT_LINES[0] || ''
+  const line = CAMP_RECRUIT_LINES[rLine.value] || CAMP_RECRUIT_LINES[0] || ''
 
-  const nextCampCell: CampCell = { ...campCell, nextReadyStep: (stepCount | 0) + CAMP_COOLDOWN_MOVES }
+  const nextCampCell: CampCell = { ...campCell, nextReadyStep: stepCount + CAMP_COOLDOWN_MOVES }
   const nextWorld = setCellAt({ ...world, rngState }, pos, nextCampCell)
 
   return {
     world: nextWorld,
     resources: {
       ...resources,
-      food: (resources.food | 0) + CAMP_FOOD_GAIN,
-      armySize: (resources.armySize | 0) + gain,
+      food: resources.food + CAMP_FOOD_GAIN,
+      armySize: resources.armySize + gain,
     },
     armyDeltas: [gain],
     foodDeltas: [CAMP_FOOD_GAIN],

@@ -4,26 +4,30 @@ import type { CellKind, FeatureKind, TerrainKind } from './types'
 
 export const WORLD_WIDTH = 10
 export const WORLD_HEIGHT = 10
-
-export const SIGNPOST_COUNT = 6
+export const INITIAL_SEED = 14
+export const ENABLE_ANIMATIONS = true
 
 export const TILE_CASTLE = 8
 export const TILE_SIGNPOST = 42
 export const TILE_FARM = 38
 export const TILE_CAMP = 36
+export const TILE_HENGE = 66
 export const TILE_MOUNTAIN = 6
 export const TILE_SWAMP = 12
+
+export const SIGNPOST_COUNT = 6
 
 export const CAMP_COUNT = 3
 export const CAMP_COOLDOWN_MOVES = 3
 export const CAMP_FOOD_GAIN = 2
 
-export const INITIAL_ARMY_SIZE = 5
+export const HENGE_COUNT = 3
+
+export const INITIAL_ARMY_SIZE = 10
 export const ARMY_SPRITE_ID = 100
 
 export const MAP_GEN_NOISE = 'NOISE' as const
 export const MAP_GEN_ALGORITHM = MAP_GEN_NOISE
-
 export const NOISE_SMOOTH_PASSES = 2
 export const NOISE_VALUE_MAX = 10000
 
@@ -54,7 +58,7 @@ export const FARM_COUNT = 3
 export const FARM_COOLDOWN_MOVES = 3
 
 export const TERRAIN_KINDS = ['grass', 'road', 'mountain', 'lake', 'swamp', 'woods', 'rainbow'] as const satisfies readonly TerrainKind[]
-export const FEATURE_KINDS = ['castle', 'signpost', 'farm', 'camp'] as const satisfies readonly FeatureKind[]
+export const FEATURE_KINDS = ['castle', 'signpost', 'farm', 'camp', 'henge'] as const satisfies readonly FeatureKind[]
 
 export const TERRAIN: Record<TerrainKind, { spriteId: number; enterFoodCost: number; message: string }> = {
   grass: { spriteId: 2, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[2] || '' },
@@ -75,6 +79,7 @@ export const FEATURES: Record<FeatureKind, { spriteId: number; enterFoodCost: nu
   camp: { spriteId: number; enterFoodCost: number; count: number; cooldownMoves: number; foodGain: number }
   signpost: { spriteId: number; enterFoodCost: number; count: number }
   castle: { spriteId: number; enterFoodCost: number }
+  henge: { spriteId: number; enterFoodCost: number; count: number }
 } = {
   castle: { spriteId: TILE_CASTLE, enterFoodCost: FOOD_COST_DEFAULT },
   signpost: { spriteId: TILE_SIGNPOST, enterFoodCost: FOOD_COST_DEFAULT, count: SIGNPOST_COUNT },
@@ -86,6 +91,7 @@ export const FEATURES: Record<FeatureKind, { spriteId: number; enterFoodCost: nu
     cooldownMoves: CAMP_COOLDOWN_MOVES,
     foodGain: CAMP_FOOD_GAIN,
   },
+  henge: { spriteId: TILE_HENGE, enterFoodCost: FOOD_COST_DEFAULT, count: HENGE_COUNT },
 }
 
 export function spriteIdForKind(kind: CellKind): number {
@@ -102,6 +108,7 @@ export function spriteIdForKind(kind: CellKind): number {
     case 'signpost':
     case 'farm':
     case 'camp':
+    case 'henge':
       return FEATURES[kind].spriteId
   }
 }
@@ -120,6 +127,7 @@ export function enterFoodCostForKind(kind: CellKind): number {
     case 'signpost':
     case 'farm':
     case 'camp':
+    case 'henge':
       return FEATURES[kind].enterFoodCost
   }
 }
@@ -138,6 +146,7 @@ export function terrainMessageForKind(kind: CellKind): string {
     case 'signpost':
     case 'farm':
     case 'camp':
+    case 'henge':
       return ''
   }
 }
@@ -182,6 +191,27 @@ export const CAMP_NAME_POOL = [
   'The Holdfast',
 ] as const
 
+export const HENGE_NAME_POOL = [
+  'The Mending',
+  'Old Insistence',
+  "Crows' Argument",
+  'The Recurring',
+  'Patient Circle',
+  'Weather Cross',
+] as const
+
+export const HENGE_LORE_LINES = [
+  'The circle remembers old debts.',
+  'The stones do not ask why you are here.',
+  'Whatever drew you here drew them first.',
+] as const
+
+export const HENGE_EMPTY_LINES = [
+  'The spirits here are quiet. Come back later.',
+  'The circle is empty for now.',
+  'You do not look back. You do not need to.',
+] as const
+
 export const CAMP_RECRUIT_LINES = [
   'Stragglers around a dying fire. They fall in without a word.',
   'A few souls with nowhere better to be. They join you.',
@@ -202,15 +232,38 @@ export const GAME_OVER_LINES = [
   'Alone now. The road goes on without you.',
 ] as const
 
+export const COMBAT_AMBUSH_PERCENT = 20
+export const COMBAT_REWARD_MIN = 5
+export const COMBAT_REWARD_MAX = 15
+export const GRID_TRANSITION_STEP_FRAMES = 5
+
+export const COMBAT_ENCOUNTER_LINES = [
+  'They were already here.',
+  'Company. The unwanted kind.',
+  'This was always going to happen.',
+] as const
+
+export const COMBAT_FLEE_EXIT_LINES = [
+  'You left one of your own behind so the journey can continue.',
+  'You turned away. Not everyone followed.',
+  'You survived. That is not the same as winning.',
+] as const
+
+export const COMBAT_VICTORY_EXIT_LINES = ['To the victor go the spoils.', 'You took what you could and moved on.', 'They will not follow you again.'] as const
+
+export const HENGE_ENCOUNTER_LINE = 'You walked into something that was already happening.'
+
+export const HENGE_COOLDOWN_MOVES = 3
+
 export const ACTION_NEW_RUN = 'NEW_RUN' as const
 export const ACTION_RESTART = 'RESTART' as const
 export const ACTION_MOVE = 'MOVE' as const
 export const ACTION_SHOW_GOAL = 'SHOW_GOAL' as const
 export const ACTION_TOGGLE_MINIMAP = 'TOGGLE_MINIMAP' as const
+export const ACTION_FIGHT = 'FIGHT' as const
+export const ACTION_RETURN = 'RETURN' as const
 export const ACTION_TICK = 'TICK' as const
 
-export const INITIAL_SEED = 14
-export const ENABLE_ANIMATIONS = true
 export const MOVE_SLIDE_FRAMES = 15
 export const LORE_MAX_CHARS_PER_LINE = 19
 

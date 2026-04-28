@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CAMP_COUNT,
   FARM_COUNT,
+  HENGE_COUNT,
   SIGNPOST_COUNT,
   WORLD_HEIGHT,
   WORLD_WIDTH,
@@ -40,11 +41,13 @@ describe('world', () => {
     expect(countKinds(g.world.cells, 'castle')).toBe(1)
     expect(countKinds(g.world.cells, 'farm')).toBe(FARM_COUNT)
     expect(countKinds(g.world.cells, 'camp')).toBe(CAMP_COUNT)
+    expect(countKinds(g.world.cells, 'henge')).toBe(HENGE_COUNT)
     expect(countKinds(g.world.cells, 'signpost')).toBe(SIGNPOST_COUNT)
 
     const cells = allCells(g.world)
     const farms = cells.filter((c) => c.cell.kind === 'farm')
     const camps = cells.filter((c) => c.cell.kind === 'camp')
+    const henges = cells.filter((c) => c.cell.kind === 'henge')
 
     expect(new Set(farms.map((f) => (f.cell.kind === 'farm' ? f.cell.name : ''))).size).toBe(FARM_COUNT)
     expect(new Set(farms.map((f) => `${f.x},${f.y}`)).size).toBe(FARM_COUNT)
@@ -58,6 +61,11 @@ describe('world', () => {
     for (const c of camps) {
       expect(c.cell.kind).toBe('camp')
       expect(c.cell.id).toBe(c.y * WORLD_WIDTH + c.x)
+    }
+
+    for (const h of henges) {
+      expect(h.cell.kind).toBe('henge')
+      expect(h.cell.id).toBe(h.y * WORLD_WIDTH + h.x)
     }
   })
 

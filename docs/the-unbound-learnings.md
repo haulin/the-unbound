@@ -10,8 +10,8 @@ In practice: new features should usually be “add a new entry / new function”
 
 - **Single plain state + pure reducer**: `processAction(prevState, action) -> nextState` kept gameplay deterministic and iteration safe.
 - **World updates are explicit + localized**: the world is a grid of cells (`world.cells`), and feature state (e.g. cooldowns) is updated immutably by cloning only the touched row + cell.
-- **Input edge detection inside reducer**: `TICK` owning `mouseLeftDown` prevented “held click repeats” bugs and avoids globals.
 - **Button-as-data (extension point)**: representing the 3×3 grid as a mapping of “cell → definition” (preview + onPress) reduces edit sites when buttons change.
+- **RNG boundary discipline**: keep bitwise/u32 concerns in `src/core/prng.ts`; call sites use `randInt` + plain math.
 
 ## What surprised us (and what to do next time)
 
@@ -33,13 +33,13 @@ In practice: new features should usually be “add a new entry / new function”
     - Each `ButtonDef` stays pure: `previewSpriteId(state)`, `onPress(state)`.
   - Keep functions **out of `state`**; `state` stays serializable data.
 
-- **Animation as progressive enhancement (prototype v3)**: movement benefits from continuity/legibility, but animation should not infect game logic.
+- **Animation as progressive enhancement**: movement benefits from continuity/legibility, but animation should not infect game logic.
   - Recommendation: keep animations as plain data in state (`ui.clock.frame` + `ui.anim.active[]`) advanced only via `TICK`.
   - Keep one knob to disable all animations (debug/feel comparison, accessibility).
   - For move transitions, lock input while the transition is active to avoid “multiple moves per blur” feel.
   - Rendering lesson: if sprites slide, add explicit masking/clipping to the grid bounds each frame; otherwise tiles will “appear from nowhere” / “disappear suddenly” at animation start/end.
 
-- **Map generation decision (prototype v2)**: we evaluated multiple generators and picked **NOISE** for v2 because it produces small distinct blobs (less “slot machine”), while still avoiding long same-terrain runs that can make limited visibility feel monotonous.
+- **Map generation decision**: we evaluated multiple generators and picked **NOISE** for v2 because it produces small distinct blobs (less “slot machine”), while still avoiding long same-terrain runs that can make limited visibility feel monotonous.
   - Alternatives considered: IID-per-cell baseline, BLOBS smoothing, DRUNKWALK/carve.
   - We removed the non-chosen generators from the cart to keep iteration focused (can revisit once final tile taxonomy is locked).
 
@@ -47,6 +47,7 @@ In practice: new features should usually be “add a new entry / new function”
 
 - For **feel iteration** (UI/UX, tuning counts, copy tone): iterate quickly, keep changes small, and update the design doc when a tweak becomes “the contract”.
 - Once the direction stabilizes: do one “elegance pass” refactor to consolidate geometry/constants and remove accumulated one-off branching.
+- If a UI/layout change has multiple plausible shapes, agree on one approach before implementing (avoid mixing half-solutions).
 
 ## Refactor philosophy (boy scout rule)
 
@@ -63,7 +64,8 @@ In practice: new features should usually be “add a new entry / new function”
 ## Type safety note (avoid `any`)
 
 - Prefer **type guards / discriminated unions** over `: any` or `as any`.
-- If you must weaken types, prefer **`unknown` + narrowing** rather than `any` (keeps “no implicit assumptions” discipline).
+- If you must weaken types, use **`unknown` + narrowing at explicit boundaries**, not deep inside core gameplay code.
+- **Core / reducer surfaces**: prefer **fail-fast, typed `Ui`** in helpers that assume full UI shape — don’t accept `unknown` at those boundaries just to save casts at call sites.
 - If the codebase grows, consider adding linting later (e.g. forbid explicit `any`) — but don’t block prototype iteration on tooling.
 
 ## Workflow/meta decisions (v1)

@@ -35,6 +35,7 @@ function makeState(): State {
       food: INITIAL_FOOD,
       armySize: 1,
     },
+    encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
 }
@@ -66,6 +67,7 @@ describe('army + camps + game over', () => {
       player: { position: { x: 0, y: 0 } },
       run: { stepCount: 0, hasFoundCastle: false, isGameOver: false },
       resources: { food: 2, armySize: 5 },
+      encounter: null,
       ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
     }
 
@@ -93,6 +95,7 @@ describe('army + camps + game over', () => {
       player: { position: { x: 0, y: 0 } },
       run: { stepCount: 0, hasFoundCastle: false, isGameOver: false },
       resources: { food: 1, armySize: 5 },
+      encounter: null,
       ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
     }
 

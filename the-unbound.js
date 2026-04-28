@@ -1,6 +1,6 @@
-// title:  The Unbound (prototype 0.0.6)
+// title:  The Unbound (prototype 0.0.7)
 // author: haulin
-// desc:   Prototype 0.0.6 toward the North Star
+// desc:   Prototype 0.0.7 toward the North Star
 // script: js
 // input:  mouse
 
@@ -14,17 +14,21 @@
   // src/core/constants.ts
   var WORLD_WIDTH = 10;
   var WORLD_HEIGHT = 10;
-  var SIGNPOST_COUNT = 6;
+  var INITIAL_SEED = 14;
+  var ENABLE_ANIMATIONS = true;
   var TILE_CASTLE = 8;
   var TILE_SIGNPOST = 42;
   var TILE_FARM = 38;
   var TILE_CAMP = 36;
+  var TILE_HENGE = 66;
   var TILE_MOUNTAIN = 6;
   var TILE_SWAMP = 12;
+  var SIGNPOST_COUNT = 6;
   var CAMP_COUNT = 3;
   var CAMP_COOLDOWN_MOVES = 3;
   var CAMP_FOOD_GAIN = 2;
-  var INITIAL_ARMY_SIZE = 5;
+  var HENGE_COUNT = 3;
+  var INITIAL_ARMY_SIZE = 10;
   var ARMY_SPRITE_ID = 100;
   var MAP_GEN_NOISE = "NOISE";
   var MAP_GEN_ALGORITHM = MAP_GEN_NOISE;
@@ -79,7 +83,8 @@
       count: CAMP_COUNT,
       cooldownMoves: CAMP_COOLDOWN_MOVES,
       foodGain: CAMP_FOOD_GAIN
-    }
+    },
+    henge: { spriteId: TILE_HENGE, enterFoodCost: FOOD_COST_DEFAULT, count: HENGE_COUNT }
   };
   function spriteIdForKind(kind) {
     switch (kind) {
@@ -95,6 +100,7 @@
       case "signpost":
       case "farm":
       case "camp":
+      case "henge":
         return FEATURES[kind].spriteId;
     }
   }
@@ -112,6 +118,7 @@
       case "signpost":
       case "farm":
       case "camp":
+      case "henge":
         return FEATURES[kind].enterFoodCost;
     }
   }
@@ -129,6 +136,7 @@
       case "signpost":
       case "farm":
       case "camp":
+      case "henge":
         return "";
     }
   }
@@ -164,6 +172,24 @@
     "Dusk Halt",
     "The Holdfast"
   ];
+  var HENGE_NAME_POOL = [
+    "The Mending",
+    "Old Insistence",
+    "Crows' Argument",
+    "The Recurring",
+    "Patient Circle",
+    "Weather Cross"
+  ];
+  var HENGE_LORE_LINES = [
+    "The circle remembers old debts.",
+    "The stones do not ask why you are here.",
+    "Whatever drew you here drew them first."
+  ];
+  var HENGE_EMPTY_LINES = [
+    "The spirits here are quiet. Come back later.",
+    "The circle is empty for now.",
+    "You do not look back. You do not need to."
+  ];
   var CAMP_RECRUIT_LINES = [
     "Stragglers around a dying fire. They fall in without a word.",
     "A few souls with nowhere better to be. They join you.",
@@ -181,19 +207,134 @@
     "You came with an army. You leave with nothing.\nThe gate remains closed.",
     "Alone now. The road goes on without you."
   ];
+  var COMBAT_AMBUSH_PERCENT = 20;
+  var COMBAT_REWARD_MIN = 5;
+  var COMBAT_REWARD_MAX = 15;
+  var GRID_TRANSITION_STEP_FRAMES = 5;
+  var COMBAT_ENCOUNTER_LINES = [
+    "They were already here.",
+    "Company. The unwanted kind.",
+    "This was always going to happen."
+  ];
+  var COMBAT_FLEE_EXIT_LINES = [
+    "You left one of your own behind so the journey can continue.",
+    "You turned away. Not everyone followed.",
+    "You survived. That is not the same as winning."
+  ];
+  var COMBAT_VICTORY_EXIT_LINES = ["To the victor go the spoils.", "You took what you could and moved on.", "They will not follow you again."];
+  var HENGE_ENCOUNTER_LINE = "You walked into something that was already happening.";
+  var HENGE_COOLDOWN_MOVES = 3;
   var ACTION_NEW_RUN = "NEW_RUN";
   var ACTION_RESTART = "RESTART";
   var ACTION_MOVE = "MOVE";
   var ACTION_SHOW_GOAL = "SHOW_GOAL";
   var ACTION_TOGGLE_MINIMAP = "TOGGLE_MINIMAP";
+  var ACTION_FIGHT = "FIGHT";
+  var ACTION_RETURN = "RETURN";
   var ACTION_TICK = "TICK";
-  var INITIAL_SEED = 14;
-  var ENABLE_ANIMATIONS = true;
   var MOVE_SLIDE_FRAMES = 15;
   var LORE_MAX_CHARS_PER_LINE = 19;
   var SPR_BUTTON_GOAL = 44;
   var SPR_BUTTON_RESTART = 46;
   var SPR_BUTTON_MINIMAP = 78;
+
+  // src/core/prng.ts
+  function xorshift32(x) {
+    x = x >>> 0;
+    x ^= x << 13 >>> 0;
+    x ^= x >>> 17;
+    x ^= x << 5 >>> 0;
+    return x >>> 0;
+  }
+  function u32(x) {
+    return x >>> 0;
+  }
+  function seedToRngState(seed) {
+    let s = (seed ^ 2779096485) >>> 0;
+    if (s === 0) s = 1;
+    return s;
+  }
+  function normalizeMaxExclusive(maxExclusive) {
+    if (!Number.isFinite(maxExclusive)) return 1;
+    const n = Math.trunc(maxExclusive);
+    return n <= 0 ? 1 : n;
+  }
+  function randInt(rngState, maxExclusive) {
+    const next = xorshift32(u32(rngState));
+    const m = normalizeMaxExclusive(maxExclusive);
+    return { rngState: next, value: next % m };
+  }
+  function hashSeedStepCell(opts) {
+    const base = seedToRngState(opts.seed | 0);
+    const stepMix = u32(Math.imul(opts.stepCount | 0, 2654435761));
+    const cellId = u32(opts.cellId | 0);
+    const salt = u32(opts.salt == null ? 0 : opts.salt | 0);
+    return xorshift32(u32(base ^ stepMix ^ cellId ^ salt));
+  }
+  function pickIndex(hash, length) {
+    const m = length | 0;
+    if (m <= 0) return 0;
+    return u32(hash) % m;
+  }
+  function pickFromPool(pool, hash) {
+    if (!pool.length) return void 0;
+    return pool[pickIndex(hash, pool.length)];
+  }
+
+  // src/core/combat.ts
+  function cellIdForPos(world, pos) {
+    return pos.y * world.width + pos.x;
+  }
+  function shouldStartAmbush(opts) {
+    const percent = opts.percent;
+    if (!Number.isFinite(percent) || percent <= 0) return false;
+    const h = hashSeedStepCell({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId });
+    return h % 100 < percent;
+  }
+  function encounterFlavorIndex(opts) {
+    const h = hashSeedStepCell({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId });
+    return pickIndex(h, COMBAT_ENCOUNTER_LINES.length);
+  }
+  function pickCombatEncounterLine(opts) {
+    const idx = encounterFlavorIndex(opts);
+    return COMBAT_ENCOUNTER_LINES[idx] || COMBAT_ENCOUNTER_LINES[0] || "";
+  }
+  function pickCombatExitLine(opts) {
+    const pool = opts.outcome === "victory" ? COMBAT_VICTORY_EXIT_LINES : COMBAT_FLEE_EXIT_LINES;
+    const salt = opts.outcome === "victory" ? 2654435769 : 2246822507;
+    const h = hashSeedStepCell({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId, salt });
+    return pickFromPool(pool, h) || pool[0] || "";
+  }
+  function spawnEnemyArmy(opts) {
+    const playerArmy = Math.max(0, Math.trunc(opts.playerArmy));
+    const maxExclusive = playerArmy + 1;
+    const r = randInt(opts.rngState, maxExclusive);
+    return { rngState: r.rngState, enemyArmy: playerArmy + r.value };
+  }
+  function resolveFightRound(opts) {
+    const playerArmy = Math.max(0, Math.trunc(opts.playerArmy));
+    const enemyArmy = Math.max(0, Math.trunc(opts.enemyArmy));
+    const w = randInt(opts.rngState, playerArmy + 5);
+    const b = randInt(w.rngState, enemyArmy + 5);
+    if (w.value >= b.value) {
+      const nextEnemyArmy = Math.floor(enemyArmy / 2);
+      const killed = enemyArmy - nextEnemyArmy;
+      return {
+        rngState: b.rngState,
+        outcome: "playerHit",
+        nextEnemyArmy,
+        enemyDelta: nextEnemyArmy - enemyArmy,
+        killed
+      };
+    }
+    return {
+      rngState: b.rngState,
+      outcome: "enemyHit",
+      nextEnemyArmy: enemyArmy,
+      enemyDelta: 0,
+      killed: 0
+    };
+  }
 
   // src/core/math.ts
   function wrapIndex(i, size) {
@@ -227,32 +368,32 @@
   // src/core/signpost.ts
   function formatNearestPoiSignpostMessage(playerPos, world) {
     const candidates = [];
+    function pushNamedCandidate(kind, id, baseName, suffix, x, y) {
+      candidates.push({ kind, id, name: `${baseName} ${suffix}`, pos: { x, y } });
+    }
     const cells = world.cells;
     for (let y = 0; y < cells.length; y++) {
       const row = cells[y];
       for (let x = 0; x < row.length; x++) {
         const cell = row[x];
-        if (cell.kind === "castle") {
-          candidates.push({ kind: "castle", id: y * world.width + x, name: "The Castle", pos: { x, y } });
-        } else if (cell.kind === "farm") {
-          candidates.push({
-            kind: "farm",
-            id: cell.id | 0,
-            name: `${cell.name || "A Farm"} Farm`,
-            pos: { x, y }
-          });
-        } else if (cell.kind === "camp") {
-          candidates.push({
-            kind: "camp",
-            id: cell.id | 0,
-            name: `${cell.name || "A Camp"} Camp`,
-            pos: { x, y }
-          });
+        switch (cell.kind) {
+          case "castle":
+            candidates.push({ kind: "castle", id: y * world.width + x, name: "The Castle", pos: { x, y } });
+            break;
+          case "farm":
+            pushNamedCandidate("farm", cell.id, cell.name || "A Farm", "Farm", x, y);
+            break;
+          case "camp":
+            pushNamedCandidate("camp", cell.id, cell.name || "A Camp", "Camp", x, y);
+            break;
+          case "henge":
+            pushNamedCandidate("henge", cell.id, cell.name || "A Henge", "Henge", x, y);
+            break;
         }
       }
     }
     if (candidates.length === 0) return "";
-    const kindRank = (k) => k === "castle" ? 0 : k === "farm" ? 1 : 2;
+    const kindRank = (k) => k === "castle" ? 0 : k === "farm" ? 1 : k === "camp" ? 2 : 3;
     let best = candidates[0];
     let bestDx = torusDelta(playerPos.x, best.pos.x, world.width);
     let bestDy = torusDelta(playerPos.y, best.pos.y, world.height);
@@ -272,7 +413,7 @@
       if (d === bestD) {
         const ar = kindRank(c.kind);
         const br = kindRank(best.kind);
-        if (ar < br || ar === br && (c.id | 0) < (best.id | 0)) {
+        if (ar < br || ar === br && c.id < best.id) {
           best = c;
           bestDx = dx;
           bestDy = dy;
@@ -283,24 +424,6 @@
     const dir = dirLabel(bestDx, bestDy);
     return `${best.name}
 ${dir}, ${bestD} leagues away.`;
-  }
-
-  // src/core/prng.ts
-  function xorshift32(x) {
-    x = x >>> 0;
-    x ^= x << 13 >>> 0;
-    x ^= x >>> 17;
-    x ^= x << 5 >>> 0;
-    return x >>> 0;
-  }
-  function seedToRngState(seed) {
-    let s = (seed ^ 2779096485) >>> 0;
-    if (s === 0) s = 1;
-    return s;
-  }
-  function randInt(rngState, maxExclusive) {
-    const next = xorshift32(rngState);
-    return { rngState: next, value: next % maxExclusive };
   }
 
   // src/core/world.ts
@@ -317,7 +440,7 @@ ${dir}, ${bestD} leagues away.`;
             sum += grid[ny][nx];
           }
         }
-        row.push(sum / 9 | 0);
+        row.push(Math.floor(sum / 9));
       }
       out.push(row);
     }
@@ -354,7 +477,7 @@ ${dir}, ${bestD} leagues away.`;
     for (let y = 0; y < WORLD_HEIGHT; y++) {
       const row = [];
       for (let x = 0; x < WORLD_WIDTH; x++) {
-        let bucket = bucketCount * (V[y][x] - minV) / span | 0;
+        let bucket = Math.floor(bucketCount * (V[y][x] - minV) / span);
         if (bucket < 0) bucket = 0;
         if (bucket >= bucketCount) bucket = bucketCount - 1;
         row.push({ kind: kindByBucket[bucket] });
@@ -371,49 +494,54 @@ ${dir}, ${bestD} leagues away.`;
     cells[y][x] = { kind: "castle" };
     return { castlePos: { x, y }, rngState };
   }
-  function placeNamedFarms(cells, rngState, castlePos) {
-    const remainingNames = [...FARM_NAME_POOL];
+  function placeNamedFeature(cells, rngState, castlePos, opts) {
+    const remainingNames = [...opts.namePool];
     let placed = 0;
-    while (placed < FARM_COUNT) {
+    while (placed < opts.count) {
       const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
       rngState = r.rngState;
       const x = r.value % WORLD_WIDTH;
       const y = Math.floor(r.value / WORLD_WIDTH);
       if (x === castlePos.x && y === castlePos.y) continue;
       const here = cells[y][x];
-      if (here.kind === "farm" || here.kind === "camp" || here.kind === "signpost") continue;
-      let name = "A Farm";
+      if (!opts.canPlaceAt(here)) continue;
+      let name = opts.fallbackName;
       if (remainingNames.length > 0) {
         const pick = randInt(rngState, remainingNames.length);
         rngState = pick.rngState;
         name = remainingNames.splice(pick.value, 1)[0];
       }
-      cells[y][x] = { kind: "farm", id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 };
+      cells[y][x] = opts.buildCell(x, y, name);
       placed++;
     }
     return rngState;
   }
+  function placeNamedFarms(cells, rngState, castlePos) {
+    return placeNamedFeature(cells, rngState, castlePos, {
+      count: FARM_COUNT,
+      namePool: FARM_NAME_POOL,
+      fallbackName: "A Farm",
+      canPlaceAt: (here) => !(here.kind === "farm" || here.kind === "camp" || here.kind === "signpost"),
+      buildCell: (x, y, name) => ({ kind: "farm", id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 })
+    });
+  }
   function placeNamedCamps(cells, rngState, castlePos) {
-    const remainingNames = [...CAMP_NAME_POOL];
-    let placed = 0;
-    while (placed < CAMP_COUNT) {
-      const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
-      rngState = r.rngState;
-      const x = r.value % WORLD_WIDTH;
-      const y = Math.floor(r.value / WORLD_WIDTH);
-      if (x === castlePos.x && y === castlePos.y) continue;
-      const here = cells[y][x];
-      if (here.kind === "farm" || here.kind === "camp" || here.kind === "signpost") continue;
-      let name = "A Camp";
-      if (remainingNames.length > 0) {
-        const pick = randInt(rngState, remainingNames.length);
-        rngState = pick.rngState;
-        name = remainingNames.splice(pick.value, 1)[0];
-      }
-      cells[y][x] = { kind: "camp", id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 };
-      placed++;
-    }
-    return rngState;
+    return placeNamedFeature(cells, rngState, castlePos, {
+      count: CAMP_COUNT,
+      namePool: CAMP_NAME_POOL,
+      fallbackName: "A Camp",
+      canPlaceAt: (here) => !(here.kind === "farm" || here.kind === "camp" || here.kind === "signpost"),
+      buildCell: (x, y, name) => ({ kind: "camp", id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 })
+    });
+  }
+  function placeHenges(cells, rngState, castlePos) {
+    return placeNamedFeature(cells, rngState, castlePos, {
+      count: HENGE_COUNT,
+      namePool: HENGE_NAME_POOL,
+      fallbackName: "A Henge",
+      canPlaceAt: (here) => !(here.kind === "castle" || here.kind === "farm" || here.kind === "camp" || here.kind === "henge" || here.kind === "signpost"),
+      buildCell: (x, y, name) => ({ kind: "henge", id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 })
+    });
   }
   function placeSignposts(cells, rngState, castlePos) {
     let placed = 0;
@@ -424,7 +552,7 @@ ${dir}, ${bestD} leagues away.`;
       const y = Math.floor(r.value / WORLD_WIDTH);
       if (x === castlePos.x && y === castlePos.y) continue;
       const here = cells[y][x];
-      if (here.kind === "farm" || here.kind === "camp" || here.kind === "signpost") continue;
+      if (here.kind === "farm" || here.kind === "camp" || here.kind === "henge" || here.kind === "signpost") continue;
       cells[y][x] = { kind: "signpost" };
       placed++;
     }
@@ -452,6 +580,7 @@ ${dir}, ${bestD} leagues away.`;
     rngState = castle.rngState;
     rngState = placeNamedFarms(cells, rngState, castle.castlePos);
     rngState = placeNamedCamps(cells, rngState, castle.castlePos);
+    rngState = placeHenges(cells, rngState, castle.castlePos);
     rngState = placeSignposts(cells, rngState, castle.castlePos);
     const startPick = pickStart({ rngState });
     rngState = startPick.rngState;
@@ -465,12 +594,6 @@ ${dir}, ${bestD} leagues away.`;
     };
     return { world, startPosition: startPick.startPosition };
   }
-
-  // src/core/tiles/onEnterCastle.ts
-  var onEnterCastle = () => ({
-    message: CASTLE_FOUND_MESSAGE,
-    hasFoundCastle: true
-  });
 
   // src/core/cells.ts
   function getCellAt(world, pos) {
@@ -486,13 +609,17 @@ ${dir}, ${bestD} leagues away.`;
     return { ...world, cells: nextCells };
   }
 
+  // src/core/tiles/onEnterCastle.ts
+  var onEnterCastle = () => ({
+    message: CASTLE_FOUND_MESSAGE,
+    hasFoundCastle: true
+  });
+
   // src/core/tiles/poiUtils.ts
   function pickDeterministicLine(lines, seed, poiIndex, stepCount) {
-    const m = lines.length;
-    if (m <= 0) return "";
-    const k = (seed | 0) + (poiIndex | 0) * 7 + (stepCount | 0) | 0;
-    const idx = (k % m + m) % m;
-    return lines[idx] || lines[0] || "";
+    if (!lines.length) return "";
+    const h = hashSeedStepCell({ seed, stepCount, cellId: poiIndex });
+    return pickFromPool(lines, h) || lines[0] || "";
   }
 
   // src/core/tiles/onEnterCamp.ts
@@ -501,28 +628,28 @@ ${dir}, ${bestD} leagues away.`;
     const campCell = getCellAt(world, pos);
     if (!campCell || campCell.kind !== "camp") return { message: "" };
     const campName = campCell.name || "A Camp";
-    const readyAt = campCell.nextReadyStep | 0 || 0;
+    const readyAt = campCell.nextReadyStep ?? 0;
     if (stepCount < readyAt) {
       return {
         message: `${campName} Camp
 ${pickDeterministicLine(CAMP_EMPTY_LINES, world.seed, campCell.id, stepCount)}`
       };
     }
-    let rngState = (world.rngState | 0) >>> 0;
+    let rngState = world.rngState;
     const rGain = randInt(rngState, 2);
     rngState = rGain.rngState;
-    const gain = (rGain.value | 0) + 1;
+    const gain = rGain.value + 1;
     const rLine = randInt(rngState, CAMP_RECRUIT_LINES.length);
     rngState = rLine.rngState;
-    const line = CAMP_RECRUIT_LINES[rLine.value | 0] || CAMP_RECRUIT_LINES[0] || "";
-    const nextCampCell = { ...campCell, nextReadyStep: (stepCount | 0) + CAMP_COOLDOWN_MOVES };
+    const line = CAMP_RECRUIT_LINES[rLine.value] || CAMP_RECRUIT_LINES[0] || "";
+    const nextCampCell = { ...campCell, nextReadyStep: stepCount + CAMP_COOLDOWN_MOVES };
     const nextWorld = setCellAt({ ...world, rngState }, pos, nextCampCell);
     return {
       world: nextWorld,
       resources: {
         ...resources,
-        food: (resources.food | 0) + CAMP_FOOD_GAIN,
-        armySize: (resources.armySize | 0) + gain
+        food: resources.food + CAMP_FOOD_GAIN,
+        armySize: resources.armySize + gain
       },
       armyDeltas: [gain],
       foodDeltas: [CAMP_FOOD_GAIN],
@@ -542,32 +669,45 @@ ${line}`
     const farmCell = getCellAt(world, pos);
     if (!farmCell || farmCell.kind !== "farm") return { message: "" };
     const farmName = farmCell.name || "A Farm";
-    const readyAt = farmCell.nextReadyStep | 0 || 0;
+    const readyAt = farmCell.nextReadyStep ?? 0;
     if (stepCount < readyAt) {
       return {
         message: `${farmName} Farm
 ${pickDeterministicLine(FARM_REVISIT_LINES, world.seed, farmCell.id, stepCount)}`
       };
     }
-    let rngState = (world.rngState | 0) >>> 0;
+    let rngState = world.rngState;
     const rGain = randInt(rngState, 8);
     rngState = rGain.rngState;
-    const gain = (rGain.value | 0) + 3;
+    const gain = rGain.value + 3;
     const rLine = randInt(rngState, FARM_HARVEST_LINES.length);
     rngState = rLine.rngState;
-    const harvestLine = FARM_HARVEST_LINES[rLine.value | 0] || FARM_HARVEST_LINES[0] || "";
-    const nextFarmCell = { ...farmCell, nextReadyStep: (stepCount | 0) + FARM_COOLDOWN_MOVES };
+    const harvestLine = FARM_HARVEST_LINES[rLine.value] || FARM_HARVEST_LINES[0] || "";
+    const nextFarmCell = { ...farmCell, nextReadyStep: stepCount + FARM_COOLDOWN_MOVES };
     const nextWorld = setCellAt({ ...world, rngState }, pos, nextFarmCell);
     return {
       world: nextWorld,
       resources: {
         ...resources,
-        food: (resources.food | 0) + gain
+        food: resources.food + gain
       },
       foodDeltas: [gain],
       message: `${farmName} Farm
 ${harvestLine}`
     };
+  };
+
+  // src/core/tiles/onEnterHenge.ts
+  var onEnterHenge = ({ cell, world, pos, stepCount }) => {
+    if (cell.kind !== "henge") return { message: "" };
+    const hengeCell = getCellAt(world, pos);
+    if (!hengeCell || hengeCell.kind !== "henge") return { message: "" };
+    const name = hengeCell.name || "A Henge";
+    const readyAt = hengeCell.nextReadyStep ?? 0;
+    const isReady = stepCount >= readyAt;
+    const line = isReady ? pickDeterministicLine(HENGE_LORE_LINES, world.seed, hengeCell.id, stepCount) : pickDeterministicLine(HENGE_EMPTY_LINES, world.seed, hengeCell.id, stepCount);
+    return { message: `${name} Henge
+${line}` };
   };
 
   // src/core/tiles/onEnterSignpost.ts
@@ -579,6 +719,7 @@ ${harvestLine}`
   var onEnterByKind = {
     camp: onEnterCamp,
     farm: onEnterFarm,
+    henge: onEnterHenge,
     signpost: onEnterSignpost,
     castle: onEnterCastle
   };
@@ -593,91 +734,56 @@ ${harvestLine}`
 
   // src/core/reducer.ts
   function getLeftPanel(ui) {
-    if (!ui || typeof ui !== "object") return { kind: LEFT_PANEL_KIND_AUTO };
-    const root = ui;
-    const lp = root.leftPanel;
-    if (!lp || typeof lp !== "object") return { kind: LEFT_PANEL_KIND_AUTO };
-    const o = lp;
-    const kind = o.kind;
-    if (kind === LEFT_PANEL_KIND_AUTO) return { kind: LEFT_PANEL_KIND_AUTO };
-    if (kind === LEFT_PANEL_KIND_MINIMAP) return { kind: LEFT_PANEL_KIND_MINIMAP };
-    if (kind === LEFT_PANEL_KIND_SPRITE) {
-      const spriteId = o.spriteId;
-      if (typeof spriteId === "number") return { kind: LEFT_PANEL_KIND_SPRITE, spriteId: spriteId | 0 };
-    }
-    return { kind: LEFT_PANEL_KIND_AUTO };
+    return ui.leftPanel;
   }
   function getUi(ui) {
-    if (!ui || typeof ui !== "object") {
-      return {
-        message: "",
-        leftPanel: { kind: LEFT_PANEL_KIND_AUTO },
-        clock: { frame: 0 },
-        anim: { nextId: 1, active: [] }
-      };
-    }
-    const u = ui;
-    const message = typeof u.message === "string" ? u.message : "";
-    const leftPanel = getLeftPanel(u);
-    const clockObj = u.clock && typeof u.clock === "object" ? u.clock : null;
-    const clockFrame = clockObj && typeof clockObj.frame === "number" ? clockObj.frame | 0 : 0;
-    const clock = { frame: clockFrame };
-    const animObj = u.anim && typeof u.anim === "object" ? u.anim : null;
-    const active = animObj && Array.isArray(animObj.active) ? animObj.active : [];
-    const nextId = animObj && typeof animObj.nextId === "number" ? animObj.nextId | 0 : 1;
-    return {
-      message,
-      leftPanel,
-      clock,
-      anim: { nextId: nextId > 0 ? nextId : 1, active }
-    };
+    return ui;
   }
   function tickClock(ui) {
-    const u = getUi(ui);
     return {
-      message: u.message,
-      leftPanel: u.leftPanel,
-      clock: { frame: (u.clock.frame | 0) + 1 },
-      anim: u.anim
+      message: ui.message,
+      leftPanel: ui.leftPanel,
+      clock: { frame: ui.clock.frame + 1 },
+      anim: ui.anim
     };
   }
   function pruneExpiredAnims(ui) {
-    const u = getUi(ui);
-    const frame = u.clock.frame | 0;
-    const active = u.anim.active;
+    const frame = ui.clock.frame;
+    const active = ui.anim.active;
     const kept = [];
     for (let i = 0; i < active.length; i++) {
       const a = active[i];
-      const startFrame = a.startFrame | 0;
-      const durationFrames = a.durationFrames | 0;
+      const startFrame = a.startFrame;
+      const durationFrames = a.durationFrames;
       const endFrame = startFrame + Math.max(0, durationFrames);
       if (frame < endFrame) kept.push(a);
     }
-    if (kept.length === active.length) return u;
+    if (kept.length === active.length) return ui;
     return {
-      message: u.message,
-      leftPanel: u.leftPanel,
-      clock: u.clock,
-      anim: { nextId: u.anim.nextId, active: kept }
+      message: ui.message,
+      leftPanel: ui.leftPanel,
+      clock: ui.clock,
+      anim: { nextId: ui.anim.nextId, active: kept }
     };
   }
   function hasBlockingAnim(ui) {
-    const u = getUi(ui);
-    const active = u.anim.active;
+    const active = ui.anim.active;
     for (let i = 0; i < active.length; i++) {
       if (active[i].blocksInput) return true;
     }
     return false;
   }
+  function gridTransitionDurationFrames() {
+    return Math.max(1, Math.trunc(GRID_TRANSITION_STEP_FRAMES)) * 5;
+  }
   function enqueueAnim(ui, anim) {
-    const u = getUi(ui);
-    const id = u.anim.nextId | 0;
+    const id = Math.max(1, Math.trunc(ui.anim.nextId));
     const a = { id, ...anim };
-    const nextActive = u.anim.active.concat([a]);
+    const nextActive = ui.anim.active.concat([a]);
     return {
-      message: u.message,
-      leftPanel: u.leftPanel,
-      clock: u.clock,
+      message: ui.message,
+      leftPanel: ui.leftPanel,
+      clock: ui.clock,
       anim: { nextId: id + 1, active: nextActive }
     };
   }
@@ -687,12 +793,11 @@ ${harvestLine}`
     return lp;
   }
   function normalizeResources(_world, raw) {
-    const food = raw && typeof raw.food === "number" ? raw.food | 0 : INITIAL_FOOD;
-    const armySize = raw && typeof raw.armySize === "number" ? raw.armySize | 0 : INITIAL_ARMY_SIZE;
-    return { food, armySize };
+    if (!raw) return { food: INITIAL_FOOD, armySize: INITIAL_ARMY_SIZE };
+    return { food: raw.food, armySize: raw.armySize };
   }
   function gameOverMessage(seed, stepCount) {
-    const k = (seed | 0) + (stepCount | 0) | 0;
+    const k = Math.trunc(seed) + Math.trunc(stepCount);
     const m = GAME_OVER_LINES.length;
     const idx = (k % m + m) % m;
     return GAME_OVER_LINES[idx] || "";
@@ -715,6 +820,7 @@ ${harvestLine}`
       player: s.player,
       run: s.run,
       resources: s.resources,
+      encounter: s.encounter,
       ui: {
         clock: prevUi.clock,
         anim: prevUi.anim,
@@ -732,6 +838,7 @@ ${harvestLine}`
       player: s.player,
       run: s.run,
       resources: s.resources,
+      encounter: s.encounter,
       ui: {
         clock: prevUi.clock,
         anim: prevUi.anim,
@@ -742,6 +849,7 @@ ${harvestLine}`
   }
   function reduceMove(prevState, dx, dy) {
     if (prevState.run.isGameOver || prevState.run.hasFoundCastle) return prevState;
+    if (prevState.encounter && prevState.encounter.kind === "combat") return prevState;
     const world = prevState.world;
     const prevPos = prevState.player.position;
     const nextPos = {
@@ -749,9 +857,9 @@ ${harvestLine}`
       y: (prevPos.y + dy + world.height) % world.height
     };
     const cell = world.cells[nextPos.y][nextPos.x];
-    const nextStepCount = (prevState.run.stepCount | 0) + 1;
+    const nextStepCount = prevState.run.stepCount + 1;
     const prevRes = normalizeResources(world, prevState.resources);
-    const prevFood = prevRes.food | 0;
+    const prevFood = prevRes.food;
     const cost = enterFoodCostForKind(cell.kind);
     const foodDeltas = [];
     const armyDeltas = [];
@@ -760,25 +868,65 @@ ${harvestLine}`
     if (prevFood >= cost) {
       food = prevFood - cost;
       foodDeltas.push(-cost);
-      armySize = prevRes.armySize | 0;
+      armySize = prevRes.armySize;
     } else {
       food = 0;
       if (prevFood > 0) foodDeltas.push(-prevFood);
-      armySize = (prevRes.armySize | 0) - 1;
+      armySize = prevRes.armySize - 1;
       armyDeltas.push(-1);
     }
     const baseResources = { ...prevRes, food, armySize };
     const handler = getOnEnterHandler(cell.kind);
     const outcome = handler({ cell, world, pos: nextPos, stepCount: nextStepCount, resources: baseResources });
-    const nextWorld = outcome.world || world;
+    let nextWorld = outcome.world || world;
     let nextResources = outcome.resources || baseResources;
     if (outcome.foodDeltas && outcome.foodDeltas.length) foodDeltas.push(...outcome.foodDeltas);
     if (outcome.armyDeltas && outcome.armyDeltas.length) armyDeltas.push(...outcome.armyDeltas);
     const nextHasFoundCastle = prevState.run.hasFoundCastle || cell.kind === "castle" || !!outcome.hasFoundCastle;
-    const isGameOver = (nextResources.armySize | 0) <= 0;
+    const isGameOver = nextResources.armySize <= 0;
     let message = outcome.message;
     if (isGameOver) {
       message = gameOverMessage(nextWorld.seed, nextStepCount);
+    }
+    let nextEncounter = prevState.encounter;
+    let didStartCombat = false;
+    if (!isGameOver && !prevState.encounter) {
+      const destCell = nextWorld.cells[nextPos.y][nextPos.x];
+      const destKind = destCell.kind;
+      const destCellId = cellIdForPos(nextWorld, nextPos);
+      const isGuaranteed = destKind === "henge";
+      const isAmbushTerrain = destKind === "woods" || destKind === "mountain";
+      const ambush = isAmbushTerrain && shouldStartAmbush({
+        seed: nextWorld.seed,
+        stepCount: nextStepCount,
+        cellId: destCellId,
+        percent: COMBAT_AMBUSH_PERCENT
+      });
+      let hengeReady = true;
+      if (destKind === "henge") {
+        const hc = destCell;
+        const readyAt = hc.nextReadyStep ?? 0;
+        hengeReady = nextStepCount >= readyAt;
+      }
+      const preEncounterMessage = message;
+      if (hengeReady && (isGuaranteed || ambush)) {
+        const spawned = spawnEnemyArmy({ rngState: nextWorld.rngState, playerArmy: nextResources.armySize });
+        nextWorld = { ...nextWorld, rngState: spawned.rngState };
+        nextEncounter = {
+          kind: "combat",
+          enemyArmySize: spawned.enemyArmy,
+          sourceKind: destKind,
+          sourceCellId: destCellId,
+          restoreMessage: preEncounterMessage
+        };
+        didStartCombat = true;
+        if (destKind === "henge") {
+          const hc = destCell;
+          const nextHenge = { ...hc, nextReadyStep: nextStepCount + HENGE_COOLDOWN_MOVES };
+          nextWorld = setCellAt(nextWorld, nextPos, nextHenge);
+        }
+        message = destKind === "henge" ? HENGE_ENCOUNTER_LINE : pickCombatEncounterLine({ seed: nextWorld.seed, stepCount: nextStepCount, cellId: destCellId });
+      }
     }
     const prevUi = getUi(prevState.ui);
     const baseUi = {
@@ -790,12 +938,17 @@ ${harvestLine}`
     const baseState = {
       world: nextWorld,
       player: { position: nextPos },
-      run: { stepCount: nextStepCount, hasFoundCastle: nextHasFoundCastle, isGameOver },
+      run: {
+        stepCount: nextStepCount,
+        hasFoundCastle: nextHasFoundCastle,
+        isGameOver
+      },
       resources: nextResources,
+      encounter: nextEncounter,
       ui: baseUi
     };
     if (!ENABLE_ANIMATIONS) return baseState;
-    const startFrame = (baseUi.clock && typeof baseUi.clock.frame === "number" ? baseUi.clock.frame : 0) | 0;
+    const startFrame = baseUi.clock.frame;
     let uiWith = baseState.ui;
     for (let i = 0; i < foodDeltas.length; i++) {
       const delta = foodDeltas[i];
@@ -819,11 +972,22 @@ ${harvestLine}`
         params: { delta }
       });
     }
+    if (didStartCombat) {
+      const revealStart = startFrame + MOVE_SLIDE_FRAMES;
+      uiWith = enqueueAnim(uiWith, {
+        kind: "gridTransition",
+        startFrame: revealStart,
+        durationFrames: gridTransitionDurationFrames(),
+        blocksInput: true,
+        params: { from: "overworld", to: "combat" }
+      });
+    }
     return {
       world: baseState.world,
       player: baseState.player,
       run: baseState.run,
       resources: baseState.resources,
+      encounter: baseState.encounter,
       ui: enqueueAnim(uiWith, {
         kind: "moveSlide",
         startFrame,
@@ -842,7 +1006,7 @@ ${harvestLine}`
       if (action.type !== ACTION_NEW_RUN) return null;
     }
     if (action.type === ACTION_NEW_RUN) {
-      const seed = action.seed | 0;
+      const seed = Math.trunc(action.seed);
       const generated = generateWorld(seed);
       const world = generated.world;
       const playerPos = generated.startPosition;
@@ -856,6 +1020,7 @@ ${harvestLine}`
           food: INITIAL_FOOD,
           armySize: INITIAL_ARMY_SIZE
         },
+        encounter: null,
         ui: {
           message: initialMessageForStart(startCellKind, playerPos, world),
           leftPanel: { kind: LEFT_PANEL_KIND_AUTO },
@@ -868,12 +1033,199 @@ ${harvestLine}`
     if (action.type === ACTION_RESTART) return reduceRestart(prevState);
     if (action.type === ACTION_SHOW_GOAL) return reduceGoal(prevState);
     if (action.type === ACTION_TOGGLE_MINIMAP) return reduceToggleMinimap(prevState);
-    if (action.type === ACTION_MOVE) return reduceMove(prevState, action.dx | 0, action.dy | 0);
+    if (action.type === ACTION_RETURN) {
+      if (!prevState.encounter) return prevState;
+      const prevUi = getUi(prevState.ui);
+      if (prevState.run.isGameOver || prevState.run.hasFoundCastle) return prevState;
+      const prevRes = normalizeResources(prevState.world, prevState.resources);
+      const nextArmy = prevRes.armySize - 1;
+      const isGameOver = nextArmy <= 0;
+      const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : prevState.run;
+      const nextResources = { ...prevRes, armySize: Math.max(0, nextArmy) };
+      const nextMessage = isGameOver ? gameOverMessage(prevState.world.seed, prevState.run.stepCount) : pickCombatExitLine({
+        seed: prevState.world.seed,
+        stepCount: prevState.run.stepCount,
+        cellId: prevState.encounter.sourceCellId,
+        outcome: "flee"
+      }) || prevUi.message;
+      const baseUi = { ...prevUi, message: nextMessage };
+      if (!ENABLE_ANIMATIONS) {
+        return {
+          world: prevState.world,
+          player: prevState.player,
+          run: nextRun,
+          resources: nextResources,
+          encounter: null,
+          ui: baseUi
+        };
+      }
+      const startFrame = baseUi.clock.frame;
+      let uiWith = baseUi;
+      uiWith = enqueueAnim(uiWith, {
+        kind: "armyDelta",
+        startFrame,
+        durationFrames: FOOD_DELTA_FRAMES,
+        blocksInput: false,
+        params: { delta: -1 }
+      });
+      return {
+        world: prevState.world,
+        player: prevState.player,
+        run: nextRun,
+        resources: nextResources,
+        encounter: null,
+        ui: isGameOver ? uiWith : enqueueAnim(uiWith, {
+          kind: "gridTransition",
+          startFrame,
+          durationFrames: gridTransitionDurationFrames(),
+          blocksInput: true,
+          params: { from: "combat", to: "overworld" }
+        })
+      };
+    }
+    if (action.type === ACTION_FIGHT) {
+      if (prevState.run.isGameOver || prevState.run.hasFoundCastle) return prevState;
+      const enc = prevState.encounter;
+      if (!enc || enc.kind !== "combat") return prevState;
+      const prevEnemy = enc.enemyArmySize;
+      if (prevEnemy <= 0) {
+        return { world: prevState.world, player: prevState.player, run: prevState.run, resources: prevState.resources, encounter: null, ui: prevState.ui };
+      }
+      const prevRes = normalizeResources(prevState.world, prevState.resources);
+      const prevUi = getUi(prevState.ui);
+      const round = resolveFightRound({
+        rngState: prevState.world.rngState,
+        playerArmy: prevRes.armySize,
+        enemyArmy: prevEnemy
+      });
+      const foodDeltas = [];
+      const armyDeltas = [];
+      const enemyDeltas = [];
+      let nextResources = prevRes;
+      let nextEncounter = enc;
+      if (round.outcome === "playerHit") {
+        const nextEnemy = round.nextEnemyArmy;
+        const killed = round.killed;
+        if (killed) enemyDeltas.push(-killed);
+        nextEncounter = nextEnemy <= 0 ? null : { ...enc, enemyArmySize: nextEnemy };
+      } else {
+        nextResources = { ...nextResources, armySize: nextResources.armySize - 1 };
+        armyDeltas.push(-1);
+      }
+      let nextWorld = { ...prevState.world, rngState: round.rngState };
+      if (round.outcome === "playerHit" && nextEncounter == null && !prevState.run.isGameOver && !prevState.run.hasFoundCastle) {
+        const span = COMBAT_REWARD_MAX - COMBAT_REWARD_MIN + 1;
+        const r = randInt(nextWorld.rngState, span);
+        nextWorld = { ...nextWorld, rngState: r.rngState };
+        const reward = COMBAT_REWARD_MIN + r.value;
+        nextResources = { ...nextResources, food: nextResources.food + reward };
+        foodDeltas.push(reward);
+      }
+      const isGameOver = nextResources.armySize <= 0;
+      const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : prevState.run;
+      const nextMessage = isGameOver ? gameOverMessage(nextWorld.seed, prevState.run.stepCount) : nextEncounter == null ? pickCombatExitLine({
+        seed: nextWorld.seed,
+        stepCount: prevState.run.stepCount,
+        cellId: enc.sourceCellId,
+        outcome: "victory"
+      }) || prevUi.message : prevUi.message;
+      const baseUi = { message: nextMessage, leftPanel: prevUi.leftPanel, clock: prevUi.clock, anim: prevUi.anim };
+      if (!ENABLE_ANIMATIONS) {
+        return {
+          world: nextWorld,
+          player: prevState.player,
+          run: nextRun,
+          resources: nextResources,
+          encounter: isGameOver ? null : nextEncounter,
+          ui: baseUi
+        };
+      }
+      const startFrame = baseUi.clock.frame;
+      let uiWith = baseUi;
+      for (let i = 0; i < foodDeltas.length; i++) {
+        const delta = foodDeltas[i];
+        if (!delta) continue;
+        uiWith = enqueueAnim(uiWith, {
+          kind: "foodDelta",
+          startFrame,
+          durationFrames: FOOD_DELTA_FRAMES,
+          blocksInput: false,
+          params: { delta }
+        });
+      }
+      for (let i = 0; i < armyDeltas.length; i++) {
+        const delta = armyDeltas[i];
+        if (!delta) continue;
+        uiWith = enqueueAnim(uiWith, {
+          kind: "armyDelta",
+          startFrame,
+          durationFrames: FOOD_DELTA_FRAMES,
+          blocksInput: false,
+          params: { delta }
+        });
+      }
+      for (let i = 0; i < enemyDeltas.length; i++) {
+        const delta = enemyDeltas[i];
+        if (!delta) continue;
+        uiWith = enqueueAnim(uiWith, {
+          kind: "enemyArmyDelta",
+          startFrame,
+          durationFrames: FOOD_DELTA_FRAMES,
+          blocksInput: false,
+          params: { delta }
+        });
+      }
+      if (!isGameOver && nextEncounter == null) {
+        uiWith = enqueueAnim(uiWith, {
+          kind: "gridTransition",
+          startFrame,
+          durationFrames: gridTransitionDurationFrames(),
+          blocksInput: true,
+          params: { from: "combat", to: "overworld" }
+        });
+      }
+      return {
+        world: nextWorld,
+        player: prevState.player,
+        run: nextRun,
+        resources: nextResources,
+        encounter: isGameOver ? null : nextEncounter,
+        ui: uiWith
+      };
+    }
+    if (action.type === ACTION_MOVE) return reduceMove(prevState, action.dx, action.dy);
     if (action.type === ACTION_TICK) {
       const tickedUi = ENABLE_ANIMATIONS ? pruneExpiredAnims(tickClock(getUi(prevState.ui))) : getUi(prevState.ui);
-      return { world: prevState.world, player: prevState.player, run: prevState.run, resources: prevState.resources, ui: tickedUi };
+      return {
+        world: prevState.world,
+        player: prevState.player,
+        run: prevState.run,
+        resources: prevState.resources,
+        encounter: prevState.encounter,
+        ui: tickedUi
+      };
     }
     return prevState;
+  }
+
+  // src/core/rightGrid.ts
+  function getRightGridCellDef(s, row, col) {
+    if (row === 0 && col === 0) return { iconKey: "goal", action: { type: ACTION_SHOW_GOAL } };
+    if (row === 2 && col === 0) return { iconKey: "minimap", action: { type: ACTION_TOGGLE_MINIMAP } };
+    if (row === 2 && col === 2) return { iconKey: "restart", action: { type: ACTION_RESTART } };
+    if (row === 0 && col === 2) return { action: null };
+    if (s.encounter && s.encounter.kind === "combat") {
+      if (row === 1 && col === 0) return { iconKey: "fight", action: { type: ACTION_FIGHT } };
+      if (row === 1 && col === 2) return { iconKey: "return", action: { type: ACTION_RETURN } };
+      if (row === 1 && col === 1) return { iconKey: "enemy", action: null };
+      return { action: null };
+    }
+    if (row === 0 && col === 1) return { tilePreview: { kind: "relativeToPlayer", dx: 0, dy: -1 }, action: { type: ACTION_MOVE, dx: 0, dy: -1 } };
+    if (row === 1 && col === 0) return { tilePreview: { kind: "relativeToPlayer", dx: -1, dy: 0 }, action: { type: ACTION_MOVE, dx: -1, dy: 0 } };
+    if (row === 1 && col === 1) return { tilePreview: { kind: "relativeToPlayer", dx: 0, dy: 0 }, action: null };
+    if (row === 1 && col === 2) return { tilePreview: { kind: "relativeToPlayer", dx: 1, dy: 0 }, action: { type: ACTION_MOVE, dx: 1, dy: 0 } };
+    if (row === 2 && col === 1) return { tilePreview: { kind: "relativeToPlayer", dx: 0, dy: 1 }, action: { type: ACTION_MOVE, dx: 0, dy: 1 } };
+    return { action: null };
   }
 
   // src/platform/tic80/layout.ts
@@ -911,20 +1263,13 @@ ${harvestLine}`
     const m = mouse();
     return { mouseX: m[0], mouseY: m[1], mouseLeftDown: !!m[2] };
   }
-  function actionForClick(_state, mouseX, mouseY) {
+  function actionForClick(state2, mouseX, mouseY) {
     const cell = hitTestGridCell(mouseX, mouseY);
     if (!cell) return null;
     const { row, col } = cell;
-    const isDisabledCorner = row === 0 && col === 2;
-    if (isDisabledCorner) return null;
-    if (row === 0 && col === 0) return { type: ACTION_SHOW_GOAL };
-    if (row === 2 && col === 0) return { type: ACTION_TOGGLE_MINIMAP };
-    if (row === 2 && col === 2) return { type: ACTION_RESTART };
-    if (row === 0 && col === 1) return { type: ACTION_MOVE, dx: 0, dy: -1 };
-    if (row === 1 && col === 0) return { type: ACTION_MOVE, dx: -1, dy: 0 };
-    if (row === 1 && col === 2) return { type: ACTION_MOVE, dx: 1, dy: 0 };
-    if (row === 2 && col === 1) return { type: ACTION_MOVE, dx: 0, dy: 1 };
-    return null;
+    const def = getRightGridCellDef(state2, row, col);
+    const a = def.action;
+    return a || null;
   }
 
   // src/platform/tic80/uiConstants.ts
@@ -998,12 +1343,16 @@ ${harvestLine}`
   }
   var BUTTON_SPRITE_SCALE = 2;
   var ILLUSTRATION_SCALE = 4;
+  var COMBAT_PREVIEW_PLATE_PAD = 2;
+  var COMBAT_PREVIEW_PLATE_W = 42;
+  var COMBAT_PREVIEW_PLATE_INSET = 2;
   var SPR_STATUS_STEPS = 130;
   var SPR_STATUS_POS = 131;
   var SPR_STATUS_SEED = 132;
   function drawLeftPanel(s) {
     rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, COLOR_BG);
     rectb(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, COLOR_DIM);
+    const isCombat = !!(s.encounter && s.encounter.kind === "combat");
     const pos = s.player.position;
     const spriteIdAtPos = getSpriteIdAt(s.world, pos.x, pos.y);
     const leftPanel = s.ui.leftPanel;
@@ -1014,9 +1363,49 @@ ${harvestLine}`
       spr(40, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2);
     } else if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
       drawMinimap(s);
+    } else if (leftPanel.kind === LEFT_PANEL_KIND_SPRITE) {
+      spr(leftPanel.spriteId, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2);
     } else {
-      const illustrationId = leftPanel.kind === LEFT_PANEL_KIND_SPRITE ? leftPanel.spriteId : spriteIdAtPos;
-      spr(illustrationId, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2);
+      if (!isCombat) {
+        spr(spriteIdAtPos, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2);
+      } else {
+        spr(spriteIdAtPos, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2);
+        const platePad = COMBAT_PREVIEW_PLATE_PAD;
+        const plateW = COMBAT_PREVIEW_PLATE_W;
+        const plateH = 16 + platePad * 2;
+        const plateX = illX + illSize - plateW - COMBAT_PREVIEW_PLATE_INSET;
+        const plateY = illY + COMBAT_PREVIEW_PLATE_INSET;
+        rect(plateX, plateY, plateW, plateH, COLOR_BG);
+        rectb(plateX, plateY, plateW, plateH, COLOR_DIM);
+        const enemyIconX = plateX + platePad;
+        const enemyIconY = plateY + platePad;
+        spr(SPR_ENEMY, enemyIconX, enemyIconY, 0, 1, 0, 0, 2, 2);
+        const enemyArmy = s.encounter && s.encounter.kind === "combat" ? s.encounter.enemyArmySize | 0 : 0;
+        const enemyCountX = enemyIconX + UI_FOOD_VALUE_OFFSET_X;
+        const enemyCountY = enemyIconY + UI_FOOD_VALUE_OFFSET_Y;
+        print(`${enemyArmy}`, enemyCountX, enemyCountY, COLOR_TEXT);
+        if (ENABLE_ANIMATIONS) {
+          const anims = s.ui.anim.active;
+          const frame = s.ui.clock.frame | 0;
+          let xCursor = enemyIconX + UI_FOOD_DELTA_OFFSET_X;
+          for (let i = 0; i < anims.length; i++) {
+            const a = anims[i];
+            if (a.kind !== "enemyArmyDelta") continue;
+            const ea = a;
+            const start = ea.startFrame | 0;
+            const dur = Math.max(1, ea.durationFrames | 0);
+            const t = Math.max(0, Math.min(dur, frame - start));
+            const p = t / dur;
+            const delta = ea.params.delta | 0;
+            if (!delta) continue;
+            const label = delta > 0 ? `+${delta}` : `${delta}`;
+            const color = delta < 0 ? COLOR_GOOD : COLOR_BAD;
+            const dy = UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI_FOOD_DELTA_RISE_PX);
+            print(label, xCursor, enemyIconY + dy, color);
+            xCursor += label.length * 6 + UI_FOOD_DELTA_GAP_PX;
+          }
+        }
+      }
     }
     const statusX = illX + illSize + UI_LEFT_PANEL_INNER_GAP;
     const statusY = illY;
@@ -1032,7 +1421,7 @@ ${harvestLine}`
     spr(ARMY_SPRITE_ID, armyX, armyY, -1, 1, 0, 0, 2, 2);
     const armyValueX = armyX + UI_ARMY_VALUE_OFFSET_X;
     const armyValueY = armyY + UI_ARMY_VALUE_OFFSET_Y;
-    const armyColor = s.resources.armySize < INITIAL_ARMY_SIZE ? COLOR_WARN : COLOR_TEXT;
+    const armyColor = s.resources.armySize < 6 ? COLOR_WARN : COLOR_TEXT;
     print(`${s.resources.armySize}`, armyValueX, armyValueY, armyColor);
     const foodX = statusX;
     const foodY = armyY + UI_ARMY_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX;
@@ -1120,17 +1509,82 @@ ${harvestLine}`
     if (!moveSlide) return drawRightPanelStatic(s);
     return drawRightPanelMoveSlideCross(s, moveSlide);
   }
-  function previewSpriteIdForCell(s, row, col) {
-    if (row === 0 && col === 0) return SPR_BUTTON_GOAL;
-    if (row === 2 && col === 0) return SPR_BUTTON_MINIMAP;
-    if (row === 2 && col === 2) return SPR_BUTTON_RESTART;
-    if (row === 0 && col === 2) return null;
+  var SPR_FIGHT = 74;
+  var SPR_RETURN = 76;
+  var SPR_ENEMY = 102;
+  function spriteIdForIconKey(iconKey) {
+    switch (iconKey) {
+      case "goal":
+        return SPR_BUTTON_GOAL;
+      case "minimap":
+        return SPR_BUTTON_MINIMAP;
+      case "restart":
+        return SPR_BUTTON_RESTART;
+      case "fight":
+        return SPR_FIGHT;
+      case "return":
+        return SPR_RETURN;
+      case "enemy":
+        return SPR_ENEMY;
+      default:
+        return null;
+    }
+  }
+  function crossRevealIndex(row, col) {
+    if (row === 0 && col === 1) return 0;
+    if (row === 1 && col === 0) return 1;
+    if (row === 2 && col === 1) return 2;
+    if (row === 1 && col === 2) return 3;
+    if (row === 1 && col === 1) return 4;
+    return -1;
+  }
+  function spriteIdForModeCrossCell(s, mode, row, col) {
+    if (mode === "combat") {
+      if (row === 1 && col === 0) return SPR_FIGHT;
+      if (row === 1 && col === 2) return SPR_RETURN;
+      if (row === 1 && col === 1) return SPR_ENEMY;
+      return null;
+    }
     const p = s.player.position;
     if (row === 0 && col === 1) return getSpriteIdAt(s.world, p.x, p.y - 1);
     if (row === 1 && col === 0) return getSpriteIdAt(s.world, p.x - 1, p.y);
-    if (row === 1 && col === 1) return getSpriteIdAt(s.world, p.x, p.y);
-    if (row === 1 && col === 2) return getSpriteIdAt(s.world, p.x + 1, p.y);
     if (row === 2 && col === 1) return getSpriteIdAt(s.world, p.x, p.y + 1);
+    if (row === 1 && col === 2) return getSpriteIdAt(s.world, p.x + 1, p.y);
+    if (row === 1 && col === 1) return getSpriteIdAt(s.world, p.x, p.y);
+    return null;
+  }
+  function previewSpriteIdForCell(s, row, col) {
+    let transition = null;
+    if (ENABLE_ANIMATIONS) {
+      const anims = s.ui.anim.active;
+      for (let i = 0; i < anims.length; i++) {
+        const a = anims[i];
+        if (a.kind === "gridTransition") {
+          transition = a;
+          break;
+        }
+      }
+    }
+    if (transition) {
+      const frame = s.ui.clock.frame | 0;
+      const start = transition.startFrame | 0;
+      if (frame >= start) {
+        const stepFrames = Math.max(1, GRID_TRANSITION_STEP_FRAMES | 0);
+        const t = Math.max(0, frame - start);
+        const phase = Math.floor(t / stepFrames);
+        const idx = crossRevealIndex(row, col);
+        if (idx >= 0) {
+          const mode = phase >= idx ? transition.params.to : transition.params.from;
+          return spriteIdForModeCrossCell(s, mode, row, col);
+        }
+      }
+    }
+    const def = getRightGridCellDef(s, row, col);
+    if (def.iconKey) return spriteIdForIconKey(def.iconKey) ?? null;
+    if (def.tilePreview && def.tilePreview.kind === "relativeToPlayer") {
+      const p = s.player.position;
+      return getSpriteIdAt(s.world, p.x + def.tilePreview.dx, p.y + def.tilePreview.dy);
+    }
     return null;
   }
   function drawRightPanelStatic(s) {
@@ -1326,9 +1780,9 @@ ${harvestLine}`
   globalThis.TIC = TIC;
 })();
 
-// title:  The Unbound (prototype 0.0.6)
+// title:  The Unbound (prototype 0.0.7)
 // author: haulin
-// desc:   Prototype 0.0.6 toward the North Star
+// desc:   Prototype 0.0.7 toward the North Star
 // script: js
 // input:  mouse
 

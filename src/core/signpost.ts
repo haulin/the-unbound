@@ -8,39 +8,40 @@ export type PoiWorldView = {
 }
 
 export function formatNearestPoiSignpostMessage(playerPos: { x: number; y: number }, world: PoiWorldView) {
-  type PoiKind = 'castle' | 'farm' | 'camp'
+  type PoiKind = 'castle' | 'farm' | 'camp' | 'henge'
   type Candidate = { kind: PoiKind; id: number; name: string; pos: { x: number; y: number } }
 
   const candidates: Candidate[] = []
+
+  function pushNamedCandidate(kind: Exclude<PoiKind, 'castle'>, id: number, baseName: string, suffix: string, x: number, y: number) {
+    candidates.push({ kind, id, name: `${baseName} ${suffix}`, pos: { x, y } })
+  }
 
   const cells = world.cells
   for (let y = 0; y < cells.length; y++) {
     const row = cells[y]!
     for (let x = 0; x < row.length; x++) {
       const cell = row[x]!
-      if (cell.kind === 'castle') {
-        candidates.push({ kind: 'castle', id: y * world.width + x, name: 'The Castle', pos: { x, y } })
-      } else if (cell.kind === 'farm') {
-        candidates.push({
-          kind: 'farm',
-          id: cell.id | 0,
-          name: `${cell.name || 'A Farm'} Farm`,
-          pos: { x, y },
-        })
-      } else if (cell.kind === 'camp') {
-        candidates.push({
-          kind: 'camp',
-          id: cell.id | 0,
-          name: `${cell.name || 'A Camp'} Camp`,
-          pos: { x, y },
-        })
+      switch (cell.kind) {
+        case 'castle':
+          candidates.push({ kind: 'castle', id: y * world.width + x, name: 'The Castle', pos: { x, y } })
+          break
+        case 'farm':
+          pushNamedCandidate('farm', cell.id, cell.name || 'A Farm', 'Farm', x, y)
+          break
+        case 'camp':
+          pushNamedCandidate('camp', cell.id, cell.name || 'A Camp', 'Camp', x, y)
+          break
+        case 'henge':
+          pushNamedCandidate('henge', cell.id, cell.name || 'A Henge', 'Henge', x, y)
+          break
       }
     }
   }
 
   if (candidates.length === 0) return ''
 
-  const kindRank = (k: PoiKind) => (k === 'castle' ? 0 : k === 'farm' ? 1 : 2)
+  const kindRank = (k: PoiKind) => (k === 'castle' ? 0 : k === 'farm' ? 1 : k === 'camp' ? 2 : 3)
 
   let best = candidates[0]!
   let bestDx = torusDelta(playerPos.x, best.pos.x, world.width)
@@ -64,7 +65,7 @@ export function formatNearestPoiSignpostMessage(playerPos: { x: number; y: numbe
     if (d === bestD) {
       const ar = kindRank(c.kind)
       const br = kindRank(best.kind)
-      if (ar < br || (ar === br && (c.id | 0) < (best.id | 0))) {
+      if (ar < br || (ar === br && c.id < best.id)) {
         best = c
         bestDx = dx
         bestDy = dy
