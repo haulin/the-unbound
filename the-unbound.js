@@ -1,6 +1,6 @@
-// title:  The Unbound (prototype 0.0.7)
+// title:  The Unbound (prototype 0.0.8)
 // author: haulin
-// desc:   Prototype 0.0.7 toward the North Star
+// desc:   Prototype 0.0.8 toward the North Star
 // script: js
 // input:  mouse
 
@@ -1214,17 +1214,18 @@ ${line}` };
     if (row === 2 && col === 0) return { iconKey: "minimap", action: { type: ACTION_TOGGLE_MINIMAP } };
     if (row === 2 && col === 2) return { iconKey: "restart", action: { type: ACTION_RESTART } };
     if (row === 0 && col === 2) return { action: null };
+    const isRunOver = !!(s.run.isGameOver || s.run.hasFoundCastle);
     if (s.encounter && s.encounter.kind === "combat") {
       if (row === 1 && col === 0) return { iconKey: "fight", action: { type: ACTION_FIGHT } };
       if (row === 1 && col === 2) return { iconKey: "return", action: { type: ACTION_RETURN } };
       if (row === 1 && col === 1) return { iconKey: "enemy", action: null };
       return { action: null };
     }
-    if (row === 0 && col === 1) return { tilePreview: { kind: "relativeToPlayer", dx: 0, dy: -1 }, action: { type: ACTION_MOVE, dx: 0, dy: -1 } };
-    if (row === 1 && col === 0) return { tilePreview: { kind: "relativeToPlayer", dx: -1, dy: 0 }, action: { type: ACTION_MOVE, dx: -1, dy: 0 } };
+    if (row === 0 && col === 1) return { tilePreview: { kind: "relativeToPlayer", dx: 0, dy: -1 }, action: isRunOver ? null : { type: ACTION_MOVE, dx: 0, dy: -1 } };
+    if (row === 1 && col === 0) return { tilePreview: { kind: "relativeToPlayer", dx: -1, dy: 0 }, action: isRunOver ? null : { type: ACTION_MOVE, dx: -1, dy: 0 } };
     if (row === 1 && col === 1) return { tilePreview: { kind: "relativeToPlayer", dx: 0, dy: 0 }, action: null };
-    if (row === 1 && col === 2) return { tilePreview: { kind: "relativeToPlayer", dx: 1, dy: 0 }, action: { type: ACTION_MOVE, dx: 1, dy: 0 } };
-    if (row === 2 && col === 1) return { tilePreview: { kind: "relativeToPlayer", dx: 0, dy: 1 }, action: { type: ACTION_MOVE, dx: 0, dy: 1 } };
+    if (row === 1 && col === 2) return { tilePreview: { kind: "relativeToPlayer", dx: 1, dy: 0 }, action: isRunOver ? null : { type: ACTION_MOVE, dx: 1, dy: 0 } };
+    if (row === 2 && col === 1) return { tilePreview: { kind: "relativeToPlayer", dx: 0, dy: 1 }, action: isRunOver ? null : { type: ACTION_MOVE, dx: 0, dy: 1 } };
     return { action: null };
   }
 
@@ -1261,7 +1262,15 @@ ${line}` };
   // src/platform/tic80/input.ts
   function sampleMouse() {
     const m = mouse();
-    return { mouseX: m[0], mouseY: m[1], mouseLeftDown: !!m[2] };
+    const out = { mouseX: m[0], mouseY: m[1], mouseLeftDown: !!m[2] };
+    return out;
+  }
+  function deriveRenderHints(state2, mouseX, mouseY) {
+    const cell = hitTestGridCell(mouseX, mouseY);
+    if (!cell) return { rightGridHoverCell: null };
+    const def = getRightGridCellDef(state2, cell.row, cell.col);
+    if (!def.action) return { rightGridHoverCell: null };
+    return { rightGridHoverCell: cell };
   }
   function actionForClick(state2, mouseX, mouseY) {
     const cell = hitTestGridCell(mouseX, mouseY);
@@ -1279,7 +1288,27 @@ ${line}` };
   var UI_COLOR_GOOD = 5;
   var UI_COLOR_WARN = 4;
   var UI_COLOR_BAD = 2;
-  var UI_LEFT_PANEL_PADDING = 6;
+  var UI_COLOR_POI_NAME = 11;
+  var UI_COLOR_POI_DESC = 13;
+  var UI_COLOR_GRID_HOVER_TINT = 15;
+  var UI_SPR_STATUS_STEPS = 130;
+  var UI_SPR_STATUS_POS = 131;
+  var UI_SPR_STATUS_SEED = 132;
+  var UI_SPR_TEXTURE_OVERLAY = 133;
+  var UI_SPR_ENEMY = 102;
+  var UI_SPR_FIGHT = 74;
+  var UI_SPR_RETURN = 76;
+  var UI_ILLUSTRATION_SCALE = 4;
+  var UI_TEXTURE_TILE_PX = 8;
+  var UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR = 8;
+  var UI_COMBAT_PREVIEW_PLATE_PAD = 2;
+  var UI_COMBAT_PREVIEW_PLATE_W = 42;
+  var UI_COMBAT_PREVIEW_PLATE_INSET = 2;
+  var UI_RIGHT_GRID_SPRITE_SCALE = 2;
+  var UI_RIGHT_GRID_SPRITE_W = 2;
+  var UI_RIGHT_GRID_SPRITE_H = 2;
+  var UI_RIGHT_GRID_COLORKEY = 0;
+  var UI_LEFT_PANEL_PADDING = 7;
   var UI_LEFT_PANEL_INNER_GAP = 6;
   var UI_STATUS_ICON_SIZE = 8;
   var UI_STATUS_ICON_GAP = 3;
@@ -1305,230 +1334,73 @@ ${line}` };
   var UI_FOOD_DELTA_GAP_PX = -4;
   var UI_SMALL_STATS_START_OFFSET_Y = UI_ARMY_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX + UI_FOOD_ICON_H_PX + UI_AFTER_RESOURCES_GAP_PX;
 
-  // src/platform/tic80/render.ts
-  var COLOR_BG = UI_COLOR_BG;
-  var COLOR_TEXT = UI_COLOR_TEXT;
-  var COLOR_DIM = UI_COLOR_DIM;
-  var COLOR_GOOD = UI_COLOR_GOOD;
-  var COLOR_WARN = UI_COLOR_WARN;
-  var COLOR_BAD = UI_COLOR_BAD;
-  function renderFrame(s) {
-    cls(COLOR_BG);
-    drawRightPanel(s);
-    drawLeftPanel(s);
+  // src/platform/tic80/nineSlice.ts
+  function int(n) {
+    return Math.floor(n);
   }
-  function formatA1(position) {
-    const col = String.fromCharCode("A".charCodeAt(0) + position.x);
-    const row = String(position.y + 1);
-    return col + row;
+  function clampInt(n, min) {
+    return Math.max(min, int(n));
   }
-  function wrapText(text, maxChars) {
-    const paragraphs = String(text || "").split("\n");
-    const out = [];
-    for (let p = 0; p < paragraphs.length; p++) {
-      const words = String(paragraphs[p] || "").split(/\s+/).filter(Boolean);
-      let line = "";
-      for (const w of words) {
-        const next = line ? `${line} ${w}` : w;
-        if (next.length > maxChars && line) {
-          out.push(line);
-          line = w;
-        } else {
-          line = next;
-        }
-      }
-      if (line) out.push(line);
-    }
-    return out;
+  function withClip(x, y, w, h, draw) {
+    clip(x, y, w, h);
+    draw();
+    clip();
   }
-  var BUTTON_SPRITE_SCALE = 2;
-  var ILLUSTRATION_SCALE = 4;
-  var COMBAT_PREVIEW_PLATE_PAD = 2;
-  var COMBAT_PREVIEW_PLATE_W = 42;
-  var COMBAT_PREVIEW_PLATE_INSET = 2;
-  var SPR_STATUS_STEPS = 130;
-  var SPR_STATUS_POS = 131;
-  var SPR_STATUS_SEED = 132;
-  function drawLeftPanel(s) {
-    rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, COLOR_BG);
-    rectb(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, COLOR_DIM);
-    const isCombat = !!(s.encounter && s.encounter.kind === "combat");
-    const pos = s.player.position;
-    const spriteIdAtPos = getSpriteIdAt(s.world, pos.x, pos.y);
-    const leftPanel = s.ui.leftPanel;
-    const illSize = 16 * ILLUSTRATION_SCALE;
-    const illX = UI_LEFT_PANEL_PADDING;
-    const illY = UI_LEFT_PANEL_PADDING;
-    if (s.run.isGameOver) {
-      spr(40, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2);
-    } else if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
-      drawMinimap(s);
-    } else if (leftPanel.kind === LEFT_PANEL_KIND_SPRITE) {
-      spr(leftPanel.spriteId, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2);
-    } else {
-      if (!isCombat) {
-        spr(spriteIdAtPos, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2);
-      } else {
-        spr(spriteIdAtPos, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2);
-        const platePad = COMBAT_PREVIEW_PLATE_PAD;
-        const plateW = COMBAT_PREVIEW_PLATE_W;
-        const plateH = 16 + platePad * 2;
-        const plateX = illX + illSize - plateW - COMBAT_PREVIEW_PLATE_INSET;
-        const plateY = illY + COMBAT_PREVIEW_PLATE_INSET;
-        rect(plateX, plateY, plateW, plateH, COLOR_BG);
-        rectb(plateX, plateY, plateW, plateH, COLOR_DIM);
-        const enemyIconX = plateX + platePad;
-        const enemyIconY = plateY + platePad;
-        spr(SPR_ENEMY, enemyIconX, enemyIconY, 0, 1, 0, 0, 2, 2);
-        const enemyArmy = s.encounter && s.encounter.kind === "combat" ? s.encounter.enemyArmySize | 0 : 0;
-        const enemyCountX = enemyIconX + UI_FOOD_VALUE_OFFSET_X;
-        const enemyCountY = enemyIconY + UI_FOOD_VALUE_OFFSET_Y;
-        print(`${enemyArmy}`, enemyCountX, enemyCountY, COLOR_TEXT);
-        if (ENABLE_ANIMATIONS) {
-          const anims = s.ui.anim.active;
-          const frame = s.ui.clock.frame | 0;
-          let xCursor = enemyIconX + UI_FOOD_DELTA_OFFSET_X;
-          for (let i = 0; i < anims.length; i++) {
-            const a = anims[i];
-            if (a.kind !== "enemyArmyDelta") continue;
-            const ea = a;
-            const start = ea.startFrame | 0;
-            const dur = Math.max(1, ea.durationFrames | 0);
-            const t = Math.max(0, Math.min(dur, frame - start));
-            const p = t / dur;
-            const delta = ea.params.delta | 0;
-            if (!delta) continue;
-            const label = delta > 0 ? `+${delta}` : `${delta}`;
-            const color = delta < 0 ? COLOR_GOOD : COLOR_BAD;
-            const dy = UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI_FOOD_DELTA_RISE_PX);
-            print(label, xCursor, enemyIconY + dy, color);
-            xCursor += label.length * 6 + UI_FOOD_DELTA_GAP_PX;
-          }
-        }
-      }
-    }
-    const statusX = illX + illSize + UI_LEFT_PANEL_INNER_GAP;
-    const statusY = illY;
-    const statusIconSize = UI_STATUS_ICON_SIZE;
-    const statusIconGap = UI_STATUS_ICON_GAP;
-    const fontH = 6;
-    const statusLineGap = UI_STATUS_LINE_GAP;
-    const statusLineH = fontH + statusLineGap;
-    const messageLineH = fontH + 1;
-    const textOffsetY = UI_STATUS_TEXT_OFFSET_Y;
-    const armyX = statusX;
-    const armyY = statusY;
-    spr(ARMY_SPRITE_ID, armyX, armyY, -1, 1, 0, 0, 2, 2);
-    const armyValueX = armyX + UI_ARMY_VALUE_OFFSET_X;
-    const armyValueY = armyY + UI_ARMY_VALUE_OFFSET_Y;
-    const armyColor = s.resources.armySize < 6 ? COLOR_WARN : COLOR_TEXT;
-    print(`${s.resources.armySize}`, armyValueX, armyValueY, armyColor);
-    const foodX = statusX;
-    const foodY = armyY + UI_ARMY_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX;
-    spr(FOOD_SPRITE_ID, foodX, foodY, -1, 1, 0, 0, 2, 2);
-    const foodValueX = foodX + UI_FOOD_VALUE_OFFSET_X;
-    const foodValueY = foodY + UI_FOOD_VALUE_OFFSET_Y;
-    const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? COLOR_WARN : COLOR_TEXT;
-    print(`${s.resources.food}`, foodValueX, foodValueY, foodColor);
-    const smallStartY = statusY + UI_SMALL_STATS_START_OFFSET_Y;
-    const seedY = smallStartY + 0 * statusLineH;
-    const posY = smallStartY + 1 * statusLineH;
-    const stepsY = smallStartY + 2 * statusLineH;
-    spr(SPR_STATUS_SEED, statusX, seedY, -1);
-    print(`${s.world.seed}`, statusX + statusIconSize + statusIconGap, seedY + textOffsetY, COLOR_TEXT);
-    spr(SPR_STATUS_POS, statusX, posY, -1);
-    print(formatA1(pos), statusX + statusIconSize + statusIconGap, posY + textOffsetY, COLOR_TEXT);
-    spr(SPR_STATUS_STEPS, statusX, stepsY, -1);
-    print(`${s.run.stepCount}`, statusX + statusIconSize + statusIconGap, stepsY + textOffsetY, COLOR_TEXT);
-    {
-      const anims = s.ui.anim.active;
-      const frame = s.ui.clock.frame | 0;
-      let xCursor = armyX + UI_ARMY_DELTA_OFFSET_X;
-      for (let i = 0; i < anims.length; i++) {
-        const a = anims[i];
-        if (a.kind !== "armyDelta") continue;
-        const aa = a;
-        const start = aa.startFrame | 0;
-        const dur = Math.max(1, aa.durationFrames | 0);
-        const t = Math.max(0, Math.min(dur, frame - start));
-        const p = t / dur;
-        const delta = aa.params.delta | 0;
-        if (!delta) continue;
-        const label = delta > 0 ? `+${delta}` : `${delta}`;
-        const color = delta > 0 ? COLOR_GOOD : COLOR_BAD;
-        const dy = UI_ARMY_DELTA_OFFSET_Y - Math.floor(p * UI_ARMY_DELTA_RISE_PX);
-        print(label, xCursor, armyY + dy, color);
-        xCursor += label.length * 6 + UI_ARMY_DELTA_GAP_PX;
-      }
-    }
-    {
-      const anims = s.ui.anim.active;
-      const frame = s.ui.clock.frame | 0;
-      let xCursor = foodX + UI_FOOD_DELTA_OFFSET_X;
-      for (let i = 0; i < anims.length; i++) {
-        const a = anims[i];
-        if (a.kind !== "foodDelta") continue;
-        const fa = a;
-        const start = fa.startFrame | 0;
-        const dur = Math.max(1, fa.durationFrames | 0);
-        const t = Math.max(0, Math.min(dur, frame - start));
-        const p = t / dur;
-        const delta = fa.params.delta | 0;
-        if (!delta) continue;
-        const label = delta > 0 ? `+${delta}` : `${delta}`;
-        const color = delta > 0 ? COLOR_GOOD : COLOR_BAD;
-        const dy = UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI_FOOD_DELTA_RISE_PX);
-        print(label, xCursor, foodY + dy, color);
-        xCursor += label.length * 6 + UI_FOOD_DELTA_GAP_PX;
-      }
-    }
-    const statusBottomY = stepsY + statusLineH;
-    const headerBottomY = Math.max(illY + illSize, statusBottomY);
-    const msgY = headerBottomY + 4;
-    const headline = s.run.isGameOver ? { text: "GAME OVER", color: COLOR_BAD } : s.run.hasFoundCastle ? { text: "YOU WIN", color: COLOR_GOOD } : null;
-    const headlineRows = headline ? 1 : 0;
-    const maxLines = Math.max(0, Math.floor((SCREEN_HEIGHT - msgY - 4) / messageLineH) - headlineRows);
-    const lines = wrapText(s.ui.message, LORE_MAX_CHARS_PER_LINE);
-    const textStartY = headline ? msgY + messageLineH : msgY;
-    if (headline) print(headline.text, UI_LEFT_PANEL_PADDING, msgY, headline.color);
-    for (let i = 0; i < lines.length && i < maxLines; i++) {
-      print(lines[i], UI_LEFT_PANEL_PADDING, textStartY + i * messageLineH, COLOR_TEXT);
-    }
+  function drawTiledHoriz(spriteId, x, y, w, stepPx, colorkey, scale) {
+    for (let dx = 0; dx < w; dx += stepPx) spr(spriteId, x + dx, y, colorkey, scale);
   }
-  function drawRightPanel(s) {
-    if (!ENABLE_ANIMATIONS) return drawRightPanelStatic(s);
-    const anims = s.ui.anim.active;
-    let moveSlide = null;
-    for (let i = 0; i < anims.length; i++) {
-      const a = anims[i];
-      if (a.kind === "moveSlide") {
-        moveSlide = a;
-        break;
-      }
-    }
-    if (!moveSlide) return drawRightPanelStatic(s);
-    return drawRightPanelMoveSlideCross(s, moveSlide);
+  function drawTiledVert(spriteId, x, y, h, stepPx, colorkey, scale) {
+    for (let dy = 0; dy < h; dy += stepPx) spr(spriteId, x, y + dy, colorkey, scale);
   }
-  var SPR_FIGHT = 74;
-  var SPR_RETURN = 76;
-  var SPR_ENEMY = 102;
+  function drawNineSliceFrame(x, y, w, h, sprites, opts = {}) {
+    const tilePx = clampInt(opts.tilePx ?? 8, 1);
+    const scale = clampInt(opts.scale ?? 1, 1);
+    const colorkey = opts.colorkey ?? 0;
+    const wPx = int(w);
+    const hPx = int(h);
+    if (wPx <= 0) return;
+    if (hPx <= 0) return;
+    const tileScreenPx = tilePx * scale;
+    if (wPx < tileScreenPx * 2 || hPx < tileScreenPx * 2) {
+      const c = opts.fallbackBorderColor;
+      if (c != null) rectb(x, y, wPx, hPx, c);
+      return;
+    }
+    const x0 = int(x);
+    const y0 = int(y);
+    const x1 = x0 + wPx - tileScreenPx;
+    const y1 = y0 + hPx - tileScreenPx;
+    const innerW = wPx - tileScreenPx * 2;
+    const innerH = hPx - tileScreenPx * 2;
+    spr(sprites.tl, x0, y0, colorkey, scale);
+    spr(sprites.tr, x1, y0, colorkey, scale);
+    spr(sprites.bl, x0, y1, colorkey, scale);
+    spr(sprites.br, x1, y1, colorkey, scale);
+    withClip(x0 + tileScreenPx, y0, innerW, tileScreenPx, () => {
+      drawTiledHoriz(sprites.t, x0 + tileScreenPx, y0, innerW, tileScreenPx, colorkey, scale);
+    });
+    withClip(x0 + tileScreenPx, y1, innerW, tileScreenPx, () => {
+      drawTiledHoriz(sprites.b, x0 + tileScreenPx, y1, innerW, tileScreenPx, colorkey, scale);
+    });
+    withClip(x0, y0 + tileScreenPx, tileScreenPx, innerH, () => {
+      drawTiledVert(sprites.l, x0, y0 + tileScreenPx, innerH, tileScreenPx, colorkey, scale);
+    });
+    withClip(x1, y0 + tileScreenPx, tileScreenPx, innerH, () => {
+      drawTiledVert(sprites.r, x1, y0 + tileScreenPx, innerH, tileScreenPx, colorkey, scale);
+    });
+  }
+
+  // src/platform/tic80/rightGridRenderPlan.ts
+  var RIGHT_GRID_SPRITE_ID = {
+    goal: SPR_BUTTON_GOAL,
+    minimap: SPR_BUTTON_MINIMAP,
+    restart: SPR_BUTTON_RESTART,
+    fight: UI_SPR_FIGHT,
+    return: UI_SPR_RETURN,
+    enemy: UI_SPR_ENEMY
+  };
   function spriteIdForIconKey(iconKey) {
-    switch (iconKey) {
-      case "goal":
-        return SPR_BUTTON_GOAL;
-      case "minimap":
-        return SPR_BUTTON_MINIMAP;
-      case "restart":
-        return SPR_BUTTON_RESTART;
-      case "fight":
-        return SPR_FIGHT;
-      case "return":
-        return SPR_RETURN;
-      case "enemy":
-        return SPR_ENEMY;
-      default:
-        return null;
-    }
+    return RIGHT_GRID_SPRITE_ID[iconKey];
   }
   function crossRevealIndex(row, col) {
     if (row === 0 && col === 1) return 0;
@@ -1540,9 +1412,9 @@ ${line}` };
   }
   function spriteIdForModeCrossCell(s, mode, row, col) {
     if (mode === "combat") {
-      if (row === 1 && col === 0) return SPR_FIGHT;
-      if (row === 1 && col === 2) return SPR_RETURN;
-      if (row === 1 && col === 1) return SPR_ENEMY;
+      if (row === 1 && col === 0) return RIGHT_GRID_SPRITE_ID.fight;
+      if (row === 1 && col === 2) return RIGHT_GRID_SPRITE_ID.return;
+      if (row === 1 && col === 1) return RIGHT_GRID_SPRITE_ID.enemy;
       return null;
     }
     const p = s.player.position;
@@ -1587,62 +1459,85 @@ ${line}` };
     }
     return null;
   }
-  function drawRightPanelStatic(s) {
-    const pitch = CELL_SIZE_PX + CELL_GAP_PX;
-    const spriteSize = 16 * BUTTON_SPRITE_SCALE;
-    const spriteOffset = Math.floor((CELL_SIZE_PX - spriteSize) / 2);
-    for (let row = 0; row < GRID_ROWS; row++) {
-      for (let col = 0; col < GRID_COLS; col++) {
-        const x = GRID_ORIGIN_X + col * pitch;
-        const y = GRID_ORIGIN_Y + row * pitch;
-        const spriteId = previewSpriteIdForCell(s, row, col);
-        if (spriteId != null) spr(spriteId, x + spriteOffset, y + spriteOffset, -1, BUTTON_SPRITE_SCALE, 0, 0, 2, 2);
-      }
-    }
-  }
   function cellOriginPx(row, col) {
     const pitch = CELL_SIZE_PX + CELL_GAP_PX;
     return { x: GRID_ORIGIN_X + col * pitch, y: GRID_ORIGIN_Y + row * pitch };
   }
-  function drawSpriteInCell(row, col, spriteId, offsetX, offsetY) {
-    const spriteSize = 16 * BUTTON_SPRITE_SCALE;
+  function spriteOriginInCellPx(row, col) {
+    const spriteSize = 16 * UI_RIGHT_GRID_SPRITE_SCALE;
     const spriteOffset = Math.floor((CELL_SIZE_PX - spriteSize) / 2);
     const o = cellOriginPx(row, col);
-    spr(
+    return { x: o.x + spriteOffset, y: o.y + spriteOffset };
+  }
+  function rectOp(x, y, w, h, color) {
+    return { kind: "rect", x, y, w, h, color };
+  }
+  function sprOp(spriteId, x, y) {
+    return {
+      kind: "spr",
       spriteId,
-      o.x + spriteOffset + (offsetX | 0),
-      o.y + spriteOffset + (offsetY | 0),
-      -1,
-      BUTTON_SPRITE_SCALE,
-      0,
-      0,
-      2,
-      2
-    );
+      x,
+      y,
+      colorkey: UI_RIGHT_GRID_COLORKEY,
+      scale: UI_RIGHT_GRID_SPRITE_SCALE,
+      w: UI_RIGHT_GRID_SPRITE_W,
+      h: UI_RIGHT_GRID_SPRITE_H,
+      flip: 0,
+      rotate: 0
+    };
   }
-  function clearCell(row, col) {
-    const o = cellOriginPx(row, col);
-    rect(o.x, o.y, CELL_SIZE_PX, CELL_SIZE_PX, COLOR_BG);
+  function drawHoverTintOps(cell) {
+    const o = cellOriginPx(cell.row, cell.col);
+    return [rectOp(o.x, o.y, CELL_SIZE_PX, CELL_SIZE_PX, UI_COLOR_GRID_HOVER_TINT)];
   }
-  function maskOutsideGridInRightPanel() {
-    const panelX = PANEL_LEFT_WIDTH;
-    const panelY = 0;
-    const panelW = PANEL_RIGHT_WIDTH;
-    const panelH = SCREEN_HEIGHT;
-    const gridX = GRID_ORIGIN_X;
-    const gridY = GRID_ORIGIN_Y;
-    const gridW = GRID_WIDTH_PX;
-    const gridH = CELL_SIZE_PX * GRID_ROWS + CELL_GAP_PX * (GRID_ROWS - 1);
-    if (gridY > panelY) rect(panelX, panelY, panelW, gridY - panelY, COLOR_BG);
-    const bottomY = gridY + gridH;
-    const panelBottomY = panelY + panelH;
-    if (panelBottomY > bottomY) rect(panelX, bottomY, panelW, panelBottomY - bottomY, COLOR_BG);
-    if (gridX > panelX) rect(panelX, gridY, gridX - panelX, gridH, COLOR_BG);
-    const rightX = gridX + gridW;
-    const panelRightX = panelX + panelW;
-    if (panelRightX > rightX) rect(rightX, gridY, panelRightX - rightX, gridH, COLOR_BG);
+  function hoverCellFromHints(hints) {
+    return hints.rightGridHoverCell;
   }
-  function maskGridGaps() {
+  function findMoveSlideAnim(s) {
+    if (!ENABLE_ANIMATIONS) return null;
+    const anims = s.ui.anim.active;
+    for (let i = 0; i < anims.length; i++) {
+      const a = anims[i];
+      if (a.kind === "moveSlide") return a;
+    }
+    return null;
+  }
+  function isMetaCornerCell(cell) {
+    return cell.row === 0 && cell.col === 0 || // goal
+    cell.row === 2 && cell.col === 0 || // minimap
+    cell.row === 2 && cell.col === 2;
+  }
+  function rightPanelBoundsPx() {
+    return {
+      x: PANEL_LEFT_WIDTH,
+      y: 0,
+      w: PANEL_RIGHT_WIDTH,
+      h: SCREEN_HEIGHT
+    };
+  }
+  function gridBoundsPx() {
+    return {
+      x: GRID_ORIGIN_X,
+      y: GRID_ORIGIN_Y,
+      w: GRID_WIDTH_PX,
+      h: CELL_SIZE_PX * GRID_ROWS + CELL_GAP_PX * (GRID_ROWS - 1)
+    };
+  }
+  function maskOutsideGridOps() {
+    const panel = rightPanelBoundsPx();
+    const grid = gridBoundsPx();
+    const ops = [];
+    if (grid.y > panel.y) ops.push(rectOp(panel.x, panel.y, panel.w, grid.y - panel.y, UI_COLOR_BG));
+    const bottomY = grid.y + grid.h;
+    const panelBottomY = panel.y + panel.h;
+    if (panelBottomY > bottomY) ops.push(rectOp(panel.x, bottomY, panel.w, panelBottomY - bottomY, UI_COLOR_BG));
+    if (grid.x > panel.x) ops.push(rectOp(panel.x, grid.y, grid.x - panel.x, grid.h, UI_COLOR_BG));
+    const rightX = grid.x + grid.w;
+    const panelRightX = panel.x + panel.w;
+    if (panelRightX > rightX) ops.push(rectOp(rightX, grid.y, panelRightX - rightX, grid.h, UI_COLOR_BG));
+    return ops;
+  }
+  function maskGridGapsOps() {
     const pitch = CELL_SIZE_PX + CELL_GAP_PX;
     const gx0 = GRID_ORIGIN_X + CELL_SIZE_PX;
     const gx1 = GRID_ORIGIN_X + pitch + CELL_SIZE_PX;
@@ -1652,16 +1547,33 @@ ${line}` };
     const row2Y = GRID_ORIGIN_Y + 2 * pitch;
     const col0X = GRID_ORIGIN_X + 0 * pitch;
     const col2X = GRID_ORIGIN_X + 2 * pitch;
-    rect(gx0, row0Y, CELL_GAP_PX, CELL_SIZE_PX, COLOR_BG);
-    rect(gx0, row2Y, CELL_GAP_PX, CELL_SIZE_PX, COLOR_BG);
-    rect(gx1, row0Y, CELL_GAP_PX, CELL_SIZE_PX, COLOR_BG);
-    rect(gx1, row2Y, CELL_GAP_PX, CELL_SIZE_PX, COLOR_BG);
-    rect(col0X, gy0, CELL_SIZE_PX, CELL_GAP_PX, COLOR_BG);
-    rect(col2X, gy0, CELL_SIZE_PX, CELL_GAP_PX, COLOR_BG);
-    rect(col0X, gy1, CELL_SIZE_PX, CELL_GAP_PX, COLOR_BG);
-    rect(col2X, gy1, CELL_SIZE_PX, CELL_GAP_PX, COLOR_BG);
+    return [
+      // Vertical gap segments (4): only rows 0 and 2.
+      rectOp(gx0, row0Y, CELL_GAP_PX, CELL_SIZE_PX, UI_COLOR_BG),
+      rectOp(gx0, row2Y, CELL_GAP_PX, CELL_SIZE_PX, UI_COLOR_BG),
+      rectOp(gx1, row0Y, CELL_GAP_PX, CELL_SIZE_PX, UI_COLOR_BG),
+      rectOp(gx1, row2Y, CELL_GAP_PX, CELL_SIZE_PX, UI_COLOR_BG),
+      // Horizontal gap segments (4): only cols 0 and 2.
+      rectOp(col0X, gy0, CELL_SIZE_PX, CELL_GAP_PX, UI_COLOR_BG),
+      rectOp(col2X, gy0, CELL_SIZE_PX, CELL_GAP_PX, UI_COLOR_BG),
+      rectOp(col0X, gy1, CELL_SIZE_PX, CELL_GAP_PX, UI_COLOR_BG),
+      rectOp(col2X, gy1, CELL_SIZE_PX, CELL_GAP_PX, UI_COLOR_BG)
+    ];
   }
-  function drawRightPanelMoveSlideCross(s, anim) {
+  function buildStaticPlan(s, hover) {
+    const ops = [];
+    for (let row = 0; row < GRID_ROWS; row++) {
+      for (let col = 0; col < GRID_COLS; col++) {
+        if (hover && hover.row === row && hover.col === col) ops.push(...drawHoverTintOps({ row, col }));
+        const spriteId = previewSpriteIdForCell(s, row, col);
+        if (spriteId == null) continue;
+        const o = spriteOriginInCellPx(row, col);
+        ops.push(sprOp(spriteId, o.x, o.y));
+      }
+    }
+    return { ops };
+  }
+  function buildMoveSlidePlan(s, anim, hover) {
     const frame = s.ui.clock.frame | 0;
     const startFrame = anim.startFrame | 0;
     const durationFrames = Math.max(1, anim.durationFrames | 0);
@@ -1675,6 +1587,7 @@ ${line}` };
     const offY = Math.floor(shiftY * t / durationFrames);
     const fromPos = anim.params.fromPos;
     const toPos = anim.params.toPos;
+    const ops = [];
     const cross = [
       { row: 0, col: 1, ox: 0, oy: -1 },
       { row: 1, col: 0, ox: -1, oy: 0 },
@@ -1682,25 +1595,272 @@ ${line}` };
       { row: 1, col: 2, ox: 1, oy: 0 },
       { row: 2, col: 1, ox: 0, oy: 1 }
     ];
+    if (hover && !isMetaCornerCell(hover)) ops.push(...drawHoverTintOps(hover));
     for (let i = 0; i < cross.length; i++) {
       const c = cross[i];
       const spriteId = getSpriteIdAt(s.world, fromPos.x + c.ox, fromPos.y + c.oy);
-      drawSpriteInCell(c.row, c.col, spriteId, offX, offY);
+      const o = spriteOriginInCellPx(c.row, c.col);
+      ops.push(sprOp(spriteId, o.x + offX, o.y + offY));
     }
     for (let i = 0; i < cross.length; i++) {
       const c = cross[i];
       const spriteId = getSpriteIdAt(s.world, toPos.x + c.ox, toPos.y + c.oy);
-      drawSpriteInCell(c.row, c.col, spriteId, offX - shiftX, offY - shiftY);
+      const o = spriteOriginInCellPx(c.row, c.col);
+      ops.push(sprOp(spriteId, o.x + offX - shiftX, o.y + offY - shiftY));
     }
-    maskOutsideGridInRightPanel();
-    maskGridGaps();
-    clearCell(0, 0);
-    clearCell(2, 0);
-    clearCell(2, 2);
-    clearCell(0, 2);
-    drawSpriteInCell(0, 0, SPR_BUTTON_GOAL, 0, 0);
-    drawSpriteInCell(2, 0, SPR_BUTTON_MINIMAP, 0, 0);
-    drawSpriteInCell(2, 2, SPR_BUTTON_RESTART, 0, 0);
+    ops.push(...maskOutsideGridOps(), ...maskGridGapsOps());
+    const corners = [
+      { row: 0, col: 0, spriteId: SPR_BUTTON_GOAL },
+      { row: 2, col: 0, spriteId: SPR_BUTTON_MINIMAP },
+      { row: 2, col: 2, spriteId: SPR_BUTTON_RESTART },
+      { row: 0, col: 2, spriteId: null }
+      // disabled
+    ];
+    for (let i = 0; i < corners.length; i++) {
+      const c = corners[i];
+      const cellO = cellOriginPx(c.row, c.col);
+      ops.push(rectOp(cellO.x, cellO.y, CELL_SIZE_PX, CELL_SIZE_PX, UI_COLOR_BG));
+      if (hover && hover.row === c.row && hover.col === c.col) ops.push(...drawHoverTintOps({ row: c.row, col: c.col }));
+      if (c.spriteId != null) {
+        const o = spriteOriginInCellPx(c.row, c.col);
+        ops.push(sprOp(c.spriteId, o.x, o.y));
+      }
+    }
+    return { ops };
+  }
+  function buildRightGridRenderPlan(s, hints) {
+    const hover = hoverCellFromHints(hints);
+    const moveSlide = findMoveSlideAnim(s);
+    if (!moveSlide) return buildStaticPlan(s, hover);
+    return buildMoveSlidePlan(s, moveSlide, hover);
+  }
+
+  // src/platform/tic80/render.ts
+  var SPR_HUD_FRAME = {
+    tl: 146,
+    t: 147,
+    tr: 148,
+    l: 162,
+    c: 163,
+    r: 164,
+    bl: 178,
+    b: 179,
+    br: 180
+  };
+  function renderFrame(s, hints) {
+    cls(UI_COLOR_BG);
+    drawRightPanel(s, hints);
+    drawLeftPanel(s);
+  }
+  function formatA1(position) {
+    const col = String.fromCharCode("A".charCodeAt(0) + position.x);
+    const row = String(position.y + 1);
+    return col + row;
+  }
+  function wrapText(text, maxChars) {
+    const paragraphs = String(text || "").split("\n");
+    const out = [];
+    for (let p = 0; p < paragraphs.length; p++) {
+      const words = String(paragraphs[p] || "").split(/\s+/).filter(Boolean);
+      let line = "";
+      for (const w of words) {
+        const next = line ? `${line} ${w}` : w;
+        if (next.length > maxChars && line) {
+          out.push(line);
+          line = w;
+        } else {
+          line = next;
+        }
+      }
+      if (line) out.push(line);
+    }
+    return out;
+  }
+  function loreLinesForMessage(message, maxChars) {
+    const rawMessage = String(message || "");
+    const firstNl = rawMessage.indexOf("\n");
+    const title = firstNl >= 0 ? rawMessage.slice(0, firstNl) : "";
+    const body = firstNl >= 0 ? rawMessage.slice(firstNl + 1) : rawMessage;
+    const out = [];
+    const titleLines = title ? wrapText(title, maxChars) : [];
+    const bodyLines = body ? wrapText(body, maxChars) : [];
+    for (let i = 0; i < titleLines.length; i++) out.push({ text: titleLines[i], color: UI_COLOR_POI_NAME });
+    for (let i = 0; i < bodyLines.length; i++) out.push({ text: bodyLines[i], color: UI_COLOR_POI_DESC });
+    return out;
+  }
+  function drawIllustrationWithTextureOverlay(spriteId, x, y) {
+    spr(spriteId, x, y, -1, UI_ILLUSTRATION_SCALE, 0, 0, 2, 2);
+    const illPx = 16 * UI_ILLUSTRATION_SCALE;
+    for (let oy = 0; oy < illPx; oy += UI_TEXTURE_TILE_PX) {
+      for (let ox = 0; ox < illPx; ox += UI_TEXTURE_TILE_PX) {
+        spr(UI_SPR_TEXTURE_OVERLAY, x + ox, y + oy, UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR, 1);
+      }
+    }
+  }
+  function drawLeftPanel(s) {
+    rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, UI_COLOR_BG);
+    drawNineSliceFrame(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, SPR_HUD_FRAME, {
+      tilePx: 8,
+      scale: 1,
+      colorkey: 0,
+      fallbackBorderColor: UI_COLOR_DIM
+    });
+    const isCombat = !!(s.encounter && s.encounter.kind === "combat");
+    const pos = s.player.position;
+    const spriteIdAtPos = getSpriteIdAt(s.world, pos.x, pos.y);
+    const leftPanel = s.ui.leftPanel;
+    const illSize = 16 * UI_ILLUSTRATION_SCALE;
+    const illX = UI_LEFT_PANEL_PADDING;
+    const illY = UI_LEFT_PANEL_PADDING;
+    if (s.run.isGameOver) {
+      drawIllustrationWithTextureOverlay(40, illX, illY);
+    } else if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
+      drawMinimap(s);
+    } else if (leftPanel.kind === LEFT_PANEL_KIND_SPRITE) {
+      drawIllustrationWithTextureOverlay(leftPanel.spriteId, illX, illY);
+    } else {
+      if (!isCombat) {
+        drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
+      } else {
+        drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
+        const platePad = UI_COMBAT_PREVIEW_PLATE_PAD;
+        const plateW = UI_COMBAT_PREVIEW_PLATE_W;
+        const plateH = 16 + platePad * 2;
+        const plateX = illX + illSize - plateW - UI_COMBAT_PREVIEW_PLATE_INSET;
+        const plateY = illY + UI_COMBAT_PREVIEW_PLATE_INSET;
+        rect(plateX, plateY, plateW, plateH, UI_COLOR_BG);
+        rectb(plateX, plateY, plateW, plateH, UI_COLOR_DIM);
+        const enemyIconX = plateX + platePad;
+        const enemyIconY = plateY + platePad;
+        spr(UI_SPR_ENEMY, enemyIconX, enemyIconY, 0, 1, 0, 0, 2, 2);
+        const enemyArmy = s.encounter && s.encounter.kind === "combat" ? s.encounter.enemyArmySize | 0 : 0;
+        const enemyCountX = enemyIconX + UI_FOOD_VALUE_OFFSET_X;
+        const enemyCountY = enemyIconY + UI_FOOD_VALUE_OFFSET_Y;
+        print(`${enemyArmy}`, enemyCountX, enemyCountY, UI_COLOR_TEXT);
+        if (ENABLE_ANIMATIONS) {
+          const anims = s.ui.anim.active;
+          const frame = s.ui.clock.frame | 0;
+          let xCursor = enemyIconX + UI_FOOD_DELTA_OFFSET_X;
+          for (let i = 0; i < anims.length; i++) {
+            const a = anims[i];
+            if (a.kind !== "enemyArmyDelta") continue;
+            const ea = a;
+            const start = ea.startFrame | 0;
+            const dur = Math.max(1, ea.durationFrames | 0);
+            const t = Math.max(0, Math.min(dur, frame - start));
+            const p = t / dur;
+            const delta = ea.params.delta | 0;
+            if (!delta) continue;
+            const label = delta > 0 ? `+${delta}` : `${delta}`;
+            const color = delta < 0 ? UI_COLOR_GOOD : UI_COLOR_BAD;
+            const dy = UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI_FOOD_DELTA_RISE_PX);
+            print(label, xCursor, enemyIconY + dy, color);
+            xCursor += label.length * 6 + UI_FOOD_DELTA_GAP_PX;
+          }
+        }
+      }
+    }
+    const statusX = illX + illSize + UI_LEFT_PANEL_INNER_GAP;
+    const statusY = illY;
+    const statusIconSize = UI_STATUS_ICON_SIZE;
+    const statusIconGap = UI_STATUS_ICON_GAP;
+    const fontH = 6;
+    const statusLineGap = UI_STATUS_LINE_GAP;
+    const statusLineH = fontH + statusLineGap;
+    const messageLineH = fontH + 1;
+    const textOffsetY = UI_STATUS_TEXT_OFFSET_Y;
+    const armyX = statusX;
+    const armyY = statusY;
+    spr(ARMY_SPRITE_ID, armyX, armyY, -1, 1, 0, 0, 2, 2);
+    const armyValueX = armyX + UI_ARMY_VALUE_OFFSET_X;
+    const armyValueY = armyY + UI_ARMY_VALUE_OFFSET_Y;
+    const armyColor = s.resources.armySize < 6 ? UI_COLOR_WARN : UI_COLOR_TEXT;
+    print(`${s.resources.armySize}`, armyValueX, armyValueY, armyColor);
+    const foodX = statusX;
+    const foodY = armyY + UI_ARMY_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX;
+    spr(FOOD_SPRITE_ID, foodX, foodY, -1, 1, 0, 0, 2, 2);
+    const foodValueX = foodX + UI_FOOD_VALUE_OFFSET_X;
+    const foodValueY = foodY + UI_FOOD_VALUE_OFFSET_Y;
+    const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? UI_COLOR_WARN : UI_COLOR_TEXT;
+    print(`${s.resources.food}`, foodValueX, foodValueY, foodColor);
+    const smallStartY = statusY + UI_SMALL_STATS_START_OFFSET_Y;
+    const seedY = smallStartY + 0 * statusLineH;
+    const posY = smallStartY + 1 * statusLineH;
+    const stepsY = smallStartY + 2 * statusLineH;
+    spr(UI_SPR_STATUS_SEED, statusX, seedY, -1);
+    print(`${s.world.seed}`, statusX + statusIconSize + statusIconGap, seedY + textOffsetY, UI_COLOR_TEXT);
+    spr(UI_SPR_STATUS_POS, statusX, posY, -1);
+    print(formatA1(pos), statusX + statusIconSize + statusIconGap, posY + textOffsetY, UI_COLOR_TEXT);
+    spr(UI_SPR_STATUS_STEPS, statusX, stepsY, -1);
+    print(`${s.run.stepCount}`, statusX + statusIconSize + statusIconGap, stepsY + textOffsetY, UI_COLOR_TEXT);
+    {
+      const anims = s.ui.anim.active;
+      const frame = s.ui.clock.frame | 0;
+      let xCursor = armyX + UI_ARMY_DELTA_OFFSET_X;
+      for (let i = 0; i < anims.length; i++) {
+        const a = anims[i];
+        if (a.kind !== "armyDelta") continue;
+        const aa = a;
+        const start = aa.startFrame | 0;
+        const dur = Math.max(1, aa.durationFrames | 0);
+        const t = Math.max(0, Math.min(dur, frame - start));
+        const p = t / dur;
+        const delta = aa.params.delta | 0;
+        if (!delta) continue;
+        const label = delta > 0 ? `+${delta}` : `${delta}`;
+        const color = delta > 0 ? UI_COLOR_GOOD : UI_COLOR_BAD;
+        const dy = UI_ARMY_DELTA_OFFSET_Y - Math.floor(p * UI_ARMY_DELTA_RISE_PX);
+        print(label, xCursor, armyY + dy, color);
+        xCursor += label.length * 6 + UI_ARMY_DELTA_GAP_PX;
+      }
+    }
+    {
+      const anims = s.ui.anim.active;
+      const frame = s.ui.clock.frame | 0;
+      let xCursor = foodX + UI_FOOD_DELTA_OFFSET_X;
+      for (let i = 0; i < anims.length; i++) {
+        const a = anims[i];
+        if (a.kind !== "foodDelta") continue;
+        const fa = a;
+        const start = fa.startFrame | 0;
+        const dur = Math.max(1, fa.durationFrames | 0);
+        const t = Math.max(0, Math.min(dur, frame - start));
+        const p = t / dur;
+        const delta = fa.params.delta | 0;
+        if (!delta) continue;
+        const label = delta > 0 ? `+${delta}` : `${delta}`;
+        const color = delta > 0 ? UI_COLOR_GOOD : UI_COLOR_BAD;
+        const dy = UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI_FOOD_DELTA_RISE_PX);
+        print(label, xCursor, foodY + dy, color);
+        xCursor += label.length * 6 + UI_FOOD_DELTA_GAP_PX;
+      }
+    }
+    const statusBottomY = stepsY + statusLineH;
+    const headerBottomY = Math.max(illY + illSize, statusBottomY);
+    const msgY = headerBottomY + 4;
+    const headline = s.run.isGameOver ? { text: "GAME OVER", color: UI_COLOR_BAD } : s.run.hasFoundCastle ? { text: "YOU WIN", color: UI_COLOR_GOOD } : null;
+    const headlineRows = headline ? 1 : 0;
+    const maxLines = Math.max(0, Math.floor((SCREEN_HEIGHT - msgY - 4) / messageLineH) - headlineRows);
+    const lore = loreLinesForMessage(s.ui.message, LORE_MAX_CHARS_PER_LINE);
+    const textStartY = headline ? msgY + messageLineH : msgY;
+    if (headline) print(headline.text, UI_LEFT_PANEL_PADDING, msgY, headline.color);
+    let printed = 0;
+    for (let i = 0; i < lore.length && printed < maxLines; i++) {
+      const line = lore[i];
+      print(line.text, UI_LEFT_PANEL_PADDING, textStartY + printed * messageLineH, line.color);
+      printed++;
+    }
+  }
+  function drawRightPanel(s, hints) {
+    const plan = buildRightGridRenderPlan(s, hints);
+    drawRightGridOps(plan.ops);
+  }
+  function drawRightGridOps(ops) {
+    for (let i = 0; i < ops.length; i++) {
+      const op = ops[i];
+      if (op.kind === "rect") rect(op.x, op.y, op.w, op.h, op.color);
+      else spr(op.spriteId, op.x, op.y, op.colorkey, op.scale, op.flip, op.rotate, op.w, op.h);
+    }
   }
   var MINIMAP_CELL_PX = 6;
   var MINIMAP_TILE_CACHE = {};
@@ -1720,7 +1880,7 @@ ${line}` };
         out.push(pix(sx, sy));
       }
     }
-    rect(scratchX, scratchY, 16, 16, COLOR_BG);
+    rect(scratchX, scratchY, 16, 16, UI_COLOR_BG);
     MINIMAP_TILE_CACHE[k] = out;
     return out;
   }
@@ -1754,7 +1914,7 @@ ${line}` };
       }
     }
     const p = s.player.position;
-    rectb(originX + p.x * cellPx, originY + p.y * cellPx, cellPx, cellPx, COLOR_TEXT);
+    rectb(originX + p.x * cellPx, originY + p.y * cellPx, cellPx, cellPx, UI_COLOR_TEXT);
   }
 
   // src/platform/tic80/entry.ts
@@ -1775,14 +1935,15 @@ ${line}` };
         if (next) state = next;
       }
     }
-    renderFrame(state);
+    const hints = deriveRenderHints(state, mouseX, mouseY);
+    renderFrame(state, hints);
   }
   globalThis.TIC = TIC;
 })();
 
-// title:  The Unbound (prototype 0.0.7)
+// title:  The Unbound (prototype 0.0.8)
 // author: haulin
-// desc:   Prototype 0.0.7 toward the North Star
+// desc:   Prototype 0.0.8 toward the North Star
 // script: js
 // input:  mouse
 

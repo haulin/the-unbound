@@ -3,13 +3,8 @@ import {
   ENABLE_ANIMATIONS,
   FOOD_SPRITE_ID,
   FOOD_WARNING_THRESHOLD,
-  GRID_TRANSITION_STEP_FRAMES,
   LORE_MAX_CHARS_PER_LINE,
-  SPR_BUTTON_GOAL,
-  SPR_BUTTON_MINIMAP,
-  SPR_BUTTON_RESTART,
 } from '../../core/constants'
-import { getRightGridCellDef } from '../../core/rightGrid'
 import { getSpriteIdAt } from '../../core/world'
 import {
   LEFT_PANEL_KIND_MINIMAP,
@@ -17,62 +12,32 @@ import {
   type ArmyDeltaAnim,
   type EnemyArmyDeltaAnim,
   type FoodDeltaAnim,
-  type GridTransitionAnim,
-  type MoveSlideAnim,
   type State,
 } from '../../core/types'
 import {
-  CELL_GAP_PX,
-  CELL_SIZE_PX,
-  GRID_COLS,
-  GRID_ORIGIN_X,
-  GRID_ORIGIN_Y,
-  GRID_ROWS,
-  GRID_WIDTH_PX,
   PANEL_LEFT_WIDTH,
-  PANEL_RIGHT_WIDTH,
   SCREEN_HEIGHT,
 } from './layout'
-import {
-  UI_COLOR_BAD,
-  UI_COLOR_BG,
-  UI_COLOR_DIM,
-  UI_COLOR_GOOD,
-  UI_COLOR_TEXT,
-  UI_COLOR_WARN,
-  UI_ARMY_DELTA_GAP_PX,
-  UI_ARMY_DELTA_OFFSET_X,
-  UI_ARMY_DELTA_OFFSET_Y,
-  UI_ARMY_DELTA_RISE_PX,
-  UI_ARMY_ICON_H_PX,
-  UI_ARMY_VALUE_OFFSET_X,
-  UI_ARMY_VALUE_OFFSET_Y,
-  UI_FOOD_DELTA_GAP_PX,
-  UI_FOOD_DELTA_OFFSET_X,
-  UI_FOOD_DELTA_OFFSET_Y,
-  UI_FOOD_DELTA_RISE_PX,
-  UI_FOOD_VALUE_OFFSET_X,
-  UI_FOOD_VALUE_OFFSET_Y,
-  UI_HERO_RESOURCE_GAP_PX,
-  UI_LEFT_PANEL_INNER_GAP,
-  UI_LEFT_PANEL_PADDING,
-  UI_SMALL_STATS_START_OFFSET_Y,
-  UI_STATUS_ICON_GAP,
-  UI_STATUS_ICON_SIZE,
-  UI_STATUS_LINE_GAP,
-  UI_STATUS_TEXT_OFFSET_Y,
-} from './uiConstants'
+import * as UI from './uiConstants'
+import type { RenderHints } from './input'
+import { drawNineSliceFrame, type NineSlice3x3 } from './nineSlice'
+import { buildRightGridRenderPlan, type RightGridRenderOp } from './rightGridRenderPlan'
 
-const COLOR_BG = UI_COLOR_BG
-const COLOR_TEXT = UI_COLOR_TEXT
-const COLOR_DIM = UI_COLOR_DIM
-const COLOR_GOOD = UI_COLOR_GOOD
-const COLOR_WARN = UI_COLOR_WARN
-const COLOR_BAD = UI_COLOR_BAD
+const SPR_HUD_FRAME: NineSlice3x3 = {
+  tl: 146,
+  t: 147,
+  tr: 148,
+  l: 162,
+  c: 163,
+  r: 164,
+  bl: 178,
+  b: 179,
+  br: 180,
+}
 
-export function renderFrame(s: State) {
-  cls(COLOR_BG)
-  drawRightPanel(s)
+export function renderFrame(s: State, hints: RenderHints) {
+  cls(UI.UI_COLOR_BG)
+  drawRightPanel(s, hints)
   // Draw left panel last so it masks any right-panel animation overflow into x < PANEL_LEFT_WIDTH.
   drawLeftPanel(s)
 }
@@ -115,72 +80,96 @@ function wrapText(text: string, maxChars: number) {
   return out
 }
 
+type LoreLine = { text: string; color: number }
+
+function loreLinesForMessage(message: string, maxChars: number): LoreLine[] {
+  const rawMessage = String(message || '')
+  const firstNl = rawMessage.indexOf('\n')
+  const title = firstNl >= 0 ? rawMessage.slice(0, firstNl) : ''
+  const body = firstNl >= 0 ? rawMessage.slice(firstNl + 1) : rawMessage
+
+  const out: LoreLine[] = []
+  const titleLines = title ? wrapText(title, maxChars) : []
+  const bodyLines = body ? wrapText(body, maxChars) : []
+
+  for (let i = 0; i < titleLines.length; i++) out.push({ text: titleLines[i]!, color: UI.UI_COLOR_POI_NAME })
+  for (let i = 0; i < bodyLines.length; i++) out.push({ text: bodyLines[i]!, color: UI.UI_COLOR_POI_DESC })
+
+  return out
+}
+
 // ----------------------------
 // Left panel
 // ----------------------------
-const BUTTON_SPRITE_SCALE = 2 // 16->32
-const ILLUSTRATION_SCALE = 4 // 16->64
-
-const COMBAT_PREVIEW_PLATE_PAD = 2
-const COMBAT_PREVIEW_PLATE_W = 42
-const COMBAT_PREVIEW_PLATE_INSET = 2
-
-const SPR_STATUS_STEPS = 130
-const SPR_STATUS_POS = 131
-const SPR_STATUS_SEED = 132
+function drawIllustrationWithTextureOverlay(spriteId: number, x: number, y: number) {
+  spr(spriteId, x, y, -1, UI.UI_ILLUSTRATION_SCALE, 0, 0, 2, 2)
+  // Texture overlay: tile an 8×8 sprite over the 64×64 illustration.
+  // Key off a non-black color so the grain can use black safely.
+  const illPx = 16 * UI.UI_ILLUSTRATION_SCALE
+  for (let oy = 0; oy < illPx; oy += UI.UI_TEXTURE_TILE_PX) {
+    for (let ox = 0; ox < illPx; ox += UI.UI_TEXTURE_TILE_PX) {
+      spr(UI.UI_SPR_TEXTURE_OVERLAY, x + ox, y + oy, UI.UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR, 1)
+    }
+  }
+}
 
 function drawLeftPanel(s: State) {
-  rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, COLOR_BG)
-  rectb(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, COLOR_DIM)
+  rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, UI.UI_COLOR_BG)
+  drawNineSliceFrame(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, SPR_HUD_FRAME, {
+    tilePx: 8,
+    scale: 1,
+    colorkey: 0,
+    fallbackBorderColor: UI.UI_COLOR_DIM,
+  })
 
   const isCombat = !!(s.encounter && s.encounter.kind === 'combat')
   const pos = s.player.position
   const spriteIdAtPos = getSpriteIdAt(s.world, pos.x, pos.y)
   const leftPanel = s.ui.leftPanel
 
-  const illSize = 16 * ILLUSTRATION_SCALE
-  const illX = UI_LEFT_PANEL_PADDING
-  const illY = UI_LEFT_PANEL_PADDING
+  const illSize = 16 * UI.UI_ILLUSTRATION_SCALE
+  const illX = UI.UI_LEFT_PANEL_PADDING
+  const illY = UI.UI_LEFT_PANEL_PADDING
   if (s.run.isGameOver) {
     // Game over: use a fixed tombstone illustration.
-    spr(40, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2)
+    drawIllustrationWithTextureOverlay(40, illX, illY)
   } else if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
     drawMinimap(s)
   } else if (leftPanel.kind === LEFT_PANEL_KIND_SPRITE) {
-    spr(leftPanel.spriteId, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2)
+    drawIllustrationWithTextureOverlay(leftPanel.spriteId, illX, illY)
   } else {
     if (!isCombat) {
-      spr(spriteIdAtPos, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2)
+      drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
     } else {
       // Combat preview: use the 64×64 illustration space as a composite.
       // - Render the underlying tile as a full 64×64 preview.
       // - Overlay a small "enemy stats" plate on top (filled + bordered),
       //   using the same icon/value/delta layout constants as the player stats.
-      spr(spriteIdAtPos, illX, illY, -1, ILLUSTRATION_SCALE, 0, 0, 2, 2)
+      drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
 
-      const platePad = COMBAT_PREVIEW_PLATE_PAD
-      const plateW = COMBAT_PREVIEW_PLATE_W
+      const platePad = UI.UI_COMBAT_PREVIEW_PLATE_PAD
+      const plateW = UI.UI_COMBAT_PREVIEW_PLATE_W
       const plateH = 16 + platePad * 2
-      const plateX = illX + illSize - plateW - COMBAT_PREVIEW_PLATE_INSET
-      const plateY = illY + COMBAT_PREVIEW_PLATE_INSET
-      rect(plateX, plateY, plateW, plateH, COLOR_BG)
-      rectb(plateX, plateY, plateW, plateH, COLOR_DIM)
+      const plateX = illX + illSize - plateW - UI.UI_COMBAT_PREVIEW_PLATE_INSET
+      const plateY = illY + UI.UI_COMBAT_PREVIEW_PLATE_INSET
+      rect(plateX, plateY, plateW, plateH, UI.UI_COLOR_BG)
+      rectb(plateX, plateY, plateW, plateH, UI.UI_COLOR_DIM)
 
       const enemyIconX = plateX + platePad
       const enemyIconY = plateY + platePad
       // Use color 0 as transparent for UI-like overlay sprites.
-      spr(SPR_ENEMY, enemyIconX, enemyIconY, 0, 1, 0, 0, 2, 2)
+      spr(UI.UI_SPR_ENEMY, enemyIconX, enemyIconY, 0, 1, 0, 0, 2, 2)
 
       const enemyArmy = s.encounter && s.encounter.kind === 'combat' ? (s.encounter.enemyArmySize | 0) : 0
-      const enemyCountX = enemyIconX + UI_FOOD_VALUE_OFFSET_X
-      const enemyCountY = enemyIconY + UI_FOOD_VALUE_OFFSET_Y
-      print(`${enemyArmy}`, enemyCountX, enemyCountY, COLOR_TEXT)
+      const enemyCountX = enemyIconX + UI.UI_FOOD_VALUE_OFFSET_X
+      const enemyCountY = enemyIconY + UI.UI_FOOD_VALUE_OFFSET_Y
+      print(`${enemyArmy}`, enemyCountX, enemyCountY, UI.UI_COLOR_TEXT)
 
       // Enemy delta overlay near the count.
       if (ENABLE_ANIMATIONS) {
         const anims = s.ui.anim.active
         const frame = s.ui.clock.frame | 0
-        let xCursor = enemyIconX + UI_FOOD_DELTA_OFFSET_X
+        let xCursor = enemyIconX + UI.UI_FOOD_DELTA_OFFSET_X
         for (let i = 0; i < anims.length; i++) {
           const a = anims[i]!
           if (a.kind !== 'enemyArmyDelta') continue
@@ -193,64 +182,64 @@ function drawLeftPanel(s: State) {
           if (!delta) continue
 
           const label = delta > 0 ? `+${delta}` : `${delta}`
-          const color = delta < 0 ? COLOR_GOOD : COLOR_BAD
-          const dy = UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI_FOOD_DELTA_RISE_PX)
+          const color = delta < 0 ? UI.UI_COLOR_GOOD : UI.UI_COLOR_BAD
+          const dy = UI.UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI.UI_FOOD_DELTA_RISE_PX)
           print(label, xCursor, enemyIconY + dy, color)
-          xCursor += label.length * 6 + UI_FOOD_DELTA_GAP_PX
+          xCursor += label.length * 6 + UI.UI_FOOD_DELTA_GAP_PX
         }
       }
     }
   }
 
-  const statusX = illX + illSize + UI_LEFT_PANEL_INNER_GAP
+  const statusX = illX + illSize + UI.UI_LEFT_PANEL_INNER_GAP
   const statusY = illY
-  const statusIconSize = UI_STATUS_ICON_SIZE
-  const statusIconGap = UI_STATUS_ICON_GAP
+  const statusIconSize = UI.UI_STATUS_ICON_SIZE
+  const statusIconGap = UI.UI_STATUS_ICON_GAP
   const fontH = 6
-  const statusLineGap = UI_STATUS_LINE_GAP
+  const statusLineGap = UI.UI_STATUS_LINE_GAP
   const statusLineH = fontH + statusLineGap
   const messageLineH = fontH + 1
-  const textOffsetY = UI_STATUS_TEXT_OFFSET_Y
+  const textOffsetY = UI.UI_STATUS_TEXT_OFFSET_Y
 
   // Army gets the hero slot in v0.0.6.
   const armyX = statusX
   const armyY = statusY
   spr(ARMY_SPRITE_ID, armyX, armyY, -1, 1, 0, 0, 2, 2) // 16×16
-  const armyValueX = armyX + UI_ARMY_VALUE_OFFSET_X
-  const armyValueY = armyY + UI_ARMY_VALUE_OFFSET_Y
-  const armyColor = s.resources.armySize < 6 ? COLOR_WARN : COLOR_TEXT
+  const armyValueX = armyX + UI.UI_ARMY_VALUE_OFFSET_X
+  const armyValueY = armyY + UI.UI_ARMY_VALUE_OFFSET_Y
+  const armyColor = s.resources.armySize < 6 ? UI.UI_COLOR_WARN : UI.UI_COLOR_TEXT
   print(`${s.resources.armySize}`, armyValueX, armyValueY, armyColor)
 
   const foodX = statusX
-  const foodY = armyY + UI_ARMY_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX
+  const foodY = armyY + UI.UI_ARMY_ICON_H_PX + UI.UI_HERO_RESOURCE_GAP_PX
   spr(FOOD_SPRITE_ID, foodX, foodY, -1, 1, 0, 0, 2, 2) // 16×16
-  const foodValueX = foodX + UI_FOOD_VALUE_OFFSET_X
-  const foodValueY = foodY + UI_FOOD_VALUE_OFFSET_Y
-  const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? COLOR_WARN : COLOR_TEXT
+  const foodValueX = foodX + UI.UI_FOOD_VALUE_OFFSET_X
+  const foodValueY = foodY + UI.UI_FOOD_VALUE_OFFSET_Y
+  const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? UI.UI_COLOR_WARN : UI.UI_COLOR_TEXT
   print(`${s.resources.food}`, foodValueX, foodValueY, foodColor)
 
-  const smallStartY = statusY + UI_SMALL_STATS_START_OFFSET_Y
+  const smallStartY = statusY + UI.UI_SMALL_STATS_START_OFFSET_Y
   const seedY = smallStartY + 0 * statusLineH
   const posY = smallStartY + 1 * statusLineH
   const stepsY = smallStartY + 2 * statusLineH
 
   // Seed (least important, but still useful)
-  spr(SPR_STATUS_SEED, statusX, seedY, -1)
-  print(`${s.world.seed}`, statusX + statusIconSize + statusIconGap, seedY + textOffsetY, COLOR_TEXT)
+  spr(UI.UI_SPR_STATUS_SEED, statusX, seedY, -1)
+  print(`${s.world.seed}`, statusX + statusIconSize + statusIconGap, seedY + textOffsetY, UI.UI_COLOR_TEXT)
 
   // Position (arguably important, keep it)
-  spr(SPR_STATUS_POS, statusX, posY, -1)
-  print(formatA1(pos), statusX + statusIconSize + statusIconGap, posY + textOffsetY, COLOR_TEXT)
+  spr(UI.UI_SPR_STATUS_POS, statusX, posY, -1)
+  print(formatA1(pos), statusX + statusIconSize + statusIconGap, posY + textOffsetY, UI.UI_COLOR_TEXT)
 
   // Steps
-  spr(SPR_STATUS_STEPS, statusX, stepsY, -1)
-  print(`${s.run.stepCount}`, statusX + statusIconSize + statusIconGap, stepsY + textOffsetY, COLOR_TEXT)
+  spr(UI.UI_SPR_STATUS_STEPS, statusX, stepsY, -1)
+  print(`${s.run.stepCount}`, statusX + statusIconSize + statusIconGap, stepsY + textOffsetY, UI.UI_COLOR_TEXT)
 
   // Army delta flashes (non-blocking)
   {
     const anims = s.ui.anim.active
     const frame = s.ui.clock.frame | 0
-    let xCursor = armyX + UI_ARMY_DELTA_OFFSET_X
+    let xCursor = armyX + UI.UI_ARMY_DELTA_OFFSET_X
     for (let i = 0; i < anims.length; i++) {
       const a = anims[i]!
       if (a.kind !== 'armyDelta') continue
@@ -263,10 +252,10 @@ function drawLeftPanel(s: State) {
       if (!delta) continue
 
       const label = delta > 0 ? `+${delta}` : `${delta}`
-      const color = delta > 0 ? COLOR_GOOD : COLOR_BAD
-      const dy = UI_ARMY_DELTA_OFFSET_Y - Math.floor(p * UI_ARMY_DELTA_RISE_PX)
+      const color = delta > 0 ? UI.UI_COLOR_GOOD : UI.UI_COLOR_BAD
+      const dy = UI.UI_ARMY_DELTA_OFFSET_Y - Math.floor(p * UI.UI_ARMY_DELTA_RISE_PX)
       print(label, xCursor, armyY + dy, color)
-      xCursor += label.length * 6 + UI_ARMY_DELTA_GAP_PX
+      xCursor += label.length * 6 + UI.UI_ARMY_DELTA_GAP_PX
     }
   }
 
@@ -274,7 +263,7 @@ function drawLeftPanel(s: State) {
   {
     const anims = s.ui.anim.active
     const frame = s.ui.clock.frame | 0
-    let xCursor = foodX + UI_FOOD_DELTA_OFFSET_X
+    let xCursor = foodX + UI.UI_FOOD_DELTA_OFFSET_X
     for (let i = 0; i < anims.length; i++) {
       const a = anims[i]!
       if (a.kind !== 'foodDelta') continue
@@ -288,12 +277,12 @@ function drawLeftPanel(s: State) {
       if (!delta) continue
 
       const label = delta > 0 ? `+${delta}` : `${delta}`
-      const color = delta > 0 ? COLOR_GOOD : COLOR_BAD
+      const color = delta > 0 ? UI.UI_COLOR_GOOD : UI.UI_COLOR_BAD
 
       // Anchor over the icon, and stack horizontally so +N stays readable.
-      const dy = UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI_FOOD_DELTA_RISE_PX)
+      const dy = UI.UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI.UI_FOOD_DELTA_RISE_PX)
       print(label, xCursor, foodY + dy, color)
-      xCursor += label.length * 6 + UI_FOOD_DELTA_GAP_PX
+      xCursor += label.length * 6 + UI.UI_FOOD_DELTA_GAP_PX
     }
   }
 
@@ -301,283 +290,37 @@ function drawLeftPanel(s: State) {
   const headerBottomY = Math.max(illY + illSize, statusBottomY)
   const msgY = headerBottomY + 4
   const headline = s.run.isGameOver
-    ? ({ text: 'GAME OVER', color: COLOR_BAD } as const)
+    ? ({ text: 'GAME OVER', color: UI.UI_COLOR_BAD } as const)
     : s.run.hasFoundCastle
-      ? ({ text: 'YOU WIN', color: COLOR_GOOD } as const)
+      ? ({ text: 'YOU WIN', color: UI.UI_COLOR_GOOD } as const)
       : null
   const headlineRows = headline ? 1 : 0
   const maxLines = Math.max(0, Math.floor((SCREEN_HEIGHT - msgY - 4) / messageLineH) - headlineRows)
-  const lines = wrapText(s.ui.message, LORE_MAX_CHARS_PER_LINE)
+  const lore = loreLinesForMessage(s.ui.message, LORE_MAX_CHARS_PER_LINE)
   const textStartY = headline ? msgY + messageLineH : msgY
-  if (headline) print(headline.text, UI_LEFT_PANEL_PADDING, msgY, headline.color)
-  for (let i = 0; i < lines.length && i < maxLines; i++) {
-    print(lines[i], UI_LEFT_PANEL_PADDING, textStartY + i * messageLineH, COLOR_TEXT)
+  if (headline) print(headline.text, UI.UI_LEFT_PANEL_PADDING, msgY, headline.color)
+  let printed = 0
+  for (let i = 0; i < lore.length && printed < maxLines; i++) {
+    const line = lore[i]!
+    print(line.text, UI.UI_LEFT_PANEL_PADDING, textStartY + printed * messageLineH, line.color)
+    printed++
   }
 }
 
 // ----------------------------
 // Right panel
 // ----------------------------
-function drawRightPanel(s: State) {
-  if (!ENABLE_ANIMATIONS) return drawRightPanelStatic(s)
+function drawRightPanel(s: State, hints: RenderHints) {
+  const plan = buildRightGridRenderPlan(s, hints)
+  drawRightGridOps(plan.ops)
+}
 
-  const anims = s.ui.anim.active
-  let moveSlide: MoveSlideAnim | null = null
-  for (let i = 0; i < anims.length; i++) {
-    const a = anims[i]!
-    if (a.kind === 'moveSlide') {
-      moveSlide = a as MoveSlideAnim
-      break
-    }
+function drawRightGridOps(ops: RightGridRenderOp[]) {
+  for (let i = 0; i < ops.length; i++) {
+    const op = ops[i]!
+    if (op.kind === 'rect') rect(op.x, op.y, op.w, op.h, op.color)
+    else spr(op.spriteId, op.x, op.y, op.colorkey, op.scale, op.flip, op.rotate, op.w, op.h)
   }
-  if (!moveSlide) return drawRightPanelStatic(s)
-
-  return drawRightPanelMoveSlideCross(s, moveSlide)
-}
-
-const SPR_FIGHT = 74
-const SPR_RETURN = 76
-const SPR_ENEMY = 102
-
-function spriteIdForIconKey(iconKey: string): number | null {
-  switch (iconKey) {
-    case 'goal':
-      return SPR_BUTTON_GOAL
-    case 'minimap':
-      return SPR_BUTTON_MINIMAP
-    case 'restart':
-      return SPR_BUTTON_RESTART
-    case 'fight':
-      return SPR_FIGHT
-    case 'return':
-      return SPR_RETURN
-    case 'enemy':
-      return SPR_ENEMY
-    default:
-      return null
-  }
-}
-
-function crossRevealIndex(row: number, col: number): number {
-  // Reveal order: N, W, S, E, C
-  if (row === 0 && col === 1) return 0
-  if (row === 1 && col === 0) return 1
-  if (row === 2 && col === 1) return 2
-  if (row === 1 && col === 2) return 3
-  if (row === 1 && col === 1) return 4
-  return -1
-}
-
-function spriteIdForModeCrossCell(s: State, mode: 'overworld' | 'combat', row: number, col: number): number | null {
-  if (mode === 'combat') {
-    // Combat layout: W=fight, E=return, C=enemy, N/S empty.
-    if (row === 1 && col === 0) return SPR_FIGHT
-    if (row === 1 && col === 2) return SPR_RETURN
-    if (row === 1 && col === 1) return SPR_ENEMY
-    return null
-  }
-
-  // Overworld: show tile previews (relative to player).
-  const p = s.player.position
-  if (row === 0 && col === 1) return getSpriteIdAt(s.world, p.x, p.y - 1)
-  if (row === 1 && col === 0) return getSpriteIdAt(s.world, p.x - 1, p.y)
-  if (row === 2 && col === 1) return getSpriteIdAt(s.world, p.x, p.y + 1)
-  if (row === 1 && col === 2) return getSpriteIdAt(s.world, p.x + 1, p.y)
-  if (row === 1 && col === 1) return getSpriteIdAt(s.world, p.x, p.y)
-  return null
-}
-
-function previewSpriteIdForCell(s: State, row: number, col: number): number | null {
-  // During a grid transition, we render a hybrid from-mode → to-mode layout.
-  let transition: GridTransitionAnim | null = null
-  if (ENABLE_ANIMATIONS) {
-    const anims = s.ui.anim.active
-    for (let i = 0; i < anims.length; i++) {
-      const a = anims[i]!
-      if (a.kind === 'gridTransition') {
-        transition = a as GridTransitionAnim
-        break
-      }
-    }
-  }
-
-  if (transition) {
-    const frame = s.ui.clock.frame | 0
-    const start = transition.startFrame | 0
-    if (frame >= start) {
-      const stepFrames = Math.max(1, GRID_TRANSITION_STEP_FRAMES | 0)
-      const t = Math.max(0, frame - start)
-      const phase = Math.floor(t / stepFrames)
-
-      const idx = crossRevealIndex(row, col)
-      if (idx >= 0) {
-        const mode = phase >= idx ? transition.params.to : transition.params.from
-        return spriteIdForModeCrossCell(s, mode, row, col)
-      }
-    }
-  }
-
-  const def = getRightGridCellDef(s, row, col)
-  if (def.iconKey) return spriteIdForIconKey(def.iconKey) ?? null
-  if (def.tilePreview && def.tilePreview.kind === 'relativeToPlayer') {
-    const p = s.player.position
-    return getSpriteIdAt(s.world, p.x + def.tilePreview.dx, p.y + def.tilePreview.dy)
-  }
-  return null
-}
-
-function drawRightPanelStatic(s: State) {
-  const pitch = CELL_SIZE_PX + CELL_GAP_PX
-  const spriteSize = 16 * BUTTON_SPRITE_SCALE
-  const spriteOffset = Math.floor((CELL_SIZE_PX - spriteSize) / 2)
-
-  for (let row = 0; row < GRID_ROWS; row++) {
-    for (let col = 0; col < GRID_COLS; col++) {
-      const x = GRID_ORIGIN_X + col * pitch
-      const y = GRID_ORIGIN_Y + row * pitch
-
-      const spriteId = previewSpriteIdForCell(s, row, col)
-      if (spriteId != null) spr(spriteId, x + spriteOffset, y + spriteOffset, -1, BUTTON_SPRITE_SCALE, 0, 0, 2, 2)
-    }
-  }
-}
-
-function cellOriginPx(row: number, col: number) {
-  const pitch = CELL_SIZE_PX + CELL_GAP_PX
-  return { x: GRID_ORIGIN_X + col * pitch, y: GRID_ORIGIN_Y + row * pitch }
-}
-
-function drawSpriteInCell(row: number, col: number, spriteId: number, offsetX: number, offsetY: number) {
-  const spriteSize = 16 * BUTTON_SPRITE_SCALE
-  const spriteOffset = Math.floor((CELL_SIZE_PX - spriteSize) / 2)
-  const o = cellOriginPx(row, col)
-  spr(
-    spriteId,
-    o.x + spriteOffset + (offsetX | 0),
-    o.y + spriteOffset + (offsetY | 0),
-    -1,
-    BUTTON_SPRITE_SCALE,
-    0,
-    0,
-    2,
-    2
-  )
-}
-
-function clearCell(row: number, col: number) {
-  const o = cellOriginPx(row, col)
-  rect(o.x, o.y, CELL_SIZE_PX, CELL_SIZE_PX, COLOR_BG)
-}
-
-function maskOutsideGridInRightPanel() {
-  const panelX = PANEL_LEFT_WIDTH
-  const panelY = 0
-  const panelW = PANEL_RIGHT_WIDTH
-  const panelH = SCREEN_HEIGHT
-
-  const gridX = GRID_ORIGIN_X
-  const gridY = GRID_ORIGIN_Y
-  const gridW = GRID_WIDTH_PX
-  const gridH = CELL_SIZE_PX * GRID_ROWS + CELL_GAP_PX * (GRID_ROWS - 1)
-
-  // Top and bottom strips
-  if (gridY > panelY) rect(panelX, panelY, panelW, gridY - panelY, COLOR_BG)
-  const bottomY = gridY + gridH
-  const panelBottomY = panelY + panelH
-  if (panelBottomY > bottomY) rect(panelX, bottomY, panelW, panelBottomY - bottomY, COLOR_BG)
-
-  // Left and right strips adjacent to the grid
-  if (gridX > panelX) rect(panelX, gridY, gridX - panelX, gridH, COLOR_BG)
-  const rightX = gridX + gridW
-  const panelRightX = panelX + panelW
-  if (panelRightX > rightX) rect(rightX, gridY, panelRightX - rightX, gridH, COLOR_BG)
-}
-
-function maskGridGaps() {
-  const pitch = CELL_SIZE_PX + CELL_GAP_PX
-
-  // Vertical gap x positions: between col0-col1 and col1-col2
-  const gx0 = GRID_ORIGIN_X + CELL_SIZE_PX
-  const gx1 = GRID_ORIGIN_X + pitch + CELL_SIZE_PX
-
-  // Horizontal gap y positions: between row0-row1 and row1-row2
-  const gy0 = GRID_ORIGIN_Y + CELL_SIZE_PX
-  const gy1 = GRID_ORIGIN_Y + pitch + CELL_SIZE_PX
-
-  // Row y origins for row0 and row2
-  const row0Y = GRID_ORIGIN_Y + 0 * pitch
-  const row2Y = GRID_ORIGIN_Y + 2 * pitch
-
-  // Col x origins for col0 and col2
-  const col0X = GRID_ORIGIN_X + 0 * pitch
-  const col2X = GRID_ORIGIN_X + 2 * pitch
-
-  // Vertical gap segments (4): only rows 0 and 2.
-  rect(gx0, row0Y, CELL_GAP_PX, CELL_SIZE_PX, COLOR_BG)
-  rect(gx0, row2Y, CELL_GAP_PX, CELL_SIZE_PX, COLOR_BG)
-  rect(gx1, row0Y, CELL_GAP_PX, CELL_SIZE_PX, COLOR_BG)
-  rect(gx1, row2Y, CELL_GAP_PX, CELL_SIZE_PX, COLOR_BG)
-
-  // Horizontal gap segments (4): only cols 0 and 2.
-  rect(col0X, gy0, CELL_SIZE_PX, CELL_GAP_PX, COLOR_BG)
-  rect(col2X, gy0, CELL_SIZE_PX, CELL_GAP_PX, COLOR_BG)
-  rect(col0X, gy1, CELL_SIZE_PX, CELL_GAP_PX, COLOR_BG)
-  rect(col2X, gy1, CELL_SIZE_PX, CELL_GAP_PX, COLOR_BG)
-}
-
-function drawRightPanelMoveSlideCross(s: State, anim: MoveSlideAnim) {
-  const frame = s.ui.clock.frame | 0
-  const startFrame = anim.startFrame | 0
-  const durationFrames = Math.max(1, anim.durationFrames | 0)
-  const t = Math.max(0, Math.min(durationFrames, frame - startFrame))
-
-  const pX = CELL_SIZE_PX + CELL_GAP_PX
-  const dx = anim.params.dx | 0
-  const dy = anim.params.dy | 0
-  const shiftX = -dx * pX
-  const shiftY = -dy * pX
-  const offX = Math.floor((shiftX * t) / durationFrames)
-  const offY = Math.floor((shiftY * t) / durationFrames)
-
-  const fromPos = anim.params.fromPos
-  const toPos = anim.params.toPos
-
-  // Cross cells: N, W, C, E, S (corners stay UI)
-  const cross = [
-    { row: 0, col: 1, ox: 0, oy: -1 },
-    { row: 1, col: 0, ox: -1, oy: 0 },
-    { row: 1, col: 1, ox: 0, oy: 0 },
-    { row: 1, col: 2, ox: 1, oy: 0 },
-    { row: 2, col: 1, ox: 0, oy: 1 },
-  ]
-
-  // Old view slides toward new view.
-  for (let i = 0; i < cross.length; i++) {
-    const c = cross[i]!
-    const spriteId = getSpriteIdAt(s.world, fromPos.x + c.ox, fromPos.y + c.oy)
-    drawSpriteInCell(c.row, c.col, spriteId, offX, offY)
-  }
-
-  // New view slides in from the opposite side.
-  for (let i = 0; i < cross.length; i++) {
-    const c = cross[i]!
-    const spriteId = getSpriteIdAt(s.world, toPos.x + c.ox, toPos.y + c.oy)
-    drawSpriteInCell(c.row, c.col, spriteId, offX - shiftX, offY - shiftY)
-  }
-
-  // Mask anything that slid outside the 3×3 grid, and keep gaps clean.
-  maskOutsideGridInRightPanel()
-  maskGridGaps()
-
-  // Keep corners stable UI (mask + redraw icons).
-  clearCell(0, 0) // goal
-  clearCell(2, 0) // minimap
-  clearCell(2, 2) // restart
-  clearCell(0, 2) // disabled
-
-  drawSpriteInCell(0, 0, SPR_BUTTON_GOAL, 0, 0)
-  drawSpriteInCell(2, 0, SPR_BUTTON_MINIMAP, 0, 0)
-  drawSpriteInCell(2, 2, SPR_BUTTON_RESTART, 0, 0)
 }
 
 // ----------------------------
@@ -593,8 +336,8 @@ function getMinimapTilePixels(tileId: number) {
 
   // TIC-80 can't draw sprites at scale < 1, and JS builds don't expose `sget()`.
   // Instead, we temporarily draw the 16×16 sprite to a scratch area and sample it via `pix()`.
-  const scratchX = UI_LEFT_PANEL_PADDING
-  const scratchY = UI_LEFT_PANEL_PADDING
+  const scratchX = UI.UI_LEFT_PANEL_PADDING
+  const scratchY = UI.UI_LEFT_PANEL_PADDING
   spr(k, scratchX, scratchY, -1, 1, 0, 0, 2, 2)
 
   const out: number[] = []
@@ -609,7 +352,7 @@ function getMinimapTilePixels(tileId: number) {
   }
 
   // Clear scratch (it sits inside the 64×64 block we redraw anyway).
-  rect(scratchX, scratchY, 16, 16, COLOR_BG)
+  rect(scratchX, scratchY, 16, 16, UI.UI_COLOR_BG)
 
   MINIMAP_TILE_CACHE[k] = out
   return out
@@ -617,8 +360,8 @@ function getMinimapTilePixels(tileId: number) {
 
 function drawMinimap(s: State) {
   const world = s.world
-  const illX = UI_LEFT_PANEL_PADDING
-  const illY = UI_LEFT_PANEL_PADDING
+  const illX = UI.UI_LEFT_PANEL_PADDING
+  const illY = UI.UI_LEFT_PANEL_PADDING
   const margin = 2
   const cellPx = MINIMAP_CELL_PX
   const originX = illX + margin
@@ -648,7 +391,7 @@ function drawMinimap(s: State) {
     }
   }
   const p = s.player.position
-  rectb(originX + p.x * cellPx, originY + p.y * cellPx, cellPx, cellPx, COLOR_TEXT)
+  rectb(originX + p.x * cellPx, originY + p.y * cellPx, cellPx, cellPx, UI.UI_COLOR_TEXT)
 }
 
 

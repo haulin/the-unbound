@@ -1,7 +1,7 @@
 {
   "name": "the-unbound",
   "private": true,
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "The Unbound — TIC-80 prototype cart (TypeScript source, bundled to the-unbound.js).",
   "license": "MIT",
   "scripts": {

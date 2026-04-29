@@ -25,6 +25,8 @@ export function getRightGridCellDef(s: State, row: number, col: number): RightGr
   if (row === 2 && col === 2) return { iconKey: 'restart', action: { type: ACTION_RESTART } }
   if (row === 0 && col === 2) return { action: null }
 
+  const isRunOver = !!(s.run.isGameOver || s.run.hasFoundCastle)
+
   if (s.encounter && s.encounter.kind === 'combat') {
     // Combat remaps the cross; corners remain meta buttons.
     if (row === 1 && col === 0) return { iconKey: 'fight', action: { type: ACTION_FIGHT } }
@@ -34,11 +36,11 @@ export function getRightGridCellDef(s: State, row: number, col: number): RightGr
   }
 
   // Overworld: cross previews adjacent tiles; center is a no-op.
-  if (row === 0 && col === 1) return { tilePreview: { kind: 'relativeToPlayer', dx: 0, dy: -1 }, action: { type: ACTION_MOVE, dx: 0, dy: -1 } }
-  if (row === 1 && col === 0) return { tilePreview: { kind: 'relativeToPlayer', dx: -1, dy: 0 }, action: { type: ACTION_MOVE, dx: -1, dy: 0 } }
+  if (row === 0 && col === 1) return { tilePreview: { kind: 'relativeToPlayer', dx: 0, dy: -1 }, action: isRunOver ? null : { type: ACTION_MOVE, dx: 0, dy: -1 } }
+  if (row === 1 && col === 0) return { tilePreview: { kind: 'relativeToPlayer', dx: -1, dy: 0 }, action: isRunOver ? null : { type: ACTION_MOVE, dx: -1, dy: 0 } }
   if (row === 1 && col === 1) return { tilePreview: { kind: 'relativeToPlayer', dx: 0, dy: 0 }, action: null }
-  if (row === 1 && col === 2) return { tilePreview: { kind: 'relativeToPlayer', dx: 1, dy: 0 }, action: { type: ACTION_MOVE, dx: 1, dy: 0 } }
-  if (row === 2 && col === 1) return { tilePreview: { kind: 'relativeToPlayer', dx: 0, dy: 1 }, action: { type: ACTION_MOVE, dx: 0, dy: 1 } }
+  if (row === 1 && col === 2) return { tilePreview: { kind: 'relativeToPlayer', dx: 1, dy: 0 }, action: isRunOver ? null : { type: ACTION_MOVE, dx: 1, dy: 0 } }
+  if (row === 2 && col === 1) return { tilePreview: { kind: 'relativeToPlayer', dx: 0, dy: 1 }, action: isRunOver ? null : { type: ACTION_MOVE, dx: 0, dy: 1 } }
 
   return { action: null }
 }

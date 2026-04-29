@@ -49,6 +49,10 @@ In practice: new features should usually be “add a new entry / new function”
 - Once the direction stabilizes: do one “elegance pass” refactor to consolidate geometry/constants and remove accumulated one-off branching.
 - If a UI/layout change has multiple plausible shapes, agree on one approach before implementing (avoid mixing half-solutions).
 
+## UI rendering learnings (TIC-80 specifics)
+
+- **Transparency is part of UI design**: if a hover highlight/tint is drawn behind an icon, the sprite often needs an explicit transparency key (colorkey) so its “background pixels” don’t erase the tint.
+
 ## Refactor philosophy (boy scout rule)
 
 - **Optimize for the reader**: the cost of writing is not the constraint here — the cost of reading is.

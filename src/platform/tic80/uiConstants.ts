@@ -10,8 +10,38 @@ export const UI_COLOR_GOOD = 5 // green
 export const UI_COLOR_WARN = 4 // yellow
 export const UI_COLOR_BAD = 2 // red
 
+// Lore / narrative text (tweakable, split title vs body).
+export const UI_COLOR_POI_NAME = 11
+export const UI_COLOR_POI_DESC = 13
+export const UI_COLOR_GRID_HOVER_TINT = 15
+
+// Sprite IDs used by the TIC-80 UI renderer.
+export const UI_SPR_STATUS_STEPS = 130
+export const UI_SPR_STATUS_POS = 131
+export const UI_SPR_STATUS_SEED = 132
+export const UI_SPR_TEXTURE_OVERLAY = 133
+export const UI_SPR_ENEMY = 102
+export const UI_SPR_FIGHT = 74
+export const UI_SPR_RETURN = 76
+
+// 64×64 illustration preview (16×16 sprite scaled up).
+export const UI_ILLUSTRATION_SCALE = 4 // 16->64
+export const UI_TEXTURE_TILE_PX = 8
+export const UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR = 8
+
+// Combat preview plate layout inside illustration block.
+export const UI_COMBAT_PREVIEW_PLATE_PAD = 2
+export const UI_COMBAT_PREVIEW_PLATE_W = 42
+export const UI_COMBAT_PREVIEW_PLATE_INSET = 2
+
+// Right grid sprite draw policy.
+export const UI_RIGHT_GRID_SPRITE_SCALE = 2 // 16->32
+export const UI_RIGHT_GRID_SPRITE_W = 2
+export const UI_RIGHT_GRID_SPRITE_H = 2
+export const UI_RIGHT_GRID_COLORKEY = 0
+
 // Left panel layout
-export const UI_LEFT_PANEL_PADDING = 6
+export const UI_LEFT_PANEL_PADDING = 7
 export const UI_LEFT_PANEL_INNER_GAP = 6
 
 export const UI_STATUS_ICON_SIZE = 8

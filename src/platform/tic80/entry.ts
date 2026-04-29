@@ -2,7 +2,7 @@ import { ACTION_NEW_RUN, ACTION_TICK, INITIAL_SEED } from '../../core/constants'
 import { hasBlockingAnim } from '../../core/reducer'
 import { processAction } from '../../core/processAction'
 import type { State } from '../../core/types'
-import { actionForClick, sampleMouse } from './input'
+import { actionForClick, deriveRenderHints, sampleMouse } from './input'
 import { renderFrame } from './render'
 
 let state: State | null = null
@@ -27,7 +27,8 @@ export function TIC() {
     }
   }
 
-  renderFrame(state)
+  const hints = deriveRenderHints(state, mouseX, mouseY)
+  renderFrame(state, hints)
 }
 
 ;(globalThis as unknown as { TIC: typeof TIC }).TIC = TIC
