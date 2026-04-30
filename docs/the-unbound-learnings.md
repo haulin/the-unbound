@@ -78,4 +78,11 @@ In practice: new features should usually be “add a new entry / new function”
 - **“Don’t assume; ask” norm**: when UI/feel looks wrong, gather the user’s observations before attributing a cause (especially with TIC-80 sprite/rendering quirks).
 - **Doc-as-contract during iteration**: once a tweak becomes stable (layout constants, button semantics, signpost count), capture it in the design doc so future diffs have an explicit baseline.
 
+## v0.0.9 — The Key (process + architecture notes)
+
+- **Volatile copy belongs in code**: treat player-facing strings in `src/core/constants.ts` as the source of truth; docs should use “such as” examples and avoid freezing exact wording.
+- **Deterministic flavor without perturbing RNG**: use deterministic pickers for text (seed + cellId + stepCount) and avoid consuming `world.rngState` in tile-enter handlers.
+- **Worldgen constraints need guardrails**: when adding placement constraints (e.g. minimum torus Manhattan distance between features), clamp impossible values and test across many seeds.
+- **Run start should be inert**: on spawn, don’t run tile-enter logic (no signpost clue / auto-buy / auto-win); show only the goal narrative. Tile interactions happen when you move onto tiles.
+
 

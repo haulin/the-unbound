@@ -30,10 +30,11 @@ function makeState(): State {
   return {
     world: w,
     player: { position: { x: 1, y: 0 } },
-    run: { stepCount: 0, hasFoundCastle: false, isGameOver: false },
+    run: { stepCount: 0, hasWon: false, isGameOver: false },
     resources: {
       food: INITIAL_FOOD,
       armySize: 1,
+      hasBronzeKey: false,
     },
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
@@ -65,8 +66,8 @@ describe('army + camps + game over', () => {
     const s: State = {
       world: w,
       player: { position: { x: 0, y: 0 } },
-      run: { stepCount: 0, hasFoundCastle: false, isGameOver: false },
-      resources: { food: 2, armySize: 5 },
+      run: { stepCount: 0, hasWon: false, isGameOver: false },
+      resources: { food: 2, armySize: 5, hasBronzeKey: false },
       encounter: null,
       ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
     }
@@ -93,8 +94,8 @@ describe('army + camps + game over', () => {
     const s: State = {
       world: w,
       player: { position: { x: 0, y: 0 } },
-      run: { stepCount: 0, hasFoundCastle: false, isGameOver: false },
-      resources: { food: 1, armySize: 5 },
+      run: { stepCount: 0, hasWon: false, isGameOver: false },
+      resources: { food: 1, armySize: 5, hasBronzeKey: false },
       encounter: null,
       ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
     }
@@ -184,9 +185,9 @@ describe('army + camps + game over', () => {
     expect(next).toBe(s)
   })
 
-  it('ignores MOVE when you have already won (hasFoundCastle)', () => {
+  it('ignores MOVE when you have already won', () => {
     const s = makeState()
-    s.run.hasFoundCastle = true
+    s.run.hasWon = true
     const next = processAction(s, { type: ACTION_MOVE, dx: 1, dy: 0 })!
     expect(next).toBe(s)
   })

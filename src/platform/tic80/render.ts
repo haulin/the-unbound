@@ -16,6 +16,7 @@ import {
 } from '../../core/types'
 import {
   PANEL_LEFT_WIDTH,
+  SCREEN_WIDTH,
   SCREEN_HEIGHT,
 } from './layout'
 import * as UI from './uiConstants'
@@ -35,11 +36,29 @@ const SPR_HUD_FRAME: NineSlice3x3 = {
   br: 180,
 }
 
+const SPR_HUD_FRAME_BRONZE: NineSlice3x3 = {
+  tl: 149,
+  t: 150,
+  tr: 151,
+  l: 165,
+  c: 166,
+  r: 167,
+  bl: 181,
+  b: 182,
+  br: 183,
+}
+
 export function renderFrame(s: State, hints: RenderHints) {
   cls(UI.UI_COLOR_BG)
   drawRightPanel(s, hints)
   // Draw left panel last so it masks any right-panel animation overflow into x < PANEL_LEFT_WIDTH.
   drawLeftPanel(s)
+
+  // Global status icons (top-right of whole screen).
+  if (s.resources.hasBronzeKey) {
+    const margin = 2
+    spr(106, SCREEN_WIDTH - 16 - margin, margin, 0, 1, 0, 0, 2, 2)
+  }
 }
 
 // ----------------------------
@@ -115,7 +134,8 @@ function drawIllustrationWithTextureOverlay(spriteId: number, x: number, y: numb
 
 function drawLeftPanel(s: State) {
   rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, UI.UI_COLOR_BG)
-  drawNineSliceFrame(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, SPR_HUD_FRAME, {
+  const frame = s.resources.hasBronzeKey ? SPR_HUD_FRAME_BRONZE : SPR_HUD_FRAME
+  drawNineSliceFrame(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, frame, {
     tilePx: 8,
     scale: 1,
     colorkey: 0,
@@ -291,7 +311,7 @@ function drawLeftPanel(s: State) {
   const msgY = headerBottomY + 4
   const headline = s.run.isGameOver
     ? ({ text: 'GAME OVER', color: UI.UI_COLOR_BAD } as const)
-    : s.run.hasFoundCastle
+    : s.run.hasWon
       ? ({ text: 'YOU WIN', color: UI.UI_COLOR_GOOD } as const)
       : null
   const headlineRows = headline ? 1 : 0

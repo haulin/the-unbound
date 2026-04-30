@@ -14,7 +14,7 @@ export type TileEnterOutcome = {
   message: string
   foodDeltas?: number[]
   armyDeltas?: number[]
-  hasFoundCastle?: boolean
+  hasWon?: boolean
 }
 
 export type TileEnterHandler = (ctx: TileEnterCtx) => TileEnterOutcome

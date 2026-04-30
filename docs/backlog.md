@@ -1,34 +1,29 @@
 # Tentative roadmap (The Unbound)
 
-v0.0.8 — The Key
 
-Keyholder PoI (one per map, named, folk mythology register)
-Gate requires key to open
-Border tints bronze on key acquired
-Keyholder flavor text (first visit, already visited, no food)
 
-v0.0.9 — The Map & Scout
+v0.1 — The Map & Scout
 
 Coordinate display blanks when lost (teleport events trigger this)
 Lost resolves on visiting any known landmark
 Scout companion slot (structural only — joins you, reveals unvisited PoIs on coordinate view)
 Scout acquisition deferred to gold epic
 
-v0.1 — Towns
+v0.2 — Towns
 
 Town PoI (named, combined farm+camp+one action)
 Up to 4 contextual buttons (3 actions + leave)
 Town flavor text pool
 Structurally ready for gold transactions without implementing them yet
 
-v0.2 — Gold (mini-epic)
+v0.3 — Gold (mini-epic)
 
 Gold resource (display, earn from combat, carry limit TBD)
 Town sells food and troops for gold
 Keyholder price becomes gold instead of food
 Scout hired in town for gold
 
-v0.3 — Second Gate
+v0.4 — Second Gate
 
 Silver keyholder, silver gate, silver border
 Map size step up (10×10)
@@ -73,9 +68,8 @@ This file captures ideas discussed during design, kept out of the current phase'
 
 ## Prototype follow-ups
 
-- Spawn safety: ensure starting position is at least ~5 tiles away (torus Manhattan) from the Castle (and maybe other PoIs).
+- Spawn safety: ensure starting position is at least ~5 tiles away (torus Manhattan) from the Gate (and maybe other PoIs).
 - Food delta UX: consider collapsing `-1` + `+N` into a single animated net delta when both occur on the same move.
-- Spawn-on-signpost: goal narrative concatenates with signpost message and can get clipped; consider prioritizing signpost message (or a shorter goal line) at start.
 - Two signposts should not point to the same PoI?
 
 ## Companions as quest rewards (deferred)

@@ -7,7 +7,9 @@ export const WORLD_HEIGHT = 10
 export const INITIAL_SEED = 14
 export const ENABLE_ANIMATIONS = true
 
-export const TILE_CASTLE = 8
+export const TILE_GATE = 68
+export const TILE_GATE_OPEN = 70
+export const TILE_LOCKSMITH = 72
 export const TILE_SIGNPOST = 42
 export const TILE_FARM = 38
 export const TILE_CAMP = 36
@@ -16,6 +18,9 @@ export const TILE_MOUNTAIN = 6
 export const TILE_SWAMP = 12
 
 export const SIGNPOST_COUNT = 6
+
+// Worldgen tuning
+export const GATE_LOCKSMITH_MIN_DISTANCE = 7
 
 export const CAMP_COUNT = 3
 export const CAMP_COOLDOWN_MOVES = 3
@@ -31,10 +36,37 @@ export const MAP_GEN_ALGORITHM = MAP_GEN_NOISE
 export const NOISE_SMOOTH_PASSES = 2
 export const NOISE_VALUE_MAX = 10000
 
-export const GOAL_NARRATIVE =
-  'Another soul sets out across the Unbound. Somewhere in these lands stands a castle older than memory. Find it.'
+export const GOAL_NARRATIVE = 'The road never ends. It only returns.\nThey say there is a bronze gate that breaks the circle.\nYou mean to find out.'
 
-export const CASTLE_FOUND_MESSAGE = 'The Castle looms before you. You are home.'
+// v0.0.9 — Gate + Key
+export const BRONZE_KEY_FOOD_COST = 10
+export const GATE_NAME = 'The Gate'
+export const LOCKSMITH_NAME = 'Locksmith of the Unbound'
+
+export const GATE_LOCKED_LINES = [
+  'A keyhole with no key. Not yet.',
+  'Bronze, but unyielding. You will need the key.',
+  'It does not open for hands. Only for the turning.',
+] as const
+
+export const GATE_OPEN_LINES = [
+  'The lock turns. The Unbound lets you pass.',
+  'Bronze gives way. The road continues.',
+] as const
+
+export const LOCKSMITH_PURCHASE_LINES = [
+  'You feed the fire. They finish the key.',
+  'A small hammer-song. A key, still warm.',
+  'They take what you offer and give you what you came for.',
+] as const
+
+export const LOCKSMITH_VISITED_LINES = ['The forge is cold. The work is done.', 'Nothing left to make for you here.'] as const
+
+export const LOCKSMITH_NO_FOOD_LINES = [
+  "No heat, no key.",
+  "Come back with enough. The fire needs feeding first.",
+  "Others have paid for this before you. Most of them got further than you'd think."
+]
 
 export const TERRAIN_MESSAGE_BY_TILE_ID: Record<number, string> = {
   2: 'The grass bends with your passing.', // grass
@@ -58,7 +90,7 @@ export const FARM_COUNT = 3
 export const FARM_COOLDOWN_MOVES = 3
 
 export const TERRAIN_KINDS = ['grass', 'road', 'mountain', 'lake', 'swamp', 'woods', 'rainbow'] as const satisfies readonly TerrainKind[]
-export const FEATURE_KINDS = ['castle', 'signpost', 'farm', 'camp', 'henge'] as const satisfies readonly FeatureKind[]
+export const FEATURE_KINDS = ['gate', 'gateOpen', 'locksmith', 'signpost', 'farm', 'camp', 'henge'] as const satisfies readonly FeatureKind[]
 
 export const TERRAIN: Record<TerrainKind, { spriteId: number; enterFoodCost: number; message: string }> = {
   grass: { spriteId: 2, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[2] || '' },
@@ -78,10 +110,14 @@ export const FEATURES: Record<FeatureKind, { spriteId: number; enterFoodCost: nu
   farm: { spriteId: number; enterFoodCost: number; count: number; cooldownMoves: number }
   camp: { spriteId: number; enterFoodCost: number; count: number; cooldownMoves: number; foodGain: number }
   signpost: { spriteId: number; enterFoodCost: number; count: number }
-  castle: { spriteId: number; enterFoodCost: number }
+  gate: { spriteId: number; enterFoodCost: number }
+  gateOpen: { spriteId: number; enterFoodCost: number }
+  locksmith: { spriteId: number; enterFoodCost: number }
   henge: { spriteId: number; enterFoodCost: number; count: number }
 } = {
-  castle: { spriteId: TILE_CASTLE, enterFoodCost: FOOD_COST_DEFAULT },
+  gate: { spriteId: TILE_GATE, enterFoodCost: FOOD_COST_DEFAULT },
+  gateOpen: { spriteId: TILE_GATE_OPEN, enterFoodCost: FOOD_COST_DEFAULT },
+  locksmith: { spriteId: TILE_LOCKSMITH, enterFoodCost: FOOD_COST_DEFAULT },
   signpost: { spriteId: TILE_SIGNPOST, enterFoodCost: FOOD_COST_DEFAULT, count: SIGNPOST_COUNT },
   farm: { spriteId: TILE_FARM, enterFoodCost: FOOD_COST_DEFAULT, count: FARM_COUNT, cooldownMoves: FARM_COOLDOWN_MOVES },
   camp: {
@@ -104,7 +140,9 @@ export function spriteIdForKind(kind: CellKind): number {
     case 'woods':
     case 'rainbow':
       return TERRAIN[kind].spriteId
-    case 'castle':
+    case 'gate':
+    case 'gateOpen':
+    case 'locksmith':
     case 'signpost':
     case 'farm':
     case 'camp':
@@ -123,7 +161,9 @@ export function enterFoodCostForKind(kind: CellKind): number {
     case 'woods':
     case 'rainbow':
       return TERRAIN[kind].enterFoodCost
-    case 'castle':
+    case 'gate':
+    case 'gateOpen':
+    case 'locksmith':
     case 'signpost':
     case 'farm':
     case 'camp':
@@ -142,7 +182,9 @@ export function terrainMessageForKind(kind: CellKind): string {
     case 'woods':
     case 'rainbow':
       return TERRAIN[kind].message
-    case 'castle':
+    case 'gate':
+    case 'gateOpen':
+    case 'locksmith':
     case 'signpost':
     case 'farm':
     case 'camp':

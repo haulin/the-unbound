@@ -25,7 +25,7 @@ export function getRightGridCellDef(s: State, row: number, col: number): RightGr
   if (row === 2 && col === 2) return { iconKey: 'restart', action: { type: ACTION_RESTART } }
   if (row === 0 && col === 2) return { action: null }
 
-  const isRunOver = !!(s.run.isGameOver || s.run.hasFoundCastle)
+  const isRunOver = !!(s.run.isGameOver || s.run.hasWon)
 
   if (s.encounter && s.encounter.kind === 'combat') {
     // Combat remaps the cross; corners remain meta buttons.

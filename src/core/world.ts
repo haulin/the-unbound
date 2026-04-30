@@ -3,6 +3,7 @@ import {
   CAMP_NAME_POOL,
   FARM_COUNT,
   FARM_NAME_POOL,
+  GATE_LOCKSMITH_MIN_DISTANCE,
   HENGE_COUNT,
   HENGE_NAME_POOL,
   MAP_GEN_ALGORITHM,
@@ -14,9 +15,50 @@ import {
   WORLD_WIDTH,
   spriteIdForKind,
 } from './constants'
-import { wrapIndex } from './math'
+import { manhattan, torusDelta, wrapIndex } from './math'
 import { randInt, seedToRngState } from './prng'
 import type { Cell, CellGrid, GeneratedWorld, Vec2, World } from './types'
+
+function cellId(x: number, y: number): number {
+  return y * WORLD_WIDTH + x
+}
+
+const TERRAIN_KIND_SET = new Set<string>(TERRAIN_KINDS as unknown as string[])
+
+function isTerrainCell(cell: Cell): boolean {
+  return TERRAIN_KIND_SET.has(cell.kind)
+}
+
+function torusManhattanDistance(a: Vec2, b: Vec2): number {
+  const dx = torusDelta(a.x, b.x, WORLD_WIDTH)
+  const dy = torusDelta(a.y, b.y, WORLD_HEIGHT)
+  return manhattan(dx, dy)
+}
+
+type PlaceFeatureOpts = {
+  count: number
+  canPlaceAt: (x: number, y: number, here: Cell) => boolean
+  buildCell: (x: number, y: number, rngState: number) => { cell: Cell; rngState: number }
+}
+
+function placeFeature(cells: CellGrid, rngState: number, opts: PlaceFeatureOpts): { placed: Vec2[]; rngState: number } {
+  const placed: Vec2[] = []
+  while (placed.length < opts.count) {
+    const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT)
+    rngState = r.rngState
+    const x = r.value % WORLD_WIDTH
+    const y = Math.floor(r.value / WORLD_WIDTH)
+
+    const here = cells[y]![x]!
+    if (!opts.canPlaceAt(x, y, here)) continue
+
+    const built = opts.buildCell(x, y, rngState)
+    rngState = built.rngState
+    cells[y]![x] = built.cell
+    placed.push({ x, y })
+  }
+  return { placed, rngState }
+}
 
 function boxBlurIntGridWrap(grid: number[][], w: number, h: number) {
   const out: number[][] = []
@@ -84,102 +126,89 @@ function generateBaseTerrainCells(rngState: number): { cells: CellGrid; rngState
   return { cells, rngState }
 }
 
-function placeCastle(cells: CellGrid, rngState: number): { castlePos: Vec2; rngState: number } {
-  const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT)
-  rngState = r.rngState
-  const x = r.value % WORLD_WIDTH
-  const y = Math.floor(r.value / WORLD_WIDTH)
-  cells[y]![x] = { kind: 'castle' }
-  return { castlePos: { x, y }, rngState }
+function placeGate(cells: CellGrid, rngState: number): { gatePos: Vec2; rngState: number } {
+  const res = placeFeature(cells, rngState, {
+    count: 1,
+    canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+    buildCell: (_x, _y, nextRng) => ({ cell: { kind: 'gate' }, rngState: nextRng }),
+  })
+  return { gatePos: res.placed[0]!, rngState: res.rngState }
+}
+
+function placeLocksmith(cells: CellGrid, rngState: number, gatePos: Vec2): { locksmithPos: Vec2; rngState: number } {
+  const maxPossible = Math.floor(WORLD_WIDTH / 2) + Math.floor(WORLD_HEIGHT / 2)
+  const minD = Math.max(0, Math.min(GATE_LOCKSMITH_MIN_DISTANCE | 0, maxPossible))
+  const res = placeFeature(cells, rngState, {
+    count: 1,
+    canPlaceAt: (x, y, here) => isTerrainCell(here) && torusManhattanDistance({ x, y }, gatePos) >= minD,
+    buildCell: (_x, _y, nextRng) => ({ cell: { kind: 'locksmith' }, rngState: nextRng }),
+  })
+  return { locksmithPos: res.placed[0]!, rngState: res.rngState }
 }
 
 type PlaceNamedFeatureOpts = {
   count: number
   namePool: readonly string[]
   fallbackName: string
-  canPlaceAt: (here: Cell) => boolean
+  canPlaceAt: (x: number, y: number, here: Cell) => boolean
   buildCell: (x: number, y: number, name: string) => Cell
 }
 
-function placeNamedFeature(cells: CellGrid, rngState: number, castlePos: Vec2, opts: PlaceNamedFeatureOpts): number {
+function placeNamedFeature(cells: CellGrid, rngState: number, opts: PlaceNamedFeatureOpts): number {
   const remainingNames: string[] = [...opts.namePool]
-  let placed = 0
-  while (placed < opts.count) {
-    const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT)
-    rngState = r.rngState
-    const x = r.value % WORLD_WIDTH
-    const y = Math.floor(r.value / WORLD_WIDTH)
-
-    if (x === castlePos.x && y === castlePos.y) continue
-    const here = cells[y]![x]!
-    if (!opts.canPlaceAt(here)) continue
-
-    let name = opts.fallbackName
-    if (remainingNames.length > 0) {
-      const pick = randInt(rngState, remainingNames.length)
-      rngState = pick.rngState
-      name = remainingNames.splice(pick.value, 1)[0]!
-    }
-
-    cells[y]![x] = opts.buildCell(x, y, name)
-    placed++
-  }
-  return rngState
+  const res = placeFeature(cells, rngState, {
+    count: opts.count,
+    canPlaceAt: opts.canPlaceAt,
+    buildCell: (x, y, nextRng) => {
+      let name = opts.fallbackName
+      if (remainingNames.length > 0) {
+        const pick = randInt(nextRng, remainingNames.length)
+        nextRng = pick.rngState
+        name = remainingNames.splice(pick.value, 1)[0] || opts.fallbackName
+      }
+      return { cell: opts.buildCell(x, y, name), rngState: nextRng }
+    },
+  })
+  return res.rngState
 }
 
-function placeNamedFarms(cells: CellGrid, rngState: number, castlePos: Vec2): number {
-  return placeNamedFeature(cells, rngState, castlePos, {
+function placeNamedFarms(cells: CellGrid, rngState: number): number {
+  return placeNamedFeature(cells, rngState, {
     count: FARM_COUNT,
     namePool: FARM_NAME_POOL,
     fallbackName: 'A Farm',
-    canPlaceAt: (here) => !(here.kind === 'farm' || here.kind === 'camp' || here.kind === 'signpost'),
-    buildCell: (x, y, name) => ({ kind: 'farm', id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 }),
+    canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+    buildCell: (x, y, name) => ({ kind: 'farm', id: cellId(x, y), name, nextReadyStep: 0 }),
   })
 }
 
-function placeNamedCamps(cells: CellGrid, rngState: number, castlePos: Vec2): number {
-  return placeNamedFeature(cells, rngState, castlePos, {
+function placeNamedCamps(cells: CellGrid, rngState: number): number {
+  return placeNamedFeature(cells, rngState, {
     count: CAMP_COUNT,
     namePool: CAMP_NAME_POOL,
     fallbackName: 'A Camp',
-    canPlaceAt: (here) => !(here.kind === 'farm' || here.kind === 'camp' || here.kind === 'signpost'),
-    buildCell: (x, y, name) => ({ kind: 'camp', id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 }),
+    canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+    buildCell: (x, y, name) => ({ kind: 'camp', id: cellId(x, y), name, nextReadyStep: 0 }),
   })
 }
 
-function placeHenges(cells: CellGrid, rngState: number, castlePos: Vec2): number {
-  return placeNamedFeature(cells, rngState, castlePos, {
+function placeHenges(cells: CellGrid, rngState: number): number {
+  return placeNamedFeature(cells, rngState, {
     count: HENGE_COUNT,
     namePool: HENGE_NAME_POOL,
     fallbackName: 'A Henge',
-    canPlaceAt: (here) =>
-      !(
-        here.kind === 'castle' ||
-        here.kind === 'farm' ||
-        here.kind === 'camp' ||
-        here.kind === 'henge' ||
-        here.kind === 'signpost'
-      ),
-    buildCell: (x, y, name) => ({ kind: 'henge', id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 }),
+    canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+    buildCell: (x, y, name) => ({ kind: 'henge', id: cellId(x, y), name, nextReadyStep: 0 }),
   })
 }
 
-function placeSignposts(cells: CellGrid, rngState: number, castlePos: Vec2): number {
-  let placed = 0
-  while (placed < SIGNPOST_COUNT) {
-    const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT)
-    rngState = r.rngState
-    const x = r.value % WORLD_WIDTH
-    const y = Math.floor(r.value / WORLD_WIDTH)
-
-    if (x === castlePos.x && y === castlePos.y) continue
-    const here = cells[y]![x]!
-    if (here.kind === 'farm' || here.kind === 'camp' || here.kind === 'henge' || here.kind === 'signpost') continue
-
-    cells[y]![x] = { kind: 'signpost' }
-    placed++
-  }
-  return rngState
+function placeSignposts(cells: CellGrid, rngState: number): number {
+  const res = placeFeature(cells, rngState, {
+    count: SIGNPOST_COUNT,
+    canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+    buildCell: (_x, _y, nextRng) => ({ cell: { kind: 'signpost' }, rngState: nextRng }),
+  })
+  return res.rngState
 }
 
 function pickStart({ rngState }: { rngState: number }) {
@@ -203,12 +232,16 @@ export function generateWorld(seed: number): GeneratedWorld {
   rngState = base.rngState
 
   const cells = base.cells
-  const castle = placeCastle(cells, rngState)
-  rngState = castle.rngState
-  rngState = placeNamedFarms(cells, rngState, castle.castlePos)
-  rngState = placeNamedCamps(cells, rngState, castle.castlePos)
-  rngState = placeHenges(cells, rngState, castle.castlePos)
-  rngState = placeSignposts(cells, rngState, castle.castlePos)
+  const gate = placeGate(cells, rngState)
+  rngState = gate.rngState
+
+  const locksmith = placeLocksmith(cells, rngState, gate.gatePos)
+  rngState = locksmith.rngState
+
+  rngState = placeNamedFarms(cells, rngState)
+  rngState = placeNamedCamps(cells, rngState)
+  rngState = placeHenges(cells, rngState)
+  rngState = placeSignposts(cells, rngState)
 
   const startPick = pickStart({ rngState })
   rngState = startPick.rngState

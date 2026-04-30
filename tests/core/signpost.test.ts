@@ -16,21 +16,33 @@ describe('signpost', () => {
     return cells
   }
 
-  it('formats nearest farm', () => {
+  it('formats nearest gate', () => {
     const msg = formatNearestPoiSignpostMessage(
       { x: 0, y: 0 },
       {
         width: 10,
         height: 10,
         cells: makeCells(10, 10, [
-          { x: 5, y: 5, cell: { kind: 'castle' } },
-          { x: 3, y: 2, cell: { kind: 'farm', id: 23, name: 'Greyfield', nextReadyStep: 0 } },
+          { x: 3, y: 2, cell: { kind: 'gate' } },
           { x: 6, y: 6, cell: { kind: 'farm', id: 66, name: 'The Oast', nextReadyStep: 0 } },
-          { x: 7, y: 7, cell: { kind: 'farm', id: 77, name: 'Burnt Acre', nextReadyStep: 0 } },
         ]),
       }
     )
-    expect(msg).toBe('Greyfield Farm\nSE, 5 leagues away.')
+    expect(msg).toBe('The Gate\nSE, 5 leagues away.')
+  })
+
+  it('formats locksmith when it is nearest', () => {
+    const msg = formatNearestPoiSignpostMessage(
+      { x: 0, y: 0 },
+      {
+        width: 10,
+        height: 10,
+        cells: makeCells(10, 10, [
+          { x: 3, y: 2, cell: { kind: 'locksmith' } },
+        ]),
+      }
+    )
+    expect(msg).toBe('Locksmith of the Unbound\nSE, 5 leagues away.')
   })
 
   it('prefers lower id when farms tie for nearest distance', () => {
@@ -40,7 +52,6 @@ describe('signpost', () => {
         width: 10,
         height: 10,
         cells: makeCells(10, 10, [
-          { x: 5, y: 5, cell: { kind: 'castle' } },
           // Both are distance 5; id 23 wins over id 32.
           { x: 3, y: 2, cell: { kind: 'farm', id: 23, name: 'Greyfield', nextReadyStep: 0 } },
           { x: 2, y: 3, cell: { kind: 'farm', id: 32, name: 'The Oast', nextReadyStep: 0 } },
@@ -57,27 +68,11 @@ describe('signpost', () => {
         width: 10,
         height: 10,
         cells: makeCells(10, 10, [
-          { x: 5, y: 5, cell: { kind: 'castle' } },
           { x: 3, y: 2, cell: { kind: 'camp', id: 23, name: 'Ember Cross', nextReadyStep: 0 } },
         ]),
       }
     )
     expect(msg).toBe('Ember Cross Camp\nSE, 5 leagues away.')
-  })
-
-  it('formats nearest henge when it is nearest', () => {
-    const msg = formatNearestPoiSignpostMessage(
-      { x: 0, y: 0 },
-      {
-        width: 10,
-        height: 10,
-        cells: makeCells(10, 10, [
-          { x: 5, y: 5, cell: { kind: 'castle' } },
-          { x: 3, y: 2, cell: { kind: 'henge', id: 23, name: 'The Mending', nextReadyStep: 0 } },
-        ]),
-      }
-    )
-    expect(msg).toBe('The Mending Henge\nSE, 5 leagues away.')
   })
 
   it('prefers farm over camp on ties', () => {
@@ -87,7 +82,6 @@ describe('signpost', () => {
         width: 10,
         height: 10,
         cells: makeCells(10, 10, [
-          { x: 5, y: 5, cell: { kind: 'castle' } },
           // Both are distance 5; farm wins over camp.
           { x: 3, y: 2, cell: { kind: 'farm', id: 23, name: 'Greyfield', nextReadyStep: 0 } },
           { x: 2, y: 3, cell: { kind: 'camp', id: 32, name: 'Ember Cross', nextReadyStep: 0 } },
@@ -104,7 +98,6 @@ describe('signpost', () => {
         width: 10,
         height: 10,
         cells: makeCells(10, 10, [
-          { x: 5, y: 5, cell: { kind: 'castle' } },
           // Both are distance 5; camp wins over henge.
           { x: 3, y: 2, cell: { kind: 'camp', id: 23, name: 'Ember Cross', nextReadyStep: 0 } },
           { x: 2, y: 3, cell: { kind: 'henge', id: 32, name: 'Old Insistence', nextReadyStep: 0 } },
@@ -114,20 +107,39 @@ describe('signpost', () => {
     expect(msg).toBe('Ember Cross Camp\nSE, 5 leagues away.')
   })
 
-  it('prefers castle over farm/camp on ties', () => {
+  it('prefers gate over locksmith/farm/camp/henge on ties', () => {
     const msg = formatNearestPoiSignpostMessage(
       { x: 0, y: 0 },
       {
         width: 10,
         height: 10,
         cells: makeCells(10, 10, [
-          // All are distance 5; castle wins over farm and camp.
-          { x: 3, y: 2, cell: { kind: 'castle' } },
+          // All are distance 5; gate wins over locksmith, farm and camp.
+          { x: 3, y: 2, cell: { kind: 'gate' } },
+          { x: 4, y: 1, cell: { kind: 'locksmith' } },
           { x: 2, y: 3, cell: { kind: 'farm', id: 32, name: 'Greyfield', nextReadyStep: 0 } },
-          { x: 4, y: 1, cell: { kind: 'camp', id: 14, name: 'Ember Cross', nextReadyStep: 0 } },
+          { x: 1, y: 4, cell: { kind: 'camp', id: 41, name: 'Ember Cross', nextReadyStep: 0 } },
+          { x: 5, y: 0, cell: { kind: 'henge', id: 5, name: 'The Mending', nextReadyStep: 0 } },
         ]),
       }
     )
-    expect(msg).toBe('The Castle\nSE, 5 leagues away.')
+    expect(msg).toBe('The Gate\nSE, 5 leagues away.')
+  })
+
+  it('skips too-close targets (D<=2) when a farther target exists', () => {
+    const msg = formatNearestPoiSignpostMessage(
+      { x: 0, y: 0 },
+      {
+        width: 10,
+        height: 10,
+        cells: makeCells(10, 10, [
+          // Too close (E, 1).
+          { x: 1, y: 0, cell: { kind: 'gate' } },
+          // Farther (SE, 5).
+          { x: 3, y: 2, cell: { kind: 'farm', id: 23, name: 'Greyfield', nextReadyStep: 0 } },
+        ]),
+      }
+    )
+    expect(msg).toBe('Greyfield Farm\nSE, 5 leagues away.')
   })
 })

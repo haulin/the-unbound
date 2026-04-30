@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   CAMP_COUNT,
   FARM_COUNT,
+  GATE_LOCKSMITH_MIN_DISTANCE,
   HENGE_COUNT,
   SIGNPOST_COUNT,
   WORLD_HEIGHT,
   WORLD_WIDTH,
 } from '../../src/core/constants'
 import { generateWorld } from '../../src/core/world'
+import { manhattan, torusDelta } from '../../src/core/math'
 import type { Cell } from '../../src/core/types'
 
 function countKinds(cells: { kind: string }[][], kind: string): number {
@@ -38,7 +40,8 @@ describe('world', () => {
     expect(g.world.cells.length).toBe(WORLD_HEIGHT)
     expect(g.world.cells[0]?.length).toBe(WORLD_WIDTH)
 
-    expect(countKinds(g.world.cells, 'castle')).toBe(1)
+    expect(countKinds(g.world.cells, 'gate')).toBe(1)
+    expect(countKinds(g.world.cells, 'locksmith')).toBe(1)
     expect(countKinds(g.world.cells, 'farm')).toBe(FARM_COUNT)
     expect(countKinds(g.world.cells, 'camp')).toBe(CAMP_COUNT)
     expect(countKinds(g.world.cells, 'henge')).toBe(HENGE_COUNT)
@@ -73,5 +76,27 @@ describe('world', () => {
     const a = generateWorld(1)
     const b = generateWorld(1)
     expect(JSON.stringify(a)).toBe(JSON.stringify(b))
+  })
+
+  it('places gate and locksmith at least min distance apart', () => {
+    const maxSeeds = 200
+    for (let seed = 1; seed <= maxSeeds; seed++) {
+      const g = generateWorld(seed).world
+      let gate: { x: number; y: number } | null = null
+      let locksmith: { x: number; y: number } | null = null
+      for (let y = 0; y < g.height; y++) {
+        for (let x = 0; x < g.width; x++) {
+          const k = g.cells[y]![x]!.kind
+          if (k === 'gate') gate = { x, y }
+          else if (k === 'locksmith') locksmith = { x, y }
+        }
+      }
+      expect(gate).not.toBe(null)
+      expect(locksmith).not.toBe(null)
+      const dx = torusDelta(gate!.x, locksmith!.x, g.width)
+      const dy = torusDelta(gate!.y, locksmith!.y, g.height)
+      const d = manhattan(dx, dy)
+      expect(d).toBeGreaterThanOrEqual(GATE_LOCKSMITH_MIN_DISTANCE)
+    }
   })
 })

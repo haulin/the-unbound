@@ -1,6 +1,6 @@
-// title:  The Unbound (prototype 0.0.8)
+// title:  The Unbound (prototype 0.0.9)
 // author: haulin
-// desc:   Prototype 0.0.8 toward the North Star
+// desc:   Prototype 0.0.9 toward the North Star
 // script: js
 // input:  mouse
 
@@ -16,7 +16,9 @@
   var WORLD_HEIGHT = 10;
   var INITIAL_SEED = 14;
   var ENABLE_ANIMATIONS = true;
-  var TILE_CASTLE = 8;
+  var TILE_GATE = 68;
+  var TILE_GATE_OPEN = 70;
+  var TILE_LOCKSMITH = 72;
   var TILE_SIGNPOST = 42;
   var TILE_FARM = 38;
   var TILE_CAMP = 36;
@@ -24,6 +26,7 @@
   var TILE_MOUNTAIN = 6;
   var TILE_SWAMP = 12;
   var SIGNPOST_COUNT = 6;
+  var GATE_LOCKSMITH_MIN_DISTANCE = 7;
   var CAMP_COUNT = 3;
   var CAMP_COOLDOWN_MOVES = 3;
   var CAMP_FOOD_GAIN = 2;
@@ -34,8 +37,30 @@
   var MAP_GEN_ALGORITHM = MAP_GEN_NOISE;
   var NOISE_SMOOTH_PASSES = 2;
   var NOISE_VALUE_MAX = 1e4;
-  var GOAL_NARRATIVE = "Another soul sets out across the Unbound. Somewhere in these lands stands a castle older than memory. Find it.";
-  var CASTLE_FOUND_MESSAGE = "The Castle looms before you. You are home.";
+  var GOAL_NARRATIVE = "The road never ends. It only returns.\nThey say there is a bronze gate that breaks the circle.\nYou mean to find out.";
+  var BRONZE_KEY_FOOD_COST = 10;
+  var GATE_NAME = "The Gate";
+  var LOCKSMITH_NAME = "Locksmith of the Unbound";
+  var GATE_LOCKED_LINES = [
+    "A keyhole with no key. Not yet.",
+    "Bronze, but unyielding. You will need the key.",
+    "It does not open for hands. Only for the turning."
+  ];
+  var GATE_OPEN_LINES = [
+    "The lock turns. The Unbound lets you pass.",
+    "Bronze gives way. The road continues."
+  ];
+  var LOCKSMITH_PURCHASE_LINES = [
+    "You feed the fire. They finish the key.",
+    "A small hammer-song. A key, still warm.",
+    "They take what you offer and give you what you came for."
+  ];
+  var LOCKSMITH_VISITED_LINES = ["The forge is cold. The work is done.", "Nothing left to make for you here."];
+  var LOCKSMITH_NO_FOOD_LINES = [
+    "No heat, no key.",
+    "Come back with enough. The fire needs feeding first.",
+    "Others have paid for this before you. Most of them got further than you'd think."
+  ];
   var TERRAIN_MESSAGE_BY_TILE_ID = {
     2: "The grass bends with your passing.",
     // grass
@@ -74,7 +99,9 @@
     rainbow: { spriteId: 34, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[34] || "" }
   };
   var FEATURES = {
-    castle: { spriteId: TILE_CASTLE, enterFoodCost: FOOD_COST_DEFAULT },
+    gate: { spriteId: TILE_GATE, enterFoodCost: FOOD_COST_DEFAULT },
+    gateOpen: { spriteId: TILE_GATE_OPEN, enterFoodCost: FOOD_COST_DEFAULT },
+    locksmith: { spriteId: TILE_LOCKSMITH, enterFoodCost: FOOD_COST_DEFAULT },
     signpost: { spriteId: TILE_SIGNPOST, enterFoodCost: FOOD_COST_DEFAULT, count: SIGNPOST_COUNT },
     farm: { spriteId: TILE_FARM, enterFoodCost: FOOD_COST_DEFAULT, count: FARM_COUNT, cooldownMoves: FARM_COOLDOWN_MOVES },
     camp: {
@@ -96,7 +123,9 @@
       case "woods":
       case "rainbow":
         return TERRAIN[kind].spriteId;
-      case "castle":
+      case "gate":
+      case "gateOpen":
+      case "locksmith":
       case "signpost":
       case "farm":
       case "camp":
@@ -114,7 +143,9 @@
       case "woods":
       case "rainbow":
         return TERRAIN[kind].enterFoodCost;
-      case "castle":
+      case "gate":
+      case "gateOpen":
+      case "locksmith":
       case "signpost":
       case "farm":
       case "camp":
@@ -132,7 +163,9 @@
       case "woods":
       case "rainbow":
         return TERRAIN[kind].message;
-      case "castle":
+      case "gate":
+      case "gateOpen":
+      case "locksmith":
       case "signpost":
       case "farm":
       case "camp":
@@ -267,9 +300,9 @@
   function hashSeedStepCell(opts) {
     const base = seedToRngState(opts.seed | 0);
     const stepMix = u32(Math.imul(opts.stepCount | 0, 2654435761));
-    const cellId = u32(opts.cellId | 0);
+    const cellId2 = u32(opts.cellId | 0);
     const salt = u32(opts.salt == null ? 0 : opts.salt | 0);
-    return xorshift32(u32(base ^ stepMix ^ cellId ^ salt));
+    return xorshift32(u32(base ^ stepMix ^ cellId2 ^ salt));
   }
   function pickIndex(hash, length) {
     const m = length | 0;
@@ -365,68 +398,35 @@
     return s;
   }
 
-  // src/core/signpost.ts
-  function formatNearestPoiSignpostMessage(playerPos, world) {
-    const candidates = [];
-    function pushNamedCandidate(kind, id, baseName, suffix, x, y) {
-      candidates.push({ kind, id, name: `${baseName} ${suffix}`, pos: { x, y } });
-    }
-    const cells = world.cells;
-    for (let y = 0; y < cells.length; y++) {
-      const row = cells[y];
-      for (let x = 0; x < row.length; x++) {
-        const cell = row[x];
-        switch (cell.kind) {
-          case "castle":
-            candidates.push({ kind: "castle", id: y * world.width + x, name: "The Castle", pos: { x, y } });
-            break;
-          case "farm":
-            pushNamedCandidate("farm", cell.id, cell.name || "A Farm", "Farm", x, y);
-            break;
-          case "camp":
-            pushNamedCandidate("camp", cell.id, cell.name || "A Camp", "Camp", x, y);
-            break;
-          case "henge":
-            pushNamedCandidate("henge", cell.id, cell.name || "A Henge", "Henge", x, y);
-            break;
-        }
-      }
-    }
-    if (candidates.length === 0) return "";
-    const kindRank = (k) => k === "castle" ? 0 : k === "farm" ? 1 : k === "camp" ? 2 : 3;
-    let best = candidates[0];
-    let bestDx = torusDelta(playerPos.x, best.pos.x, world.width);
-    let bestDy = torusDelta(playerPos.y, best.pos.y, world.height);
-    let bestD = manhattan(bestDx, bestDy);
-    for (let i = 1; i < candidates.length; i++) {
-      const c = candidates[i];
-      const dx = torusDelta(playerPos.x, c.pos.x, world.width);
-      const dy = torusDelta(playerPos.y, c.pos.y, world.height);
-      const d = manhattan(dx, dy);
-      if (d < bestD) {
-        best = c;
-        bestDx = dx;
-        bestDy = dy;
-        bestD = d;
-        continue;
-      }
-      if (d === bestD) {
-        const ar = kindRank(c.kind);
-        const br = kindRank(best.kind);
-        if (ar < br || ar === br && c.id < best.id) {
-          best = c;
-          bestDx = dx;
-          bestDy = dy;
-          bestD = d;
-        }
-      }
-    }
-    const dir = dirLabel(bestDx, bestDy);
-    return `${best.name}
-${dir}, ${bestD} leagues away.`;
-  }
-
   // src/core/world.ts
+  function cellId(x, y) {
+    return y * WORLD_WIDTH + x;
+  }
+  var TERRAIN_KIND_SET = new Set(TERRAIN_KINDS);
+  function isTerrainCell(cell) {
+    return TERRAIN_KIND_SET.has(cell.kind);
+  }
+  function torusManhattanDistance(a, b) {
+    const dx = torusDelta(a.x, b.x, WORLD_WIDTH);
+    const dy = torusDelta(a.y, b.y, WORLD_HEIGHT);
+    return manhattan(dx, dy);
+  }
+  function placeFeature(cells, rngState, opts) {
+    const placed = [];
+    while (placed.length < opts.count) {
+      const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
+      rngState = r.rngState;
+      const x = r.value % WORLD_WIDTH;
+      const y = Math.floor(r.value / WORLD_WIDTH);
+      const here = cells[y][x];
+      if (!opts.canPlaceAt(x, y, here)) continue;
+      const built = opts.buildCell(x, y, rngState);
+      rngState = built.rngState;
+      cells[y][x] = built.cell;
+      placed.push({ x, y });
+    }
+    return { placed, rngState };
+  }
   function boxBlurIntGridWrap(grid, w, h) {
     const out = [];
     for (let y = 0; y < h; y++) {
@@ -486,77 +486,75 @@ ${dir}, ${bestD} leagues away.`;
     }
     return { cells, rngState };
   }
-  function placeCastle(cells, rngState) {
-    const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
-    rngState = r.rngState;
-    const x = r.value % WORLD_WIDTH;
-    const y = Math.floor(r.value / WORLD_WIDTH);
-    cells[y][x] = { kind: "castle" };
-    return { castlePos: { x, y }, rngState };
+  function placeGate(cells, rngState) {
+    const res = placeFeature(cells, rngState, {
+      count: 1,
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: (_x, _y, nextRng) => ({ cell: { kind: "gate" }, rngState: nextRng })
+    });
+    return { gatePos: res.placed[0], rngState: res.rngState };
   }
-  function placeNamedFeature(cells, rngState, castlePos, opts) {
+  function placeLocksmith(cells, rngState, gatePos) {
+    const maxPossible = Math.floor(WORLD_WIDTH / 2) + Math.floor(WORLD_HEIGHT / 2);
+    const minD = Math.max(0, Math.min(GATE_LOCKSMITH_MIN_DISTANCE | 0, maxPossible));
+    const res = placeFeature(cells, rngState, {
+      count: 1,
+      canPlaceAt: (x, y, here) => isTerrainCell(here) && torusManhattanDistance({ x, y }, gatePos) >= minD,
+      buildCell: (_x, _y, nextRng) => ({ cell: { kind: "locksmith" }, rngState: nextRng })
+    });
+    return { locksmithPos: res.placed[0], rngState: res.rngState };
+  }
+  function placeNamedFeature(cells, rngState, opts) {
     const remainingNames = [...opts.namePool];
-    let placed = 0;
-    while (placed < opts.count) {
-      const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
-      rngState = r.rngState;
-      const x = r.value % WORLD_WIDTH;
-      const y = Math.floor(r.value / WORLD_WIDTH);
-      if (x === castlePos.x && y === castlePos.y) continue;
-      const here = cells[y][x];
-      if (!opts.canPlaceAt(here)) continue;
-      let name = opts.fallbackName;
-      if (remainingNames.length > 0) {
-        const pick = randInt(rngState, remainingNames.length);
-        rngState = pick.rngState;
-        name = remainingNames.splice(pick.value, 1)[0];
+    const res = placeFeature(cells, rngState, {
+      count: opts.count,
+      canPlaceAt: opts.canPlaceAt,
+      buildCell: (x, y, nextRng) => {
+        let name = opts.fallbackName;
+        if (remainingNames.length > 0) {
+          const pick = randInt(nextRng, remainingNames.length);
+          nextRng = pick.rngState;
+          name = remainingNames.splice(pick.value, 1)[0] || opts.fallbackName;
+        }
+        return { cell: opts.buildCell(x, y, name), rngState: nextRng };
       }
-      cells[y][x] = opts.buildCell(x, y, name);
-      placed++;
-    }
-    return rngState;
+    });
+    return res.rngState;
   }
-  function placeNamedFarms(cells, rngState, castlePos) {
-    return placeNamedFeature(cells, rngState, castlePos, {
+  function placeNamedFarms(cells, rngState) {
+    return placeNamedFeature(cells, rngState, {
       count: FARM_COUNT,
       namePool: FARM_NAME_POOL,
       fallbackName: "A Farm",
-      canPlaceAt: (here) => !(here.kind === "farm" || here.kind === "camp" || here.kind === "signpost"),
-      buildCell: (x, y, name) => ({ kind: "farm", id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 })
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: (x, y, name) => ({ kind: "farm", id: cellId(x, y), name, nextReadyStep: 0 })
     });
   }
-  function placeNamedCamps(cells, rngState, castlePos) {
-    return placeNamedFeature(cells, rngState, castlePos, {
+  function placeNamedCamps(cells, rngState) {
+    return placeNamedFeature(cells, rngState, {
       count: CAMP_COUNT,
       namePool: CAMP_NAME_POOL,
       fallbackName: "A Camp",
-      canPlaceAt: (here) => !(here.kind === "farm" || here.kind === "camp" || here.kind === "signpost"),
-      buildCell: (x, y, name) => ({ kind: "camp", id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 })
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: (x, y, name) => ({ kind: "camp", id: cellId(x, y), name, nextReadyStep: 0 })
     });
   }
-  function placeHenges(cells, rngState, castlePos) {
-    return placeNamedFeature(cells, rngState, castlePos, {
+  function placeHenges(cells, rngState) {
+    return placeNamedFeature(cells, rngState, {
       count: HENGE_COUNT,
       namePool: HENGE_NAME_POOL,
       fallbackName: "A Henge",
-      canPlaceAt: (here) => !(here.kind === "castle" || here.kind === "farm" || here.kind === "camp" || here.kind === "henge" || here.kind === "signpost"),
-      buildCell: (x, y, name) => ({ kind: "henge", id: y * WORLD_WIDTH + x, name, nextReadyStep: 0 })
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: (x, y, name) => ({ kind: "henge", id: cellId(x, y), name, nextReadyStep: 0 })
     });
   }
-  function placeSignposts(cells, rngState, castlePos) {
-    let placed = 0;
-    while (placed < SIGNPOST_COUNT) {
-      const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
-      rngState = r.rngState;
-      const x = r.value % WORLD_WIDTH;
-      const y = Math.floor(r.value / WORLD_WIDTH);
-      if (x === castlePos.x && y === castlePos.y) continue;
-      const here = cells[y][x];
-      if (here.kind === "farm" || here.kind === "camp" || here.kind === "henge" || here.kind === "signpost") continue;
-      cells[y][x] = { kind: "signpost" };
-      placed++;
-    }
-    return rngState;
+  function placeSignposts(cells, rngState) {
+    const res = placeFeature(cells, rngState, {
+      count: SIGNPOST_COUNT,
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: (_x, _y, nextRng) => ({ cell: { kind: "signpost" }, rngState: nextRng })
+    });
+    return res.rngState;
   }
   function pickStart({ rngState }) {
     const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
@@ -576,12 +574,14 @@ ${dir}, ${bestD} leagues away.`;
     const base = generateBaseTerrainCells(rngState);
     rngState = base.rngState;
     const cells = base.cells;
-    const castle = placeCastle(cells, rngState);
-    rngState = castle.rngState;
-    rngState = placeNamedFarms(cells, rngState, castle.castlePos);
-    rngState = placeNamedCamps(cells, rngState, castle.castlePos);
-    rngState = placeHenges(cells, rngState, castle.castlePos);
-    rngState = placeSignposts(cells, rngState, castle.castlePos);
+    const gate = placeGate(cells, rngState);
+    rngState = gate.rngState;
+    const locksmith = placeLocksmith(cells, rngState, gate.gatePos);
+    rngState = locksmith.rngState;
+    rngState = placeNamedFarms(cells, rngState);
+    rngState = placeNamedCamps(cells, rngState);
+    rngState = placeHenges(cells, rngState);
+    rngState = placeSignposts(cells, rngState);
     const startPick = pickStart({ rngState });
     rngState = startPick.rngState;
     const world = {
@@ -608,12 +608,6 @@ ${dir}, ${bestD} leagues away.`;
     nextCells[pos.y] = nextRow;
     return { ...world, cells: nextCells };
   }
-
-  // src/core/tiles/onEnterCastle.ts
-  var onEnterCastle = () => ({
-    message: CASTLE_FOUND_MESSAGE,
-    hasFoundCastle: true
-  });
 
   // src/core/tiles/poiUtils.ts
   function pickDeterministicLine(lines, seed, poiIndex, stepCount) {
@@ -697,6 +691,21 @@ ${harvestLine}`
     };
   };
 
+  // src/core/tiles/onEnterGate.ts
+  var onEnterGate = ({ cell, world, pos, stepCount, resources }) => {
+    if (cell.kind !== "gate" && cell.kind !== "gateOpen") return { message: "" };
+    const cellId2 = pos.y * world.width + pos.x;
+    if (!resources.hasBronzeKey) {
+      const line2 = pickDeterministicLine(GATE_LOCKED_LINES, world.seed, cellId2, stepCount);
+      return { message: `${GATE_NAME}
+${line2}` };
+    }
+    const nextWorld = cell.kind === "gateOpen" ? world : setCellAt(world, pos, { kind: "gateOpen" });
+    const line = pickDeterministicLine(GATE_OPEN_LINES, world.seed, cellId2, stepCount);
+    return { world: nextWorld, hasWon: true, message: `${GATE_NAME}
+${line}` };
+  };
+
   // src/core/tiles/onEnterHenge.ts
   var onEnterHenge = ({ cell, world, pos, stepCount }) => {
     if (cell.kind !== "henge") return { message: "" };
@@ -710,6 +719,101 @@ ${harvestLine}`
 ${line}` };
   };
 
+  // src/core/tiles/onEnterLocksmith.ts
+  var onEnterLocksmith = ({ cell, world, pos, stepCount, resources }) => {
+    if (cell.kind !== "locksmith") return { message: "" };
+    const cellId2 = pos.y * world.width + pos.x;
+    if (resources.hasBronzeKey) {
+      const line2 = pickDeterministicLine(LOCKSMITH_VISITED_LINES, world.seed, cellId2, stepCount);
+      return { message: `${LOCKSMITH_NAME}
+${line2}` };
+    }
+    if (resources.food >= BRONZE_KEY_FOOD_COST) {
+      const line2 = pickDeterministicLine(LOCKSMITH_PURCHASE_LINES, world.seed, cellId2, stepCount);
+      return {
+        resources: {
+          ...resources,
+          food: resources.food - BRONZE_KEY_FOOD_COST,
+          hasBronzeKey: true
+        },
+        foodDeltas: [-BRONZE_KEY_FOOD_COST],
+        message: `${LOCKSMITH_NAME}
+${line2}`
+      };
+    }
+    const line = pickDeterministicLine(LOCKSMITH_NO_FOOD_LINES, world.seed, cellId2, stepCount);
+    return { message: `${LOCKSMITH_NAME}
+${line}` };
+  };
+
+  // src/core/signpost.ts
+  function formatNearestPoiSignpostMessage(playerPos, world) {
+    const SIGNPOST_MIN_TARGET_DISTANCE = 2;
+    const kindRank = (k) => k === "gate" || k === "gateOpen" ? 0 : k === "locksmith" ? 1 : k === "farm" ? 2 : k === "camp" ? 3 : 4;
+    function candidateId(x, y) {
+      return y * world.width + x;
+    }
+    const candidates = [];
+    function pushNamedCandidate(kind, id, baseName, suffix, x, y) {
+      const name = `${baseName} ${suffix}`;
+      candidates.push({ kind, id, name, pos: { x, y } });
+    }
+    const cells = world.cells;
+    for (let y = 0; y < cells.length; y++) {
+      const row = cells[y];
+      for (let x = 0; x < row.length; x++) {
+        const cell = row[x];
+        switch (cell.kind) {
+          case "gate":
+            candidates.push({ kind: "gate", id: candidateId(x, y), name: GATE_NAME, pos: { x, y } });
+            break;
+          case "gateOpen":
+            candidates.push({ kind: "gateOpen", id: candidateId(x, y), name: GATE_NAME, pos: { x, y } });
+            break;
+          case "locksmith":
+            candidates.push({ kind: "locksmith", id: candidateId(x, y), name: LOCKSMITH_NAME, pos: { x, y } });
+            break;
+          case "farm":
+            pushNamedCandidate("farm", cell.id, cell.name || "A Farm", "Farm", x, y);
+            break;
+          case "camp":
+            pushNamedCandidate("camp", cell.id, cell.name || "A Camp", "Camp", x, y);
+            break;
+          case "henge":
+            pushNamedCandidate("henge", cell.id, cell.name || "A Henge", "Henge", x, y);
+            break;
+        }
+      }
+    }
+    if (candidates.length === 0) return "";
+    function evalCandidate(c) {
+      const dx = torusDelta(playerPos.x, c.pos.x, world.width);
+      const dy = torusDelta(playerPos.y, c.pos.y, world.height);
+      const d = manhattan(dx, dy);
+      const rank = kindRank(c.kind);
+      return { ...c, dx, dy, d, rank };
+    }
+    function isBetter(a, b) {
+      if (a.d !== b.d) return a.d < b.d;
+      if (a.rank !== b.rank) return a.rank < b.rank;
+      return a.id < b.id;
+    }
+    let bestAny = null;
+    let bestFar = null;
+    for (let i = 0; i < candidates.length; i++) {
+      const e = evalCandidate(candidates[i]);
+      if (!bestAny || isBetter(e, bestAny)) bestAny = e;
+      if (e.d > SIGNPOST_MIN_TARGET_DISTANCE) {
+        if (!bestFar || isBetter(e, bestFar)) bestFar = e;
+      }
+    }
+    const chosen = bestFar || bestAny;
+    if (!chosen) return "";
+    const dir = dirLabel(chosen.dx, chosen.dy);
+    return `${chosen.name}
+${dir}, ${chosen.d} leagues away.`;
+  }
+
   // src/core/tiles/onEnterSignpost.ts
   var onEnterSignpost = ({ world, pos }) => ({
     message: formatNearestPoiSignpostMessage(pos, world)
@@ -719,9 +823,11 @@ ${line}` };
   var onEnterByKind = {
     camp: onEnterCamp,
     farm: onEnterFarm,
+    gate: onEnterGate,
+    gateOpen: onEnterGate,
     henge: onEnterHenge,
-    signpost: onEnterSignpost,
-    castle: onEnterCastle
+    locksmith: onEnterLocksmith,
+    signpost: onEnterSignpost
   };
   function getOnEnterHandler(kind) {
     return onEnterByKind[kind] || onEnterDefaultTerrain;
@@ -793,8 +899,8 @@ ${line}` };
     return lp;
   }
   function normalizeResources(_world, raw) {
-    if (!raw) return { food: INITIAL_FOOD, armySize: INITIAL_ARMY_SIZE };
-    return { food: raw.food, armySize: raw.armySize };
+    if (!raw) return { food: INITIAL_FOOD, armySize: INITIAL_ARMY_SIZE, hasBronzeKey: false };
+    return { food: raw.food, armySize: raw.armySize, hasBronzeKey: !!raw.hasBronzeKey };
   }
   function gameOverMessage(seed, stepCount) {
     const k = Math.trunc(seed) + Math.trunc(stepCount);
@@ -802,14 +908,8 @@ ${line}` };
     const idx = (k % m + m) % m;
     return GAME_OVER_LINES[idx] || "";
   }
-  function initialMessageForStart(cellKind, playerPos, world) {
-    let msg = GOAL_NARRATIVE;
-    if (cellKind === "signpost") {
-      msg += "\n" + formatNearestPoiSignpostMessage(playerPos, world);
-    } else if (cellKind === "castle") {
-      msg += "\n" + CASTLE_FOUND_MESSAGE;
-    }
-    return msg;
+  function initialMessageForStart() {
+    return GOAL_NARRATIVE;
   }
   function reduceGoal(s) {
     const prevUi = getUi(s.ui);
@@ -848,7 +948,7 @@ ${line}` };
     };
   }
   function reduceMove(prevState, dx, dy) {
-    if (prevState.run.isGameOver || prevState.run.hasFoundCastle) return prevState;
+    if (prevState.run.isGameOver || prevState.run.hasWon) return prevState;
     if (prevState.encounter && prevState.encounter.kind === "combat") return prevState;
     const world = prevState.world;
     const prevPos = prevState.player.position;
@@ -882,7 +982,7 @@ ${line}` };
     let nextResources = outcome.resources || baseResources;
     if (outcome.foodDeltas && outcome.foodDeltas.length) foodDeltas.push(...outcome.foodDeltas);
     if (outcome.armyDeltas && outcome.armyDeltas.length) armyDeltas.push(...outcome.armyDeltas);
-    const nextHasFoundCastle = prevState.run.hasFoundCastle || cell.kind === "castle" || !!outcome.hasFoundCastle;
+    const nextHasWon = prevState.run.hasWon || !!outcome.hasWon;
     const isGameOver = nextResources.armySize <= 0;
     let message = outcome.message;
     if (isGameOver) {
@@ -940,7 +1040,7 @@ ${line}` };
       player: { position: nextPos },
       run: {
         stepCount: nextStepCount,
-        hasFoundCastle: nextHasFoundCastle,
+        hasWon: nextHasWon,
         isGameOver
       },
       resources: nextResources,
@@ -1010,23 +1110,31 @@ ${line}` };
       const generated = generateWorld(seed);
       const world = generated.world;
       const playerPos = generated.startPosition;
-      const startCellKind = world.cells[playerPos.y][playerPos.x].kind;
-      const hasFoundCastle = startCellKind === "castle";
+      const hasWon = false;
+      const baseUi = {
+        message: initialMessageForStart(),
+        leftPanel: { kind: LEFT_PANEL_KIND_AUTO },
+        clock: { frame: 0 },
+        anim: { nextId: 1, active: [] }
+      };
+      const ui = ENABLE_ANIMATIONS ? enqueueAnim(baseUi, {
+        kind: "gridTransition",
+        startFrame: 0,
+        durationFrames: gridTransitionDurationFrames(),
+        blocksInput: true,
+        params: { from: "blank", to: "overworld" }
+      }) : baseUi;
       return {
         world,
         player: { position: { x: playerPos.x, y: playerPos.y } },
-        run: { stepCount: 0, hasFoundCastle, isGameOver: false },
+        run: { stepCount: 0, hasWon, isGameOver: false },
         resources: {
           food: INITIAL_FOOD,
-          armySize: INITIAL_ARMY_SIZE
+          armySize: INITIAL_ARMY_SIZE,
+          hasBronzeKey: false
         },
         encounter: null,
-        ui: {
-          message: initialMessageForStart(startCellKind, playerPos, world),
-          leftPanel: { kind: LEFT_PANEL_KIND_AUTO },
-          clock: { frame: 0 },
-          anim: { nextId: 1, active: [] }
-        }
+        ui
       };
     }
     if (prevState == null) return null;
@@ -1036,7 +1144,7 @@ ${line}` };
     if (action.type === ACTION_RETURN) {
       if (!prevState.encounter) return prevState;
       const prevUi = getUi(prevState.ui);
-      if (prevState.run.isGameOver || prevState.run.hasFoundCastle) return prevState;
+      if (prevState.run.isGameOver || prevState.run.hasWon) return prevState;
       const prevRes = normalizeResources(prevState.world, prevState.resources);
       const nextArmy = prevRes.armySize - 1;
       const isGameOver = nextArmy <= 0;
@@ -1084,7 +1192,7 @@ ${line}` };
       };
     }
     if (action.type === ACTION_FIGHT) {
-      if (prevState.run.isGameOver || prevState.run.hasFoundCastle) return prevState;
+      if (prevState.run.isGameOver || prevState.run.hasWon) return prevState;
       const enc = prevState.encounter;
       if (!enc || enc.kind !== "combat") return prevState;
       const prevEnemy = enc.enemyArmySize;
@@ -1113,7 +1221,7 @@ ${line}` };
         armyDeltas.push(-1);
       }
       let nextWorld = { ...prevState.world, rngState: round.rngState };
-      if (round.outcome === "playerHit" && nextEncounter == null && !prevState.run.isGameOver && !prevState.run.hasFoundCastle) {
+      if (round.outcome === "playerHit" && nextEncounter == null && !prevState.run.isGameOver && !prevState.run.hasWon) {
         const span = COMBAT_REWARD_MAX - COMBAT_REWARD_MIN + 1;
         const r = randInt(nextWorld.rngState, span);
         nextWorld = { ...nextWorld, rngState: r.rngState };
@@ -1214,7 +1322,7 @@ ${line}` };
     if (row === 2 && col === 0) return { iconKey: "minimap", action: { type: ACTION_TOGGLE_MINIMAP } };
     if (row === 2 && col === 2) return { iconKey: "restart", action: { type: ACTION_RESTART } };
     if (row === 0 && col === 2) return { action: null };
-    const isRunOver = !!(s.run.isGameOver || s.run.hasFoundCastle);
+    const isRunOver = !!(s.run.isGameOver || s.run.hasWon);
     if (s.encounter && s.encounter.kind === "combat") {
       if (row === 1 && col === 0) return { iconKey: "fight", action: { type: ACTION_FIGHT } };
       if (row === 1 && col === 2) return { iconKey: "return", action: { type: ACTION_RETURN } };
@@ -1411,6 +1519,7 @@ ${line}` };
     return -1;
   }
   function spriteIdForModeCrossCell(s, mode, row, col) {
+    if (mode === "blank") return null;
     if (mode === "combat") {
       if (row === 1 && col === 0) return RIGHT_GRID_SPRITE_ID.fight;
       if (row === 1 && col === 2) return RIGHT_GRID_SPRITE_ID.return;
@@ -1647,10 +1756,25 @@ ${line}` };
     b: 179,
     br: 180
   };
+  var SPR_HUD_FRAME_BRONZE = {
+    tl: 149,
+    t: 150,
+    tr: 151,
+    l: 165,
+    c: 166,
+    r: 167,
+    bl: 181,
+    b: 182,
+    br: 183
+  };
   function renderFrame(s, hints) {
     cls(UI_COLOR_BG);
     drawRightPanel(s, hints);
     drawLeftPanel(s);
+    if (s.resources.hasBronzeKey) {
+      const margin = 2;
+      spr(106, SCREEN_WIDTH - 16 - margin, margin, 0, 1, 0, 0, 2, 2);
+    }
   }
   function formatA1(position) {
     const col = String.fromCharCode("A".charCodeAt(0) + position.x);
@@ -1699,7 +1823,8 @@ ${line}` };
   }
   function drawLeftPanel(s) {
     rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, UI_COLOR_BG);
-    drawNineSliceFrame(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, SPR_HUD_FRAME, {
+    const frame = s.resources.hasBronzeKey ? SPR_HUD_FRAME_BRONZE : SPR_HUD_FRAME;
+    drawNineSliceFrame(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, frame, {
       tilePx: 8,
       scale: 1,
       colorkey: 0,
@@ -1739,7 +1864,7 @@ ${line}` };
         print(`${enemyArmy}`, enemyCountX, enemyCountY, UI_COLOR_TEXT);
         if (ENABLE_ANIMATIONS) {
           const anims = s.ui.anim.active;
-          const frame = s.ui.clock.frame | 0;
+          const frame2 = s.ui.clock.frame | 0;
           let xCursor = enemyIconX + UI_FOOD_DELTA_OFFSET_X;
           for (let i = 0; i < anims.length; i++) {
             const a = anims[i];
@@ -1747,7 +1872,7 @@ ${line}` };
             const ea = a;
             const start = ea.startFrame | 0;
             const dur = Math.max(1, ea.durationFrames | 0);
-            const t = Math.max(0, Math.min(dur, frame - start));
+            const t = Math.max(0, Math.min(dur, frame2 - start));
             const p = t / dur;
             const delta = ea.params.delta | 0;
             if (!delta) continue;
@@ -1795,7 +1920,7 @@ ${line}` };
     print(`${s.run.stepCount}`, statusX + statusIconSize + statusIconGap, stepsY + textOffsetY, UI_COLOR_TEXT);
     {
       const anims = s.ui.anim.active;
-      const frame = s.ui.clock.frame | 0;
+      const frame2 = s.ui.clock.frame | 0;
       let xCursor = armyX + UI_ARMY_DELTA_OFFSET_X;
       for (let i = 0; i < anims.length; i++) {
         const a = anims[i];
@@ -1803,7 +1928,7 @@ ${line}` };
         const aa = a;
         const start = aa.startFrame | 0;
         const dur = Math.max(1, aa.durationFrames | 0);
-        const t = Math.max(0, Math.min(dur, frame - start));
+        const t = Math.max(0, Math.min(dur, frame2 - start));
         const p = t / dur;
         const delta = aa.params.delta | 0;
         if (!delta) continue;
@@ -1816,7 +1941,7 @@ ${line}` };
     }
     {
       const anims = s.ui.anim.active;
-      const frame = s.ui.clock.frame | 0;
+      const frame2 = s.ui.clock.frame | 0;
       let xCursor = foodX + UI_FOOD_DELTA_OFFSET_X;
       for (let i = 0; i < anims.length; i++) {
         const a = anims[i];
@@ -1824,7 +1949,7 @@ ${line}` };
         const fa = a;
         const start = fa.startFrame | 0;
         const dur = Math.max(1, fa.durationFrames | 0);
-        const t = Math.max(0, Math.min(dur, frame - start));
+        const t = Math.max(0, Math.min(dur, frame2 - start));
         const p = t / dur;
         const delta = fa.params.delta | 0;
         if (!delta) continue;
@@ -1838,7 +1963,7 @@ ${line}` };
     const statusBottomY = stepsY + statusLineH;
     const headerBottomY = Math.max(illY + illSize, statusBottomY);
     const msgY = headerBottomY + 4;
-    const headline = s.run.isGameOver ? { text: "GAME OVER", color: UI_COLOR_BAD } : s.run.hasFoundCastle ? { text: "YOU WIN", color: UI_COLOR_GOOD } : null;
+    const headline = s.run.isGameOver ? { text: "GAME OVER", color: UI_COLOR_BAD } : s.run.hasWon ? { text: "YOU WIN", color: UI_COLOR_GOOD } : null;
     const headlineRows = headline ? 1 : 0;
     const maxLines = Math.max(0, Math.floor((SCREEN_HEIGHT - msgY - 4) / messageLineH) - headlineRows);
     const lore = loreLinesForMessage(s.ui.message, LORE_MAX_CHARS_PER_LINE);
@@ -1941,9 +2066,9 @@ ${line}` };
   globalThis.TIC = TIC;
 })();
 
-// title:  The Unbound (prototype 0.0.8)
+// title:  The Unbound (prototype 0.0.9)
 // author: haulin
-// desc:   Prototype 0.0.8 toward the North Star
+// desc:   Prototype 0.0.9 toward the North Star
 // script: js
 // input:  mouse
 

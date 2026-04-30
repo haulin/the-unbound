@@ -58,7 +58,8 @@ function crossRevealIndex(row: number, col: number): number {
   return -1
 }
 
-function spriteIdForModeCrossCell(s: State, mode: 'overworld' | 'combat', row: number, col: number): number | null {
+function spriteIdForModeCrossCell(s: State, mode: 'blank' | 'overworld' | 'combat', row: number, col: number): number | null {
+  if (mode === 'blank') return null
   if (mode === 'combat') {
     // Combat layout: W=fight, E=return, C=enemy, N/S empty.
     if (row === 1 && col === 0) return RIGHT_GRID_SPRITE_ID.fight

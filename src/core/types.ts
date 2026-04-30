@@ -12,16 +12,18 @@ import type {
 export type Vec2 = { x: number; y: number }
 
 export type TerrainKind = 'grass' | 'road' | 'mountain' | 'lake' | 'swamp' | 'woods' | 'rainbow'
-export type FeatureKind = 'castle' | 'signpost' | 'farm' | 'camp' | 'henge'
+export type FeatureKind = 'gate' | 'gateOpen' | 'locksmith' | 'signpost' | 'farm' | 'camp' | 'henge'
 export type CellKind = TerrainKind | FeatureKind
 
 export type TerrainCell = { kind: TerrainKind }
-export type CastleCell = { kind: 'castle' }
+export type GateCell = { kind: 'gate' }
+export type GateOpenCell = { kind: 'gateOpen' }
+export type LocksmithCell = { kind: 'locksmith' }
 export type SignpostCell = { kind: 'signpost' }
 export type FarmCell = { kind: 'farm'; id: number; name: string; nextReadyStep: number }
 export type CampCell = { kind: 'camp'; id: number; name: string; nextReadyStep: number }
 export type HengeCell = { kind: 'henge'; id: number; name: string; nextReadyStep: number }
-export type Cell = TerrainCell | CastleCell | SignpostCell | FarmCell | CampCell | HengeCell
+export type Cell = TerrainCell | GateCell | GateOpenCell | LocksmithCell | SignpostCell | FarmCell | CampCell | HengeCell
 
 export type CellGrid = Cell[][]
 
@@ -76,7 +78,7 @@ export type EnemyArmyDeltaAnim = BaseAnim & {
 
 export type GridTransitionAnim = BaseAnim & {
   kind: 'gridTransition'
-  params: { from: 'overworld' | 'combat'; to: 'overworld' | 'combat' }
+  params: { from: 'blank' | 'overworld' | 'combat'; to: 'overworld' | 'combat' }
 }
 
 export type Anim = MoveSlideAnim | FoodDeltaAnim | ArmyDeltaAnim | EnemyArmyDeltaAnim | GridTransitionAnim
@@ -86,11 +88,12 @@ export type UiAnim = { nextId: number; active: Anim[] }
 export type Ui = { message: string; leftPanel: LeftPanel; clock: UiClock; anim: UiAnim }
 
 export type Player = { position: Vec2 }
-export type Run = { stepCount: number; hasFoundCastle: boolean; isGameOver: boolean }
+export type Run = { stepCount: number; hasWon: boolean; isGameOver: boolean }
 
 export type Resources = {
   food: number
   armySize: number
+  hasBronzeKey: boolean
 }
 
 export type CombatEncounter = {

@@ -7,7 +7,6 @@ import {
   ACTION_SHOW_GOAL,
   ACTION_TICK,
   ACTION_TOGGLE_MINIMAP,
-  CASTLE_FOUND_MESSAGE,
   COMBAT_AMBUSH_PERCENT,
   COMBAT_REWARD_MAX,
   COMBAT_REWARD_MIN,
@@ -25,7 +24,6 @@ import {
   enterFoodCostForKind,
 } from './constants'
 import { cellIdForPos, pickCombatEncounterLine, pickCombatExitLine, resolveFightRound, shouldStartAmbush, spawnEnemyArmy } from './combat'
-import { formatNearestPoiSignpostMessage } from './signpost'
 import { generateWorld } from './world'
 import { setCellAt } from './cells'
 import { randInt } from './prng'
@@ -40,7 +38,6 @@ import {
   type Resources,
   type State,
   type Ui,
-  type CellKind,
   type Cell,
   type Encounter,
   type HengeCell,
@@ -117,8 +114,8 @@ function clearSpriteFocusIfAny(ui: Ui): LeftPanel {
 }
 
 function normalizeResources(_world: World, raw: Resources | null | undefined): Resources {
-  if (!raw) return { food: INITIAL_FOOD, armySize: INITIAL_ARMY_SIZE }
-  return { food: raw.food, armySize: raw.armySize }
+  if (!raw) return { food: INITIAL_FOOD, armySize: INITIAL_ARMY_SIZE, hasBronzeKey: false }
+  return { food: raw.food, armySize: raw.armySize, hasBronzeKey: !!raw.hasBronzeKey }
 }
 
 function gameOverMessage(seed: number, stepCount: number): string {
@@ -128,14 +125,9 @@ function gameOverMessage(seed: number, stepCount: number): string {
   return GAME_OVER_LINES[idx] || ''
 }
 
-function initialMessageForStart(cellKind: CellKind, playerPos: { x: number; y: number }, world: World): string {
-  let msg = GOAL_NARRATIVE
-  if (cellKind === 'signpost') {
-    msg += '\n' + formatNearestPoiSignpostMessage(playerPos, world)
-  } else if (cellKind === 'castle') {
-    msg += '\n' + CASTLE_FOUND_MESSAGE
-  }
-  return msg
+function initialMessageForStart(): string {
+  // Always start with the goal narrative only (no auto-appended signpost clue).
+  return GOAL_NARRATIVE
 }
 
 function reduceGoal(s: State): State {
@@ -181,7 +173,7 @@ function reduceToggleMinimap(s: State): State {
 }
 
 function reduceMove(prevState: State, dx: number, dy: number): State {
-  if (prevState.run.isGameOver || prevState.run.hasFoundCastle) return prevState
+  if (prevState.run.isGameOver || prevState.run.hasWon) return prevState
   if (prevState.encounter && prevState.encounter.kind === 'combat') return prevState
 
   const world = prevState.world
@@ -222,7 +214,7 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
   let nextResources = outcome.resources || baseResources
   if (outcome.foodDeltas && outcome.foodDeltas.length) foodDeltas.push(...outcome.foodDeltas)
   if (outcome.armyDeltas && outcome.armyDeltas.length) armyDeltas.push(...outcome.armyDeltas)
-  const nextHasFoundCastle = prevState.run.hasFoundCastle || cell.kind === 'castle' || !!outcome.hasFoundCastle
+  const nextHasWon = prevState.run.hasWon || !!outcome.hasWon
 
   const isGameOver = nextResources.armySize <= 0
   let message = outcome.message
@@ -298,7 +290,7 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
     player: { position: nextPos },
     run: {
       stepCount: nextStepCount,
-      hasFoundCastle: nextHasFoundCastle,
+      hasWon: nextHasWon,
       isGameOver,
     },
     resources: nextResources,
@@ -375,24 +367,36 @@ export function processAction(prevState: State | null, action: Action): State | 
     const world = generated.world
     const playerPos = generated.startPosition
 
-    const startCellKind = world.cells[playerPos.y]![playerPos.x]!.kind
-    const hasFoundCastle = startCellKind === 'castle'
+    const hasWon = false
+
+    const baseUi: Ui = {
+      message: initialMessageForStart(),
+      leftPanel: { kind: LEFT_PANEL_KIND_AUTO },
+      clock: { frame: 0 },
+      anim: { nextId: 1, active: [] },
+    }
+
+    const ui = ENABLE_ANIMATIONS
+      ? enqueueAnim(baseUi, {
+          kind: 'gridTransition',
+          startFrame: 0,
+          durationFrames: gridTransitionDurationFrames(),
+          blocksInput: true,
+          params: { from: 'blank', to: 'overworld' },
+        })
+      : baseUi
 
     return {
       world,
       player: { position: { x: playerPos.x, y: playerPos.y } },
-      run: { stepCount: 0, hasFoundCastle, isGameOver: false },
+      run: { stepCount: 0, hasWon, isGameOver: false },
       resources: {
         food: INITIAL_FOOD,
         armySize: INITIAL_ARMY_SIZE,
+        hasBronzeKey: false,
       },
       encounter: null,
-      ui: {
-        message: initialMessageForStart(startCellKind, playerPos, world),
-        leftPanel: { kind: LEFT_PANEL_KIND_AUTO },
-        clock: { frame: 0 },
-        anim: { nextId: 1, active: [] },
-      },
+      ui,
     }
   }
 
@@ -404,7 +408,7 @@ export function processAction(prevState: State | null, action: Action): State | 
   if (action.type === ACTION_RETURN) {
     if (!prevState.encounter) return prevState
     const prevUi = getUi(prevState.ui)
-    if (prevState.run.isGameOver || prevState.run.hasFoundCastle) return prevState
+    if (prevState.run.isGameOver || prevState.run.hasWon) return prevState
 
     // Returning from combat costs 1 troop
     const prevRes = normalizeResources(prevState.world, prevState.resources)
@@ -459,7 +463,7 @@ export function processAction(prevState: State | null, action: Action): State | 
     }
   }
   if (action.type === ACTION_FIGHT) {
-    if (prevState.run.isGameOver || prevState.run.hasFoundCastle) return prevState
+    if (prevState.run.isGameOver || prevState.run.hasWon) return prevState
     const enc = prevState.encounter
     if (!enc || enc.kind !== 'combat') return prevState
 
@@ -498,7 +502,7 @@ export function processAction(prevState: State | null, action: Action): State | 
     let nextWorld = { ...prevState.world, rngState: round.rngState }
 
     // Combat reward is paid once, at the end, when the enemy is eliminated.
-    if (round.outcome === 'playerHit' && nextEncounter == null && !prevState.run.isGameOver && !prevState.run.hasFoundCastle) {
+    if (round.outcome === 'playerHit' && nextEncounter == null && !prevState.run.isGameOver && !prevState.run.hasWon) {
       const span = COMBAT_REWARD_MAX - COMBAT_REWARD_MIN + 1
       const r = randInt(nextWorld.rngState, span)
       nextWorld = { ...nextWorld, rngState: r.rngState }
