@@ -2,28 +2,39 @@
 
 
 
-v0.1 — The Map & Scout
+v0.1 — Lost
 
 Coordinate display blanks when lost (teleport events trigger this)
-Lost resolves on visiting any known landmark
-Scout companion slot (structural only — joins you, reveals unvisited PoIs on coordinate view)
-Scout acquisition deferred to gold epic
+Swamp and woods can teleport the player (lost mechanic)
+Lost resolves on visiting an orienting feature (signpost, farm)
+Mutually exclusive with combat ambush via single per-move event roll
+Run starts unoriented; starting tile is inert (no auto-orient)
 
-v0.2 — Towns
+v0.2 — Map & Scout
+
+Scout companion slot (structural only — joins you, reveals nearest unvisited orienting feature on coordinate view)
+Scout acquisition deferred to gold epic
+cell.visited tracking
+Simplified game-map button (4th left-panel slot). Open design questions:
+  - Render visited orienting features as: dots vs tiny 8×8 sprites vs letters (G/L/F/S/T)?
+  - Are signposts shown on the map?
+  - Under Scout, are gate and locksmith revealed (even though they don't orient)?
+
+v0.3 — Towns
 
 Town PoI (named, combined farm+camp+one action)
 Up to 4 contextual buttons (3 actions + leave)
 Town flavor text pool
 Structurally ready for gold transactions without implementing them yet
 
-v0.3 — Gold (mini-epic)
+v0.4 — Gold (mini-epic)
 
 Gold resource (display, earn from combat, carry limit TBD)
 Town sells food and troops for gold
 Keyholder price becomes gold instead of food
 Scout hired in town for gold
 
-v0.4 — Second Gate
+v0.5 — Second Gate
 
 Silver keyholder, silver gate, silver border
 Map size step up (10×10)
@@ -65,6 +76,17 @@ This file captures ideas discussed during design, kept out of the current phase'
 - Event spawn probabilities influenced by player stats and time-since-visit (e.g., when poor, more likely to find a chest).
 - Tavern where you pay for rumors explaining game mechanics.
 - Collectibles to find.
+
+## Swamp opportunity (deferred from v0.1)
+
+Swamps in v0.1 are pure-risk (lost only). If playtest shows swamps are universally avoided:
+
+- Strange-fish food find (1–3 food, RNG-amount, mutually exclusive with the lost roll). Same shape as combat reward; "probabilistic flavor" pattern is already established (deterministic flavor picker + RNG amount).
+- Or: under future Scout (deferred companions), swamps cost less food when Scout slot is filled (Cartographer-style effect).
+
+## Woods fog tuning (potential follow-up to v0.1)
+
+If the lost mechanic feels good on swamp+woods, no further work. If swamp-only feels more lore-pure, woods-lost can be split off as a future toggle (`WOODS_LOST_PERCENT = 0`).
 
 ## Prototype follow-ups
 

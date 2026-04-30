@@ -4,13 +4,13 @@ import {
   ACTION_FIGHT,
   ACTION_MOVE,
   ACTION_RETURN,
-  COMBAT_AMBUSH_PERCENT,
   COMBAT_ENCOUNTER_LINES,
   COMBAT_REWARD_MAX,
   COMBAT_REWARD_MIN,
   ENABLE_ANIMATIONS,
   HENGE_ENCOUNTER_LINE,
   INITIAL_FOOD,
+  WOODS_AMBUSH_PERCENT,
 } from '../../src/core/constants'
 import { randInt, seedToRngState, xorshift32 } from '../../src/core/prng'
 import type { EnemyArmyDeltaAnim, FoodDeltaAnim, State, World } from '../../src/core/types'
@@ -38,7 +38,7 @@ function makeState(w: World): State {
   return {
     world: w,
     player: { position: { x: 1, y: 0 } },
-    run: { stepCount: 0, hasWon: false, isGameOver: false },
+    run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false },
     resources: { food: INITIAL_FOOD, armySize: 5, hasBronzeKey: false },
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
@@ -54,7 +54,7 @@ function ambushHash(seed: number, stepCount: number, cellId: number) {
 function findSeedForAmbush(cellId: number): number {
   for (let seed = 1; seed < 10000; seed++) {
     const h = ambushHash(seed, 1, cellId)
-    if ((h % 100) < COMBAT_AMBUSH_PERCENT) return seed
+    if ((h % 100) < WOODS_AMBUSH_PERCENT) return seed
   }
   throw new Error('could not find ambush seed')
 }
@@ -97,7 +97,7 @@ describe('combat reducer (v0.0.7)', () => {
     // Find a seed where ambush does not trigger for stepCount=1 on this cellId.
     for (; seed < 10000; seed++) {
       const h = ambushHash(seed, 1, cellId)
-      if ((h % 100) >= COMBAT_AMBUSH_PERCENT) break
+      if ((h % 100) >= WOODS_AMBUSH_PERCENT) break
     }
     const w = makeWorld({ seed, dstKind: 'woods', rngState: 777 })
     const s = makeState(w)

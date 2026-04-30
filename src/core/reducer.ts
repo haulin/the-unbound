@@ -7,7 +7,6 @@ import {
   ACTION_SHOW_GOAL,
   ACTION_TICK,
   ACTION_TOGGLE_MINIMAP,
-  COMBAT_AMBUSH_PERCENT,
   COMBAT_REWARD_MAX,
   COMBAT_REWARD_MIN,
   ENABLE_ANIMATIONS,
@@ -19,11 +18,15 @@ import {
   HENGE_ENCOUNTER_LINE,
   INITIAL_ARMY_SIZE,
   INITIAL_FOOD,
+  LOST_FLAVOR_LINES,
   MOVE_SLIDE_FRAMES,
   SPR_BUTTON_GOAL,
   enterFoodCostForKind,
 } from './constants'
-import { cellIdForPos, pickCombatEncounterLine, pickCombatExitLine, resolveFightRound, shouldStartAmbush, spawnEnemyArmy } from './combat'
+import { cellIdForPos, pickCombatEncounterLine, pickCombatExitLine, resolveFightRound, spawnEnemyArmy } from './combat'
+import { rollTileEvent } from './tileEvents'
+import { pickTeleportDestination } from './teleport'
+import { pickDeterministicLine } from './tiles/poiUtils'
 import { generateWorld } from './world'
 import { setCellAt } from './cells'
 import { randInt } from './prng'
@@ -215,6 +218,7 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
   if (outcome.foodDeltas && outcome.foodDeltas.length) foodDeltas.push(...outcome.foodDeltas)
   if (outcome.armyDeltas && outcome.armyDeltas.length) armyDeltas.push(...outcome.armyDeltas)
   const nextHasWon = prevState.run.hasWon || !!outcome.hasWon
+  const nextKnowsPosition = prevState.run.knowsPosition || !!outcome.knowsPosition
 
   const isGameOver = nextResources.armySize <= 0
   let message = outcome.message
@@ -224,21 +228,12 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
 
   let nextEncounter: Encounter | null = prevState.encounter
   let didStartCombat = false
+  let teleported = false
+  let landingPos = nextPos
   if (!isGameOver && !prevState.encounter) {
     const destCell = nextWorld.cells[nextPos.y]![nextPos.x]!
     const destKind = destCell.kind
     const destCellId = cellIdForPos(nextWorld, nextPos)
-
-    const isGuaranteed = destKind === 'henge'
-    const isAmbushTerrain = destKind === 'woods' || destKind === 'mountain'
-    const ambush =
-      isAmbushTerrain &&
-      shouldStartAmbush({
-        seed: nextWorld.seed,
-        stepCount: nextStepCount,
-        cellId: destCellId,
-        percent: COMBAT_AMBUSH_PERCENT,
-      })
 
     let hengeReady = true
     if (destKind === 'henge') {
@@ -247,10 +242,18 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
       hengeReady = nextStepCount >= readyAt
     }
 
+    const event = rollTileEvent({
+      seed: nextWorld.seed,
+      stepCount: nextStepCount,
+      cellId: destCellId,
+      kind: destKind,
+      hengeReady,
+    })
+
     // Capture the tile message before we override it with encounter flavor (we want to restore this on victory/return).
     const preEncounterMessage = message
 
-    if (hengeReady && (isGuaranteed || ambush)) {
+    if (event && event.kind === 'fight') {
       const spawned = spawnEnemyArmy({ rngState: nextWorld.rngState, playerArmy: nextResources.armySize })
       nextWorld = { ...nextWorld, rngState: spawned.rngState }
       nextEncounter = {
@@ -275,6 +278,18 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
           ? HENGE_ENCOUNTER_LINE
           : pickCombatEncounterLine({ seed: nextWorld.seed, stepCount: nextStepCount, cellId: destCellId })
     }
+
+    if (event && event.kind === 'lost') {
+      const td = pickTeleportDestination({
+        world: nextWorld,
+        origin: nextPos,
+        rngState: nextWorld.rngState,
+      })
+      nextWorld = { ...nextWorld, rngState: td.rngState }
+      landingPos = td.destination
+      message = pickDeterministicLine(LOST_FLAVOR_LINES, nextWorld.seed, destCellId, nextStepCount)
+      teleported = true
+    }
   }
 
   const prevUi = getUi(prevState.ui)
@@ -285,13 +300,17 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
     anim: prevUi.anim,
   }
 
+  const finalPlayerPos = teleported ? landingPos : nextPos
+  const finalKnowsPosition = teleported ? false : nextKnowsPosition
+
   const baseState: State = {
     world: nextWorld,
-    player: { position: nextPos },
+    player: { position: finalPlayerPos },
     run: {
       stepCount: nextStepCount,
       hasWon: nextHasWon,
       isGameOver,
+      knowsPosition: finalKnowsPosition,
     },
     resources: nextResources,
     encounter: nextEncounter,
@@ -335,19 +354,31 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
       params: { from: 'overworld', to: 'combat' },
     })
   }
+  if (teleported) {
+    uiWith = enqueueAnim(uiWith, {
+      kind: 'gridTransition',
+      startFrame,
+      durationFrames: gridTransitionDurationFrames(),
+      blocksInput: true,
+      params: { from: 'blank', to: 'overworld' },
+    })
+  } else {
+    uiWith = enqueueAnim(uiWith, {
+      kind: 'moveSlide',
+      startFrame,
+      durationFrames: MOVE_SLIDE_FRAMES,
+      blocksInput: true,
+      params: { fromPos: { x: prevPos.x, y: prevPos.y }, toPos: { x: nextPos.x, y: nextPos.y }, dx, dy },
+    })
+  }
+
   return {
     world: baseState.world,
     player: baseState.player,
     run: baseState.run,
     resources: baseState.resources,
     encounter: baseState.encounter,
-    ui: enqueueAnim(uiWith, {
-      kind: 'moveSlide',
-      startFrame,
-      durationFrames: MOVE_SLIDE_FRAMES,
-      blocksInput: true,
-      params: { fromPos: { x: prevPos.x, y: prevPos.y }, toPos: { x: nextPos.x, y: nextPos.y }, dx, dy },
-    }),
+    ui: uiWith,
   }
 }
 
@@ -389,7 +420,7 @@ export function processAction(prevState: State | null, action: Action): State | 
     return {
       world,
       player: { position: { x: playerPos.x, y: playerPos.y } },
-      run: { stepCount: 0, hasWon, isGameOver: false },
+      run: { stepCount: 0, hasWon, isGameOver: false, knowsPosition: false },
       resources: {
         food: INITIAL_FOOD,
         armySize: INITIAL_ARMY_SIZE,

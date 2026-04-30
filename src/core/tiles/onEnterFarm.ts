@@ -20,6 +20,7 @@ export const onEnterFarm: TileEnterHandler = ({ cell, world, pos, stepCount, res
   if (stepCount < readyAt) {
     return {
       message: `${farmName} Farm\n${pickDeterministicLine(FARM_REVISIT_LINES, world.seed, farmCell.id, stepCount)}`,
+      knowsPosition: true,
     }
   }
 
@@ -43,6 +44,7 @@ export const onEnterFarm: TileEnterHandler = ({ cell, world, pos, stepCount, res
     },
     foodDeltas: [gain],
     message: `${farmName} Farm\n${harvestLine}`,
+    knowsPosition: true,
   }
 }
 

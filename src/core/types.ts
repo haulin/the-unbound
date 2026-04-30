@@ -88,7 +88,7 @@ export type UiAnim = { nextId: number; active: Anim[] }
 export type Ui = { message: string; leftPanel: LeftPanel; clock: UiClock; anim: UiAnim }
 
 export type Player = { position: Vec2 }
-export type Run = { stepCount: number; hasWon: boolean; isGameOver: boolean }
+export type Run = { stepCount: number; hasWon: boolean; isGameOver: boolean; knowsPosition: boolean }
 
 export type Resources = {
   food: number

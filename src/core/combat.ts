@@ -5,18 +5,6 @@ export function cellIdForPos(world: { width: number }, pos: { x: number; y: numb
   return pos.y * world.width + pos.x
 }
 
-export function shouldStartAmbush(opts: {
-  seed: number
-  stepCount: number
-  cellId: number
-  percent: number
-}): boolean {
-  const percent = opts.percent
-  if (!Number.isFinite(percent) || percent <= 0) return false
-  const h = hashSeedStepCell({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId })
-  return (h % 100) < percent
-}
-
 export function encounterFlavorIndex(opts: { seed: number; stepCount: number; cellId: number }): number {
   const h = hashSeedStepCell({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId })
   return pickIndex(h, COMBAT_ENCOUNTER_LINES.length)

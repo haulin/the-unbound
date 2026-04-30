@@ -15,6 +15,7 @@ export type TileEnterOutcome = {
   foodDeltas?: number[]
   armyDeltas?: number[]
   hasWon?: boolean
+  knowsPosition?: boolean
 }
 
 export type TileEnterHandler = (ctx: TileEnterCtx) => TileEnterOutcome

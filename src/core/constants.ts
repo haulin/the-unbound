@@ -68,14 +68,29 @@ export const LOCKSMITH_NO_FOOD_LINES = [
   "Others have paid for this before you. Most of them got further than you'd think."
 ]
 
-export const TERRAIN_MESSAGE_BY_TILE_ID: Record<number, string> = {
-  2: 'The grass bends with your passing.', // grass
-  4: 'The road here remembers other feet.', // road / gravel
-  6: 'The peaks ahead do not look closer. Stone and thin air. Your supplies will feel it.', // mountains
-  10: 'The water is still. Something moves beneath.', // lake
-  12: 'Crossing the bog is harder than it looks. You\'ll need to eat well tonight.', // swamp
-  14: "A path that isn't quite a path.", // woods
-  34: 'The light here bends wrong.', // rainbow's end
+// Per-terrain lore pools. One line for inert terrains; small pools for event-bearing
+// terrains so repeated visits hint at the mechanic (woods → ambush + lost; mountain →
+// ambush; swamp → lost). The picker is deterministic per (seed, cellId, stepCount).
+export const TERRAIN_LORE_BY_KIND: Record<TerrainKind, readonly string[]> = {
+  grass: ['The grass bends with your passing.'],
+  road: ['The road here remembers other feet.'],
+  lake: ['The water is still. Something moves beneath.'],
+  rainbow: ['The light here bends wrong.'],
+  mountain: [
+    'The peaks ahead do not look closer. Stone and thin air. Your supplies will feel it.',
+    'Narrow passes. Notorious for ambushes.',
+    'The wind here forgets to carry sound.',
+  ],
+  swamp: [
+    "Crossing the bog is harder than it looks. You'll need to eat well tonight.",
+    'Mist clings. Landmarks lie. You hope you remember the way back.',
+    'The reeds whisper. They have heard worse.',
+  ],
+  woods: [
+    "A path that isn't quite a path.",
+    'Something moves between the trunks. You move faster.',
+    'The trees rearrange themselves while you blink. You hope it is the wind.',
+  ],
 }
 
 export const INITIAL_FOOD = 15
@@ -92,18 +107,14 @@ export const FARM_COOLDOWN_MOVES = 3
 export const TERRAIN_KINDS = ['grass', 'road', 'mountain', 'lake', 'swamp', 'woods', 'rainbow'] as const satisfies readonly TerrainKind[]
 export const FEATURE_KINDS = ['gate', 'gateOpen', 'locksmith', 'signpost', 'farm', 'camp', 'henge'] as const satisfies readonly FeatureKind[]
 
-export const TERRAIN: Record<TerrainKind, { spriteId: number; enterFoodCost: number; message: string }> = {
-  grass: { spriteId: 2, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[2] || '' },
-  road: { spriteId: 4, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[4] || '' },
-  mountain: {
-    spriteId: TILE_MOUNTAIN,
-    enterFoodCost: FOOD_COST_MOUNTAIN,
-    message: TERRAIN_MESSAGE_BY_TILE_ID[TILE_MOUNTAIN] || '',
-  },
-  lake: { spriteId: 10, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[10] || '' },
-  swamp: { spriteId: TILE_SWAMP, enterFoodCost: FOOD_COST_SWAMP, message: TERRAIN_MESSAGE_BY_TILE_ID[TILE_SWAMP] || '' },
-  woods: { spriteId: 14, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[14] || '' },
-  rainbow: { spriteId: 34, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[34] || '' },
+export const TERRAIN: Record<TerrainKind, { spriteId: number; enterFoodCost: number }> = {
+  grass: { spriteId: 2, enterFoodCost: FOOD_COST_DEFAULT },
+  road: { spriteId: 4, enterFoodCost: FOOD_COST_DEFAULT },
+  mountain: { spriteId: TILE_MOUNTAIN, enterFoodCost: FOOD_COST_MOUNTAIN },
+  lake: { spriteId: 10, enterFoodCost: FOOD_COST_DEFAULT },
+  swamp: { spriteId: TILE_SWAMP, enterFoodCost: FOOD_COST_SWAMP },
+  woods: { spriteId: 14, enterFoodCost: FOOD_COST_DEFAULT },
+  rainbow: { spriteId: 34, enterFoodCost: FOOD_COST_DEFAULT },
 }
 
 export const FEATURES: Record<FeatureKind, { spriteId: number; enterFoodCost: number }> & {
@@ -172,7 +183,7 @@ export function enterFoodCostForKind(kind: CellKind): number {
   }
 }
 
-export function terrainMessageForKind(kind: CellKind): string {
+export function terrainLoreLinesForKind(kind: CellKind): readonly string[] {
   switch (kind) {
     case 'grass':
     case 'road':
@@ -181,7 +192,7 @@ export function terrainMessageForKind(kind: CellKind): string {
     case 'swamp':
     case 'woods':
     case 'rainbow':
-      return TERRAIN[kind].message
+      return TERRAIN_LORE_BY_KIND[kind]
     case 'gate':
     case 'gateOpen':
     case 'locksmith':
@@ -189,7 +200,7 @@ export function terrainMessageForKind(kind: CellKind): string {
     case 'farm':
     case 'camp':
     case 'henge':
-      return ''
+      return []
   }
 }
 
@@ -274,7 +285,20 @@ export const GAME_OVER_LINES = [
   'Alone now. The road goes on without you.',
 ] as const
 
-export const COMBAT_AMBUSH_PERCENT = 20
+// v0.1 — Lost (per-tile event roll + teleport)
+export const WOODS_AMBUSH_PERCENT = 15
+export const WOODS_LOST_PERCENT = 10
+export const MOUNTAIN_AMBUSH_PERCENT = 25
+export const SWAMP_LOST_PERCENT = 20
+export const TELEPORT_MIN_DISTANCE = 4
+export const LOST_COORD_LABEL = '??'
+export const LOST_FLAVOR_LINES = [
+  'The road loops. You do not.',
+  'The horizon reads the same in every direction.',
+  'Further than expected. Not where you were.',
+  'Lost between one step and the next.',
+] as const
+
 export const COMBAT_REWARD_MIN = 5
 export const COMBAT_REWARD_MAX = 15
 export const GRID_TRANSITION_STEP_FRAMES = 5

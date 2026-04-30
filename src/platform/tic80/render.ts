@@ -4,6 +4,7 @@ import {
   FOOD_SPRITE_ID,
   FOOD_WARNING_THRESHOLD,
   LORE_MAX_CHARS_PER_LINE,
+  LOST_COORD_LABEL,
 } from '../../core/constants'
 import { getSpriteIdAt } from '../../core/world'
 import {
@@ -73,6 +74,10 @@ function formatA1(position: { x: number; y: number }) {
   const col = String.fromCharCode('A'.charCodeAt(0) + position.x)
   const row = String(position.y + 1)
   return col + row
+}
+
+function formatPositionLabel(s: State): string {
+  return s.run.knowsPosition ? formatA1(s.player.position) : LOST_COORD_LABEL
 }
 
 function wrapText(text: string, maxChars: number) {
@@ -150,13 +155,15 @@ function drawLeftPanel(s: State) {
   const illSize = 16 * UI.UI_ILLUSTRATION_SCALE
   const illX = UI.UI_LEFT_PANEL_PADDING
   const illY = UI.UI_LEFT_PANEL_PADDING
-  if (s.run.isGameOver) {
-    // Game over: use a fixed tombstone illustration.
-    drawIllustrationWithTextureOverlay(40, illX, illY)
-  } else if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
+  // User-driven panel toggles (minimap, goal-sprite focus) win over the AUTO-mode
+  // defaults (tombstone on game over, combat plate during combat, tile preview otherwise).
+  if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
     drawMinimap(s)
   } else if (leftPanel.kind === LEFT_PANEL_KIND_SPRITE) {
     drawIllustrationWithTextureOverlay(leftPanel.spriteId, illX, illY)
+  } else if (s.run.isGameOver) {
+    // Game over: use a fixed tombstone illustration.
+    drawIllustrationWithTextureOverlay(40, illX, illY)
   } else {
     if (!isCombat) {
       drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
@@ -249,7 +256,7 @@ function drawLeftPanel(s: State) {
 
   // Position (arguably important, keep it)
   spr(UI.UI_SPR_STATUS_POS, statusX, posY, -1)
-  print(formatA1(pos), statusX + statusIconSize + statusIconGap, posY + textOffsetY, UI.UI_COLOR_TEXT)
+  print(formatPositionLabel(s), statusX + statusIconSize + statusIconGap, posY + textOffsetY, UI.UI_COLOR_TEXT)
 
   // Steps
   spr(UI.UI_SPR_STATUS_STEPS, statusX, stepsY, -1)

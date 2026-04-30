@@ -1,6 +1,6 @@
-// title:  The Unbound (prototype 0.0.9)
+// title:  The Unbound (prototype 0.1.0)
 // author: haulin
-// desc:   Prototype 0.0.9 toward the North Star
+// desc:   Prototype 0.1.0 toward the North Star
 // script: js
 // input:  mouse
 
@@ -61,21 +61,26 @@
     "Come back with enough. The fire needs feeding first.",
     "Others have paid for this before you. Most of them got further than you'd think."
   ];
-  var TERRAIN_MESSAGE_BY_TILE_ID = {
-    2: "The grass bends with your passing.",
-    // grass
-    4: "The road here remembers other feet.",
-    // road / gravel
-    6: "The peaks ahead do not look closer. Stone and thin air. Your supplies will feel it.",
-    // mountains
-    10: "The water is still. Something moves beneath.",
-    // lake
-    12: "Crossing the bog is harder than it looks. You'll need to eat well tonight.",
-    // swamp
-    14: "A path that isn't quite a path.",
-    // woods
-    34: "The light here bends wrong."
-    // rainbow's end
+  var TERRAIN_LORE_BY_KIND = {
+    grass: ["The grass bends with your passing."],
+    road: ["The road here remembers other feet."],
+    lake: ["The water is still. Something moves beneath."],
+    rainbow: ["The light here bends wrong."],
+    mountain: [
+      "The peaks ahead do not look closer. Stone and thin air. Your supplies will feel it.",
+      "Narrow passes. Notorious for ambushes.",
+      "The wind here forgets to carry sound."
+    ],
+    swamp: [
+      "Crossing the bog is harder than it looks. You'll need to eat well tonight.",
+      "Mist clings. Landmarks lie. You hope you remember the way back.",
+      "The reeds whisper. They have heard worse."
+    ],
+    woods: [
+      "A path that isn't quite a path.",
+      "Something moves between the trunks. You move faster.",
+      "The trees rearrange themselves while you blink. You hope it is the wind."
+    ]
   };
   var INITIAL_FOOD = 15;
   var FOOD_COST_DEFAULT = 1;
@@ -85,18 +90,15 @@
   var FARM_COUNT = 3;
   var FARM_COOLDOWN_MOVES = 3;
   var TERRAIN_KINDS = ["grass", "road", "mountain", "lake", "swamp", "woods", "rainbow"];
+  var FEATURE_KINDS = ["gate", "gateOpen", "locksmith", "signpost", "farm", "camp", "henge"];
   var TERRAIN = {
-    grass: { spriteId: 2, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[2] || "" },
-    road: { spriteId: 4, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[4] || "" },
-    mountain: {
-      spriteId: TILE_MOUNTAIN,
-      enterFoodCost: FOOD_COST_MOUNTAIN,
-      message: TERRAIN_MESSAGE_BY_TILE_ID[TILE_MOUNTAIN] || ""
-    },
-    lake: { spriteId: 10, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[10] || "" },
-    swamp: { spriteId: TILE_SWAMP, enterFoodCost: FOOD_COST_SWAMP, message: TERRAIN_MESSAGE_BY_TILE_ID[TILE_SWAMP] || "" },
-    woods: { spriteId: 14, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[14] || "" },
-    rainbow: { spriteId: 34, enterFoodCost: FOOD_COST_DEFAULT, message: TERRAIN_MESSAGE_BY_TILE_ID[34] || "" }
+    grass: { spriteId: 2, enterFoodCost: FOOD_COST_DEFAULT },
+    road: { spriteId: 4, enterFoodCost: FOOD_COST_DEFAULT },
+    mountain: { spriteId: TILE_MOUNTAIN, enterFoodCost: FOOD_COST_MOUNTAIN },
+    lake: { spriteId: 10, enterFoodCost: FOOD_COST_DEFAULT },
+    swamp: { spriteId: TILE_SWAMP, enterFoodCost: FOOD_COST_SWAMP },
+    woods: { spriteId: 14, enterFoodCost: FOOD_COST_DEFAULT },
+    rainbow: { spriteId: 34, enterFoodCost: FOOD_COST_DEFAULT }
   };
   var FEATURES = {
     gate: { spriteId: TILE_GATE, enterFoodCost: FOOD_COST_DEFAULT },
@@ -153,7 +155,7 @@
         return FEATURES[kind].enterFoodCost;
     }
   }
-  function terrainMessageForKind(kind) {
+  function terrainLoreLinesForKind(kind) {
     switch (kind) {
       case "grass":
       case "road":
@@ -162,7 +164,7 @@
       case "swamp":
       case "woods":
       case "rainbow":
-        return TERRAIN[kind].message;
+        return TERRAIN_LORE_BY_KIND[kind];
       case "gate":
       case "gateOpen":
       case "locksmith":
@@ -170,7 +172,7 @@
       case "farm":
       case "camp":
       case "henge":
-        return "";
+        return [];
     }
   }
   var FOOD_SPRITE_ID = 98;
@@ -240,7 +242,18 @@
     "You came with an army. You leave with nothing.\nThe gate remains closed.",
     "Alone now. The road goes on without you."
   ];
-  var COMBAT_AMBUSH_PERCENT = 20;
+  var WOODS_AMBUSH_PERCENT = 15;
+  var WOODS_LOST_PERCENT = 10;
+  var MOUNTAIN_AMBUSH_PERCENT = 25;
+  var SWAMP_LOST_PERCENT = 20;
+  var TELEPORT_MIN_DISTANCE = 4;
+  var LOST_COORD_LABEL = "??";
+  var LOST_FLAVOR_LINES = [
+    "The road loops. You do not.",
+    "The horizon reads the same in every direction.",
+    "Further than expected. Not where you were.",
+    "Lost between one step and the next."
+  ];
   var COMBAT_REWARD_MIN = 5;
   var COMBAT_REWARD_MAX = 15;
   var GRID_TRANSITION_STEP_FRAMES = 5;
@@ -318,12 +331,6 @@
   function cellIdForPos(world, pos) {
     return pos.y * world.width + pos.x;
   }
-  function shouldStartAmbush(opts) {
-    const percent = opts.percent;
-    if (!Number.isFinite(percent) || percent <= 0) return false;
-    const h = hashSeedStepCell({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId });
-    return h % 100 < percent;
-  }
   function encounterFlavorIndex(opts) {
     const h = hashSeedStepCell({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId });
     return pickIndex(h, COMBAT_ENCOUNTER_LINES.length);
@@ -369,6 +376,33 @@
     };
   }
 
+  // src/core/tileEvents.ts
+  function rollTileEvent(args) {
+    const { seed, stepCount, cellId: cellId2, kind, hengeReady } = args;
+    if (kind === "henge") {
+      return hengeReady ? { kind: "fight", source: "henge" } : null;
+    }
+    let ambushPct = 0;
+    let lostPct = 0;
+    if (kind === "woods") {
+      ambushPct = WOODS_AMBUSH_PERCENT;
+      lostPct = WOODS_LOST_PERCENT;
+    } else if (kind === "mountain") {
+      ambushPct = MOUNTAIN_AMBUSH_PERCENT;
+      lostPct = 0;
+    } else if (kind === "swamp") {
+      ambushPct = 0;
+      lostPct = SWAMP_LOST_PERCENT;
+    } else {
+      return null;
+    }
+    if (ambushPct + lostPct === 0) return null;
+    const p = hashSeedStepCell({ seed, stepCount, cellId: cellId2 }) % 100;
+    if (p < ambushPct) return { kind: "fight", source: kind };
+    if (p < ambushPct + lostPct) return { kind: "lost", source: kind };
+    return null;
+  }
+
   // src/core/math.ts
   function wrapIndex(i, size) {
     const r = i % size;
@@ -396,6 +430,48 @@
     if (dx < 0) s += "W";
     else if (dx > 0) s += "E";
     return s;
+  }
+
+  // src/core/teleport.ts
+  var FEATURE_KIND_SET = new Set(FEATURE_KINDS);
+  function isTerrain(kind) {
+    return !FEATURE_KIND_SET.has(kind);
+  }
+  function pickTeleportDestination(args) {
+    const { world, origin } = args;
+    let rngState = args.rngState;
+    const candidates = [];
+    let maxD = 0;
+    for (let y = 0; y < world.height; y++) {
+      const row = world.cells[y];
+      for (let x = 0; x < world.width; x++) {
+        const cell = row[x];
+        if (!isTerrain(cell.kind)) continue;
+        if (x === origin.x && y === origin.y) continue;
+        const dx = torusDelta(origin.x, x, world.width);
+        const dy = torusDelta(origin.y, y, world.height);
+        const d = manhattan(dx, dy);
+        candidates.push({ x, y, d });
+        if (d > maxD) maxD = d;
+      }
+    }
+    const target = Math.min(TELEPORT_MIN_DISTANCE, maxD);
+    const eligible = candidates.filter((c) => c.d >= target);
+    const pool = eligible.length > 0 ? eligible : candidates;
+    if (pool.length === 0) {
+      return { destination: origin, rngState };
+    }
+    const r = randInt(rngState, pool.length);
+    rngState = r.rngState;
+    const pick = pool[r.value];
+    return { destination: { x: pick.x, y: pick.y }, rngState };
+  }
+
+  // src/core/tiles/poiUtils.ts
+  function pickDeterministicLine(lines, seed, poiIndex, stepCount) {
+    if (!lines.length) return "";
+    const h = hashSeedStepCell({ seed, stepCount, cellId: poiIndex });
+    return pickFromPool(lines, h) || lines[0] || "";
   }
 
   // src/core/world.ts
@@ -609,13 +685,6 @@
     return { ...world, cells: nextCells };
   }
 
-  // src/core/tiles/poiUtils.ts
-  function pickDeterministicLine(lines, seed, poiIndex, stepCount) {
-    if (!lines.length) return "";
-    const h = hashSeedStepCell({ seed, stepCount, cellId: poiIndex });
-    return pickFromPool(lines, h) || lines[0] || "";
-  }
-
   // src/core/tiles/onEnterCamp.ts
   var onEnterCamp = ({ cell, world, pos, stepCount, resources }) => {
     if (cell.kind !== "camp") return { message: "" };
@@ -653,8 +722,8 @@ ${line}`
   };
 
   // src/core/tiles/onEnterDefaultTerrain.ts
-  var onEnterDefaultTerrain = ({ cell }) => ({
-    message: terrainMessageForKind(cell.kind)
+  var onEnterDefaultTerrain = ({ cell, world, pos, stepCount }) => ({
+    message: pickDeterministicLine(terrainLoreLinesForKind(cell.kind), world.seed, cellIdForPos(world, pos), stepCount)
   });
 
   // src/core/tiles/onEnterFarm.ts
@@ -667,7 +736,8 @@ ${line}`
     if (stepCount < readyAt) {
       return {
         message: `${farmName} Farm
-${pickDeterministicLine(FARM_REVISIT_LINES, world.seed, farmCell.id, stepCount)}`
+${pickDeterministicLine(FARM_REVISIT_LINES, world.seed, farmCell.id, stepCount)}`,
+        knowsPosition: true
       };
     }
     let rngState = world.rngState;
@@ -687,7 +757,8 @@ ${pickDeterministicLine(FARM_REVISIT_LINES, world.seed, farmCell.id, stepCount)}
       },
       foodDeltas: [gain],
       message: `${farmName} Farm
-${harvestLine}`
+${harvestLine}`,
+      knowsPosition: true
     };
   };
 
@@ -816,7 +887,8 @@ ${dir}, ${chosen.d} leagues away.`;
 
   // src/core/tiles/onEnterSignpost.ts
   var onEnterSignpost = ({ world, pos }) => ({
-    message: formatNearestPoiSignpostMessage(pos, world)
+    message: formatNearestPoiSignpostMessage(pos, world),
+    knowsPosition: true
   });
 
   // src/core/tiles/registry.ts
@@ -983,6 +1055,7 @@ ${dir}, ${chosen.d} leagues away.`;
     if (outcome.foodDeltas && outcome.foodDeltas.length) foodDeltas.push(...outcome.foodDeltas);
     if (outcome.armyDeltas && outcome.armyDeltas.length) armyDeltas.push(...outcome.armyDeltas);
     const nextHasWon = prevState.run.hasWon || !!outcome.hasWon;
+    const nextKnowsPosition = prevState.run.knowsPosition || !!outcome.knowsPosition;
     const isGameOver = nextResources.armySize <= 0;
     let message = outcome.message;
     if (isGameOver) {
@@ -990,26 +1063,27 @@ ${dir}, ${chosen.d} leagues away.`;
     }
     let nextEncounter = prevState.encounter;
     let didStartCombat = false;
+    let teleported = false;
+    let landingPos = nextPos;
     if (!isGameOver && !prevState.encounter) {
       const destCell = nextWorld.cells[nextPos.y][nextPos.x];
       const destKind = destCell.kind;
       const destCellId = cellIdForPos(nextWorld, nextPos);
-      const isGuaranteed = destKind === "henge";
-      const isAmbushTerrain = destKind === "woods" || destKind === "mountain";
-      const ambush = isAmbushTerrain && shouldStartAmbush({
-        seed: nextWorld.seed,
-        stepCount: nextStepCount,
-        cellId: destCellId,
-        percent: COMBAT_AMBUSH_PERCENT
-      });
       let hengeReady = true;
       if (destKind === "henge") {
         const hc = destCell;
         const readyAt = hc.nextReadyStep ?? 0;
         hengeReady = nextStepCount >= readyAt;
       }
+      const event = rollTileEvent({
+        seed: nextWorld.seed,
+        stepCount: nextStepCount,
+        cellId: destCellId,
+        kind: destKind,
+        hengeReady
+      });
       const preEncounterMessage = message;
-      if (hengeReady && (isGuaranteed || ambush)) {
+      if (event && event.kind === "fight") {
         const spawned = spawnEnemyArmy({ rngState: nextWorld.rngState, playerArmy: nextResources.armySize });
         nextWorld = { ...nextWorld, rngState: spawned.rngState };
         nextEncounter = {
@@ -1027,6 +1101,17 @@ ${dir}, ${chosen.d} leagues away.`;
         }
         message = destKind === "henge" ? HENGE_ENCOUNTER_LINE : pickCombatEncounterLine({ seed: nextWorld.seed, stepCount: nextStepCount, cellId: destCellId });
       }
+      if (event && event.kind === "lost") {
+        const td = pickTeleportDestination({
+          world: nextWorld,
+          origin: nextPos,
+          rngState: nextWorld.rngState
+        });
+        nextWorld = { ...nextWorld, rngState: td.rngState };
+        landingPos = td.destination;
+        message = pickDeterministicLine(LOST_FLAVOR_LINES, nextWorld.seed, destCellId, nextStepCount);
+        teleported = true;
+      }
     }
     const prevUi = getUi(prevState.ui);
     const baseUi = {
@@ -1035,13 +1120,16 @@ ${dir}, ${chosen.d} leagues away.`;
       clock: prevUi.clock,
       anim: prevUi.anim
     };
+    const finalPlayerPos = teleported ? landingPos : nextPos;
+    const finalKnowsPosition = teleported ? false : nextKnowsPosition;
     const baseState = {
       world: nextWorld,
-      player: { position: nextPos },
+      player: { position: finalPlayerPos },
       run: {
         stepCount: nextStepCount,
         hasWon: nextHasWon,
-        isGameOver
+        isGameOver,
+        knowsPosition: finalKnowsPosition
       },
       resources: nextResources,
       encounter: nextEncounter,
@@ -1082,19 +1170,30 @@ ${dir}, ${chosen.d} leagues away.`;
         params: { from: "overworld", to: "combat" }
       });
     }
+    if (teleported) {
+      uiWith = enqueueAnim(uiWith, {
+        kind: "gridTransition",
+        startFrame,
+        durationFrames: gridTransitionDurationFrames(),
+        blocksInput: true,
+        params: { from: "blank", to: "overworld" }
+      });
+    } else {
+      uiWith = enqueueAnim(uiWith, {
+        kind: "moveSlide",
+        startFrame,
+        durationFrames: MOVE_SLIDE_FRAMES,
+        blocksInput: true,
+        params: { fromPos: { x: prevPos.x, y: prevPos.y }, toPos: { x: nextPos.x, y: nextPos.y }, dx, dy }
+      });
+    }
     return {
       world: baseState.world,
       player: baseState.player,
       run: baseState.run,
       resources: baseState.resources,
       encounter: baseState.encounter,
-      ui: enqueueAnim(uiWith, {
-        kind: "moveSlide",
-        startFrame,
-        durationFrames: MOVE_SLIDE_FRAMES,
-        blocksInput: true,
-        params: { fromPos: { x: prevPos.x, y: prevPos.y }, toPos: { x: nextPos.x, y: nextPos.y }, dx, dy }
-      })
+      ui: uiWith
     };
   }
   function reduceRestart(s) {
@@ -1127,7 +1226,7 @@ ${dir}, ${chosen.d} leagues away.`;
       return {
         world,
         player: { position: { x: playerPos.x, y: playerPos.y } },
-        run: { stepCount: 0, hasWon, isGameOver: false },
+        run: { stepCount: 0, hasWon, isGameOver: false, knowsPosition: false },
         resources: {
           food: INITIAL_FOOD,
           armySize: INITIAL_ARMY_SIZE,
@@ -1781,6 +1880,9 @@ ${dir}, ${chosen.d} leagues away.`;
     const row = String(position.y + 1);
     return col + row;
   }
+  function formatPositionLabel(s) {
+    return s.run.knowsPosition ? formatA1(s.player.position) : LOST_COORD_LABEL;
+  }
   function wrapText(text, maxChars) {
     const paragraphs = String(text || "").split("\n");
     const out = [];
@@ -1837,12 +1939,12 @@ ${dir}, ${chosen.d} leagues away.`;
     const illSize = 16 * UI_ILLUSTRATION_SCALE;
     const illX = UI_LEFT_PANEL_PADDING;
     const illY = UI_LEFT_PANEL_PADDING;
-    if (s.run.isGameOver) {
-      drawIllustrationWithTextureOverlay(40, illX, illY);
-    } else if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
+    if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
       drawMinimap(s);
     } else if (leftPanel.kind === LEFT_PANEL_KIND_SPRITE) {
       drawIllustrationWithTextureOverlay(leftPanel.spriteId, illX, illY);
+    } else if (s.run.isGameOver) {
+      drawIllustrationWithTextureOverlay(40, illX, illY);
     } else {
       if (!isCombat) {
         drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
@@ -1915,7 +2017,7 @@ ${dir}, ${chosen.d} leagues away.`;
     spr(UI_SPR_STATUS_SEED, statusX, seedY, -1);
     print(`${s.world.seed}`, statusX + statusIconSize + statusIconGap, seedY + textOffsetY, UI_COLOR_TEXT);
     spr(UI_SPR_STATUS_POS, statusX, posY, -1);
-    print(formatA1(pos), statusX + statusIconSize + statusIconGap, posY + textOffsetY, UI_COLOR_TEXT);
+    print(formatPositionLabel(s), statusX + statusIconSize + statusIconGap, posY + textOffsetY, UI_COLOR_TEXT);
     spr(UI_SPR_STATUS_STEPS, statusX, stepsY, -1);
     print(`${s.run.stepCount}`, statusX + statusIconSize + statusIconGap, stepsY + textOffsetY, UI_COLOR_TEXT);
     {
@@ -2066,9 +2168,9 @@ ${dir}, ${chosen.d} leagues away.`;
   globalThis.TIC = TIC;
 })();
 
-// title:  The Unbound (prototype 0.0.9)
+// title:  The Unbound (prototype 0.1.0)
 // author: haulin
-// desc:   Prototype 0.0.9 toward the North Star
+// desc:   Prototype 0.1.0 toward the North Star
 // script: js
 // input:  mouse
 
