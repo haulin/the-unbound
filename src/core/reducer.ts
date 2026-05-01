@@ -6,6 +6,7 @@ import {
   ACTION_RESTART,
   ACTION_SHOW_GOAL,
   ACTION_TICK,
+  ACTION_TOGGLE_MAP,
   ACTION_TOGGLE_MINIMAP,
   COMBAT_REWARD_MAX,
   COMBAT_REWARD_MIN,
@@ -19,10 +20,12 @@ import {
   INITIAL_ARMY_SIZE,
   INITIAL_FOOD,
   LOST_FLAVOR_LINES,
+  MAP_HINT_MESSAGE,
   MOVE_SLIDE_FRAMES,
   SPR_BUTTON_GOAL,
   enterFoodCostForKind,
 } from './constants'
+import { reduceCampAction } from './camp'
 import { cellIdForPos, pickCombatEncounterLine, pickCombatExitLine, resolveFightRound, spawnEnemyArmy } from './combat'
 import { rollTileEvent } from './tileEvents'
 import { pickTeleportDestination } from './teleport'
@@ -33,6 +36,7 @@ import { randInt } from './prng'
 import { getOnEnterHandler } from './tiles/registry'
 import {
   LEFT_PANEL_KIND_AUTO,
+  LEFT_PANEL_KIND_MAP,
   LEFT_PANEL_KIND_MINIMAP,
   LEFT_PANEL_KIND_SPRITE,
   type Action,
@@ -44,8 +48,11 @@ import {
   type Cell,
   type Encounter,
   type HengeCell,
+  type RunPathStep,
+  type Vec2,
   type World,
 } from './types'
+import { enqueueAnim } from './uiAnim'
 
 export function getLeftPanel(ui: Ui): LeftPanel {
   return ui.leftPanel
@@ -98,18 +105,6 @@ function gridTransitionDurationFrames(): number {
   return Math.max(1, Math.trunc(GRID_TRANSITION_STEP_FRAMES)) * 5
 }
 
-function enqueueAnim(ui: Ui, anim: Omit<Anim, 'id'>): Ui {
-  const id = Math.max(1, Math.trunc(ui.anim.nextId))
-  const a = { id, ...anim } as Anim
-  const nextActive = ui.anim.active.concat([a])
-  return {
-    message: ui.message,
-    leftPanel: ui.leftPanel,
-    clock: ui.clock,
-    anim: { nextId: id + 1, active: nextActive },
-  }
-}
-
 function clearSpriteFocusIfAny(ui: Ui): LeftPanel {
   const lp = getLeftPanel(ui)
   if (lp.kind === LEFT_PANEL_KIND_SPRITE) return { kind: LEFT_PANEL_KIND_AUTO }
@@ -117,8 +112,8 @@ function clearSpriteFocusIfAny(ui: Ui): LeftPanel {
 }
 
 function normalizeResources(_world: World, raw: Resources | null | undefined): Resources {
-  if (!raw) return { food: INITIAL_FOOD, armySize: INITIAL_ARMY_SIZE, hasBronzeKey: false }
-  return { food: raw.food, armySize: raw.armySize, hasBronzeKey: !!raw.hasBronzeKey }
+  if (!raw) return { food: INITIAL_FOOD, armySize: INITIAL_ARMY_SIZE, hasBronzeKey: false, hasScout: false }
+  return { food: raw.food, armySize: raw.armySize, hasBronzeKey: !!raw.hasBronzeKey, hasScout: !!raw.hasScout }
 }
 
 function gameOverMessage(seed: number, stepCount: number): string {
@@ -158,6 +153,24 @@ function reduceGoal(s: State): State {
 function reduceToggleMinimap(s: State): State {
   const prevUi = getUi(s.ui)
   const prevLeftPanel = getLeftPanel(prevUi)
+
+  if (prevLeftPanel.kind === LEFT_PANEL_KIND_MAP) {
+    const nextMessage = prevUi.message === MAP_HINT_MESSAGE ? prevLeftPanel.restoreMessage : prevUi.message
+    return {
+      world: s.world,
+      player: s.player,
+      run: s.run,
+      resources: s.resources,
+      encounter: s.encounter,
+      ui: {
+        clock: prevUi.clock,
+        anim: prevUi.anim,
+        message: nextMessage,
+        leftPanel: { kind: LEFT_PANEL_KIND_MINIMAP },
+      },
+    }
+  }
+
   const nextLeftPanel: LeftPanel =
     prevLeftPanel.kind === LEFT_PANEL_KIND_MINIMAP ? { kind: LEFT_PANEL_KIND_AUTO } : { kind: LEFT_PANEL_KIND_MINIMAP }
   return {
@@ -175,9 +188,46 @@ function reduceToggleMinimap(s: State): State {
   }
 }
 
+function reduceToggleMap(s: State): State {
+  const prevUi = getUi(s.ui)
+  const prevLeftPanel = getLeftPanel(prevUi)
+
+  // Close: restore prior panel + message (unless overwritten).
+  if (prevLeftPanel.kind === LEFT_PANEL_KIND_MAP) {
+    const restoreMessage = prevUi.message === MAP_HINT_MESSAGE ? prevLeftPanel.restoreMessage : prevUi.message
+    return {
+      world: s.world,
+      player: s.player,
+      run: s.run,
+      resources: s.resources,
+      encounter: s.encounter,
+      ui: {
+        clock: prevUi.clock,
+        anim: prevUi.anim,
+        message: restoreMessage,
+        leftPanel: prevLeftPanel.restoreLeftPanel,
+      },
+    }
+  }
+
+  return {
+    world: s.world,
+    player: s.player,
+    run: s.run,
+    resources: s.resources,
+    encounter: s.encounter,
+    ui: {
+      clock: prevUi.clock,
+      anim: prevUi.anim,
+      message: MAP_HINT_MESSAGE,
+      leftPanel: { kind: LEFT_PANEL_KIND_MAP, restoreLeftPanel: prevLeftPanel, restoreMessage: prevUi.message },
+    },
+  }
+}
+
 function reduceMove(prevState: State, dx: number, dy: number): State {
   if (prevState.run.isGameOver || prevState.run.hasWon) return prevState
-  if (prevState.encounter && prevState.encounter.kind === 'combat') return prevState
+  if (prevState.encounter) return prevState
 
   const world = prevState.world
   const prevPos = prevState.player.position
@@ -242,53 +292,58 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
       hengeReady = nextStepCount >= readyAt
     }
 
-    const event = rollTileEvent({
-      seed: nextWorld.seed,
-      stepCount: nextStepCount,
-      cellId: destCellId,
-      kind: destKind,
-      hengeReady,
-    })
-
     // Capture the tile message before we override it with encounter flavor (we want to restore this on victory/return).
     const preEncounterMessage = message
 
-    if (event && event.kind === 'fight') {
-      const spawned = spawnEnemyArmy({ rngState: nextWorld.rngState, playerArmy: nextResources.armySize })
-      nextWorld = { ...nextWorld, rngState: spawned.rngState }
-      nextEncounter = {
-        kind: 'combat',
-        enemyArmySize: spawned.enemyArmy,
-        sourceKind: destKind,
-        sourceCellId: destCellId,
-        restoreMessage: preEncounterMessage,
-      }
-      didStartCombat = true
-
-      // Henge-specific cooldown lives on the henge cell itself.
-      if (destKind === 'henge') {
-        const hc = destCell as HengeCell
-        const nextHenge: HengeCell = { ...hc, nextReadyStep: nextStepCount + HENGE_COOLDOWN_MOVES }
-        nextWorld = setCellAt(nextWorld, nextPos, nextHenge)
-      }
-
-      // Override tile lore with encounter lore.
-      message =
-        destKind === 'henge'
-          ? HENGE_ENCOUNTER_LINE
-          : pickCombatEncounterLine({ seed: nextWorld.seed, stepCount: nextStepCount, cellId: destCellId })
-    }
-
-    if (event && event.kind === 'lost') {
-      const td = pickTeleportDestination({
-        world: nextWorld,
-        origin: nextPos,
-        rngState: nextWorld.rngState,
+    if (destKind === 'camp') {
+      nextEncounter = { kind: 'camp', sourceKind: 'camp', sourceCellId: destCellId, restoreMessage: preEncounterMessage }
+    } else {
+      const event = rollTileEvent({
+        seed: nextWorld.seed,
+        stepCount: nextStepCount,
+        cellId: destCellId,
+        kind: destKind,
+        hengeReady,
+        hasScout: !!nextResources.hasScout,
       })
-      nextWorld = { ...nextWorld, rngState: td.rngState }
-      landingPos = td.destination
-      message = pickDeterministicLine(LOST_FLAVOR_LINES, nextWorld.seed, destCellId, nextStepCount)
-      teleported = true
+
+      if (event && event.kind === 'fight') {
+        const spawned = spawnEnemyArmy({ rngState: nextWorld.rngState, playerArmy: nextResources.armySize })
+        nextWorld = { ...nextWorld, rngState: spawned.rngState }
+        nextEncounter = {
+          kind: 'combat',
+          enemyArmySize: spawned.enemyArmy,
+          sourceKind: destKind,
+          sourceCellId: destCellId,
+          restoreMessage: preEncounterMessage,
+        }
+        didStartCombat = true
+
+        // Henge-specific cooldown lives on the henge cell itself.
+        if (destKind === 'henge') {
+          const hc = destCell as HengeCell
+          const nextHenge: HengeCell = { ...hc, nextReadyStep: nextStepCount + HENGE_COOLDOWN_MOVES }
+          nextWorld = setCellAt(nextWorld, nextPos, nextHenge)
+        }
+
+        // Override tile lore with encounter lore.
+        message =
+          destKind === 'henge'
+            ? HENGE_ENCOUNTER_LINE
+            : pickCombatEncounterLine({ seed: nextWorld.seed, stepCount: nextStepCount, cellId: destCellId })
+      }
+
+      if (event && event.kind === 'lost') {
+        const td = pickTeleportDestination({
+          world: nextWorld,
+          origin: nextPos,
+          rngState: nextWorld.rngState,
+        })
+        nextWorld = { ...nextWorld, rngState: td.rngState }
+        landingPos = td.destination
+        message = pickDeterministicLine(LOST_FLAVOR_LINES, nextWorld.seed, destCellId, nextStepCount)
+        teleported = true
+      }
     }
   }
 
@@ -303,6 +358,14 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
   const finalPlayerPos = teleported ? landingPos : nextPos
   const finalKnowsPosition = teleported ? false : nextKnowsPosition
 
+  const mem = updateRunPathMemoryAfterMove({
+    prevPath: prevState.run.path,
+    prevLostBufferStartIndex: prevState.run.lostBufferStartIndex,
+    nextPos: finalPlayerPos,
+    nextKnowsPosition: finalKnowsPosition,
+    teleported,
+  })
+
   const baseState: State = {
     world: nextWorld,
     player: { position: finalPlayerPos },
@@ -311,6 +374,8 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
       hasWon: nextHasWon,
       isGameOver,
       knowsPosition: finalKnowsPosition,
+      path: mem.path,
+      lostBufferStartIndex: mem.lostBufferStartIndex,
     },
     resources: nextResources,
     encounter: nextEncounter,
@@ -382,6 +447,50 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
   }
 }
 
+function updateRunPathMemoryAfterMove(args: {
+  prevPath: RunPathStep[] | null | undefined
+  prevLostBufferStartIndex: number | null | undefined
+  nextPos: Vec2
+  nextKnowsPosition: boolean
+  teleported: boolean
+}): { path: RunPathStep[]; lostBufferStartIndex: number | null } {
+  const prevPath = args.prevPath ?? []
+  let path = prevPath.concat([{ pos: args.nextPos, isMapped: false }])
+  let lostBufferStartIndex = args.prevLostBufferStartIndex ?? null
+
+  if (args.teleported) {
+    lostBufferStartIndex = path.length - 1
+  }
+
+  if (!args.nextKnowsPosition && lostBufferStartIndex == null) {
+    lostBufferStartIndex = path.length - 1
+  }
+
+  if (args.nextKnowsPosition) {
+    if (lostBufferStartIndex != null) {
+      const start = Math.max(0, Math.min(lostBufferStartIndex, path.length - 1))
+      const mapped = path.slice()
+      for (let i = start; i < mapped.length; i++) {
+        const step = mapped[i]!
+        if (step.isMapped) continue
+        mapped[i] = { pos: step.pos, isMapped: true }
+      }
+      path = mapped
+      lostBufferStartIndex = null
+    } else {
+      const idx = path.length - 1
+      const step = path[idx]!
+      if (!step.isMapped) {
+        const mapped = path.slice()
+        mapped[idx] = { pos: step.pos, isMapped: true }
+        path = mapped
+      }
+    }
+  }
+
+  return { path, lostBufferStartIndex }
+}
+
 function reduceRestart(s: State): State {
   const next = processAction(null, { type: ACTION_NEW_RUN, seed: s.world.seed + 1 })
   return next || s
@@ -420,11 +529,12 @@ export function processAction(prevState: State | null, action: Action): State | 
     return {
       world,
       player: { position: { x: playerPos.x, y: playerPos.y } },
-      run: { stepCount: 0, hasWon, isGameOver: false, knowsPosition: false },
+      run: { stepCount: 0, hasWon, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
       resources: {
         food: INITIAL_FOOD,
         armySize: INITIAL_ARMY_SIZE,
         hasBronzeKey: false,
+        hasScout: false,
       },
       encounter: null,
       ui,
@@ -436,12 +546,19 @@ export function processAction(prevState: State | null, action: Action): State | 
   if (action.type === ACTION_RESTART) return reduceRestart(prevState)
   if (action.type === ACTION_SHOW_GOAL) return reduceGoal(prevState)
   if (action.type === ACTION_TOGGLE_MINIMAP) return reduceToggleMinimap(prevState)
+  if (action.type === ACTION_TOGGLE_MAP) {
+    return reduceToggleMap(prevState)
+  }
+
+  const campHandled = reduceCampAction(prevState, action)
+  if (campHandled) return campHandled
+
   if (action.type === ACTION_RETURN) {
     if (!prevState.encounter) return prevState
+    if (prevState.encounter.kind !== 'combat') return prevState
     const prevUi = getUi(prevState.ui)
     if (prevState.run.isGameOver || prevState.run.hasWon) return prevState
 
-    // Returning from combat costs 1 troop
     const prevRes = normalizeResources(prevState.world, prevState.resources)
     const nextArmy = prevRes.armySize - 1
     const isGameOver = nextArmy <= 0

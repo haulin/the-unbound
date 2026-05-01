@@ -1,10 +1,14 @@
 // Core gameplay + generation constants (platform-agnostic)
 
 import type { CellKind, FeatureKind, TerrainKind } from './types'
+import { TERRAIN_LORE_BY_KIND } from './lore'
+
+// Re-export lore/name pools (defined in `src/core/lore.ts`).
+export * from './lore'
 
 export const WORLD_WIDTH = 10
 export const WORLD_HEIGHT = 10
-export const INITIAL_SEED = 14
+export const INITIAL_SEED = 34
 export const ENABLE_ANIMATIONS = true
 
 export const TILE_GATE = 68
@@ -26,6 +30,9 @@ export const CAMP_COUNT = 3
 export const CAMP_COOLDOWN_MOVES = 3
 export const CAMP_FOOD_GAIN = 2
 
+// v0.2 — Scout
+export const SCOUT_FOOD_COST = 5
+
 export const HENGE_COUNT = 3
 
 export const INITIAL_ARMY_SIZE = 10
@@ -36,62 +43,14 @@ export const MAP_GEN_ALGORITHM = MAP_GEN_NOISE
 export const NOISE_SMOOTH_PASSES = 2
 export const NOISE_VALUE_MAX = 10000
 
-export const GOAL_NARRATIVE = 'The road never ends. It only returns.\nThey say there is a bronze gate that breaks the circle.\nYou mean to find out.'
-
 // v0.0.9 — Gate + Key
 export const BRONZE_KEY_FOOD_COST = 10
 export const GATE_NAME = 'The Gate'
 export const LOCKSMITH_NAME = 'Locksmith of the Unbound'
 
-export const GATE_LOCKED_LINES = [
-  'A keyhole with no key. Not yet.',
-  'Bronze, but unyielding. You will need the key.',
-  'It does not open for hands. Only for the turning.',
-] as const
+// Lore strings for gate/locksmith are defined in `lore.ts`.
 
-export const GATE_OPEN_LINES = [
-  'The lock turns. The Unbound lets you pass.',
-  'Bronze gives way. The road continues.',
-] as const
-
-export const LOCKSMITH_PURCHASE_LINES = [
-  'You feed the fire. They finish the key.',
-  'A small hammer-song. A key, still warm.',
-  'They take what you offer and give you what you came for.',
-] as const
-
-export const LOCKSMITH_VISITED_LINES = ['The forge is cold. The work is done.', 'Nothing left to make for you here.'] as const
-
-export const LOCKSMITH_NO_FOOD_LINES = [
-  "No heat, no key.",
-  "Come back with enough. The fire needs feeding first.",
-  "Others have paid for this before you. Most of them got further than you'd think."
-]
-
-// Per-terrain lore pools. One line for inert terrains; small pools for event-bearing
-// terrains so repeated visits hint at the mechanic (woods → ambush + lost; mountain →
-// ambush; swamp → lost). The picker is deterministic per (seed, cellId, stepCount).
-export const TERRAIN_LORE_BY_KIND: Record<TerrainKind, readonly string[]> = {
-  grass: ['The grass bends with your passing.'],
-  road: ['The road here remembers other feet.'],
-  lake: ['The water is still. Something moves beneath.'],
-  rainbow: ['The light here bends wrong.'],
-  mountain: [
-    'The peaks ahead do not look closer. Stone and thin air. Your supplies will feel it.',
-    'Narrow passes. Notorious for ambushes.',
-    'The wind here forgets to carry sound.',
-  ],
-  swamp: [
-    "Crossing the bog is harder than it looks. You'll need to eat well tonight.",
-    'Mist clings. Landmarks lie. You hope you remember the way back.',
-    'The reeds whisper. They have heard worse.',
-  ],
-  woods: [
-    "A path that isn't quite a path.",
-    'Something moves between the trunks. You move faster.',
-    'The trees rearrange themselves while you blink. You hope it is the wind.',
-  ],
-}
+// Per-terrain lore pools are defined in `lore.ts`.
 
 export const INITIAL_FOOD = 15
 export const FOOD_COST_DEFAULT = 1
@@ -209,81 +168,7 @@ export const FOOD_SPRITE_ID = 98
 
 export const FOOD_DELTA_FRAMES = 24
 
-// Max 14 characters
-export const FARM_NAME_POOL = [
-  'The Oast',
-  'Burnt Acre',
-  'Greyfield',
-  "Hob's Reach",
-  'The Stemming',
-  'Fallow End',
-  "Cotter's Rise",
-] as const
-
-export const FARM_HARVEST_LINES = [
-  'Someone left in a hurry. The stores are still full.',
-  'The cellar is cold and deep. You help yourself.',
-  'Enough here to keep moving. You take what you need.',
-  'Unharvested, but not unwelcome. You gather what you can.',
-  'The farmer is long gone. The food remains.',
-] as const
-
-export const FARM_REVISIT_LINES = [
-  'You already took what there was.',
-  'The stores are empty now. Come back later.',
-  'Nothing left here. It will regrow in time.',
-] as const
-
-export const CAMP_NAME_POOL = [
-  'The Wayrest',
-  'Ember Cross',
-  'The Muster',
-  'Cold Haven',
-  'Ashford',
-  'Dusk Halt',
-  'The Holdfast',
-] as const
-
-export const HENGE_NAME_POOL = [
-  'The Mending',
-  'Old Insistence',
-  "Crows' Argument",
-  'The Recurring',
-  'Patient Circle',
-  'Weather Cross',
-] as const
-
-export const HENGE_LORE_LINES = [
-  'The circle remembers old debts.',
-  'The stones do not ask why you are here.',
-  'Whatever drew you here drew them first.',
-] as const
-
-export const HENGE_EMPTY_LINES = [
-  'The spirits here are quiet. Come back later.',
-  'The circle is empty for now.',
-  'You do not look back. You do not need to.',
-] as const
-
-export const CAMP_RECRUIT_LINES = [
-  'Stragglers around a dying fire. They fall in without a word.',
-  'A few souls with nowhere better to be. They join you.',
-  "They were waiting for someone. You'll do.",
-  'No questions asked. No names given. Your ranks grow.',
-  "They look like they've found something. So have you.",
-] as const
-
-export const CAMP_EMPTY_LINES = [
-  'The fire is cold. Give it time.',
-  'Not yet. The road brings more, but not today.',
-  "The word hasn't spread far enough yet. Return later.",
-] as const
-
-export const GAME_OVER_LINES = [
-  "The last of them fell somewhere you won't remember. The world keeps turning.",
-  'You came with an army. You leave with nothing.\nThe gate remains closed.',
-  'Alone now. The road goes on without you.',
-] as const
+// Lore strings + name pools are defined in `lore.ts`.
 
 // v0.1 — Lost (per-tile event roll + teleport)
 export const WOODS_AMBUSH_PERCENT = 15
@@ -291,33 +176,13 @@ export const WOODS_LOST_PERCENT = 10
 export const MOUNTAIN_AMBUSH_PERCENT = 25
 export const SWAMP_LOST_PERCENT = 20
 export const TELEPORT_MIN_DISTANCE = 4
-export const LOST_COORD_LABEL = '??'
-export const LOST_FLAVOR_LINES = [
-  'The road loops. You do not.',
-  'The horizon reads the same in every direction.',
-  'Further than expected. Not where you were.',
-  'Lost between one step and the next.',
-] as const
+// LOST_* are defined in `lore.ts`.
 
 export const COMBAT_REWARD_MIN = 5
 export const COMBAT_REWARD_MAX = 15
 export const GRID_TRANSITION_STEP_FRAMES = 5
 
-export const COMBAT_ENCOUNTER_LINES = [
-  'They were already here.',
-  'Company. The unwanted kind.',
-  'This was always going to happen.',
-] as const
-
-export const COMBAT_FLEE_EXIT_LINES = [
-  'You left one of your own behind so the journey can continue.',
-  'You turned away. Not everyone followed.',
-  'You survived. That is not the same as winning.',
-] as const
-
-export const COMBAT_VICTORY_EXIT_LINES = ['To the victor go the spoils.', 'You took what you could and moved on.', 'They will not follow you again.'] as const
-
-export const HENGE_ENCOUNTER_LINE = 'You walked into something that was already happening.'
+// Combat + henge encounter lore lines are defined in `lore.ts`.
 
 export const HENGE_COOLDOWN_MOVES = 3
 
@@ -326,9 +191,13 @@ export const ACTION_RESTART = 'RESTART' as const
 export const ACTION_MOVE = 'MOVE' as const
 export const ACTION_SHOW_GOAL = 'SHOW_GOAL' as const
 export const ACTION_TOGGLE_MINIMAP = 'TOGGLE_MINIMAP' as const
+export const ACTION_TOGGLE_MAP = 'TOGGLE_MAP' as const
 export const ACTION_FIGHT = 'FIGHT' as const
 export const ACTION_RETURN = 'RETURN' as const
 export const ACTION_TICK = 'TICK' as const
+export const ACTION_CAMP_SEARCH = 'CAMP_SEARCH' as const
+export const ACTION_CAMP_HIRE_SCOUT = 'CAMP_HIRE_SCOUT' as const
+export const ACTION_CAMP_LEAVE = 'CAMP_LEAVE' as const
 
 export const MOVE_SLIDE_FRAMES = 15
 export const LORE_MAX_CHARS_PER_LINE = 19
@@ -337,4 +206,8 @@ export const LORE_MAX_CHARS_PER_LINE = 19
 export const SPR_BUTTON_GOAL = 44
 export const SPR_BUTTON_RESTART = 46
 export const SPR_BUTTON_MINIMAP = 78
+export const SPR_BUTTON_MAP = 138
+export const SPR_BUTTON_CAMP_SEARCH = 110
+export const SPR_BUTTON_CAMP_HIRE_SCOUT = 142
+export const SPR_ICON_SCOUT = 108
 

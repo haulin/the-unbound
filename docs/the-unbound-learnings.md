@@ -95,3 +95,10 @@ In practice: new features should usually be “add a new entry / new function”
 - **Terrain lore as a pool teaches mechanics through repetition**: `TERRAIN_LORE_BY_KIND` gives event-bearing terrains 3-line pools (one mechanic hint per applicable event + pure flavor). Players learn that woods can ambush *or* dislocate by re-reading; explicit tutorial text not needed. Inert terrains (grass/road/lake/rainbow) stay as single-line pools.
 - **Versioning shifted to MAJOR.MINOR**: patch versions skipped — features that previously would have been v0.1.1 / v0.1.2 are v0.2 / v0.3 instead. Backlog and `package.json` reflect this.
 
+## v0.2 — Map & Scout (process + architecture notes)
+
+- **Encounters as modules (OCP)**: keep `processAction` as an orchestrator and delegate encounter-specific actions to the encounter module (e.g. `reduceCampAction(prevState, action)`), so new encounters add new files instead of growing the main reducer.
+- **Renderer consumes models, not mechanics**: for deterministic previews, compute a core “preview model” (e.g. camp preview values) in core and have platform renderers read it; the renderer should not replicate game calculations.
+- **Non-consuming deterministic picks**: for “random-looking but replay-stable” outcomes that must not perturb unrelated systems (flavor lines, event percentiles, deterministic previews), prefer keyed pickers (seed/stepCount/location + optional salt) over consuming `world.rngState`.
+- **Animation enqueueing can be shared**: keep animation state updates as pure data transforms and extract generic helpers (e.g. enqueue) so encounter modules can add animations without importing reducer internals.
+

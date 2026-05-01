@@ -1,13 +1,12 @@
 import { COMBAT_ENCOUNTER_LINES, COMBAT_FLEE_EXIT_LINES, COMBAT_VICTORY_EXIT_LINES } from './constants'
-import { hashSeedStepCell, pickFromPool, pickIndex, randInt } from './prng'
+import { pickFromPool, pickIndex, randInt } from './prng'
 
 export function cellIdForPos(world: { width: number }, pos: { x: number; y: number }): number {
   return pos.y * world.width + pos.x
 }
 
 export function encounterFlavorIndex(opts: { seed: number; stepCount: number; cellId: number }): number {
-  const h = hashSeedStepCell({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId })
-  return pickIndex(h, COMBAT_ENCOUNTER_LINES.length)
+  return pickIndex({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId }, COMBAT_ENCOUNTER_LINES.length)
 }
 
 export function pickCombatEncounterLine(opts: { seed: number; stepCount: number; cellId: number }): string {
@@ -23,8 +22,7 @@ export function pickCombatExitLine(opts: {
 }): string {
   const pool = opts.outcome === 'victory' ? COMBAT_VICTORY_EXIT_LINES : COMBAT_FLEE_EXIT_LINES
   const salt = opts.outcome === 'victory' ? 0x9e3779b9 : 0x85ebca6b
-  const h = hashSeedStepCell({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId, salt })
-  return pickFromPool(pool, h) || pool[0] || ''
+  return pickFromPool({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId, salt }, pool) || pool[0] || ''
 }
 
 export function spawnEnemyArmy(opts: { rngState: number; playerArmy: number }): { rngState: number; enemyArmy: number } {

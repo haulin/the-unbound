@@ -2,6 +2,9 @@ import {
   ENABLE_ANIMATIONS,
   GRID_TRANSITION_STEP_FRAMES,
   SPR_BUTTON_GOAL,
+  SPR_BUTTON_MAP,
+  SPR_BUTTON_CAMP_HIRE_SCOUT,
+  SPR_BUTTON_CAMP_SEARCH,
   SPR_BUTTON_MINIMAP,
   SPR_BUTTON_RESTART,
 } from '../../core/constants'
@@ -38,10 +41,15 @@ export type RightGridRenderPlan = {
 const RIGHT_GRID_SPRITE_ID: Record<RightGridIconKey, number> = {
   goal: SPR_BUTTON_GOAL,
   minimap: SPR_BUTTON_MINIMAP,
+  map: SPR_BUTTON_MAP,
   restart: SPR_BUTTON_RESTART,
   fight: UI.UI_SPR_FIGHT,
   return: UI.UI_SPR_RETURN,
   enemy: UI.UI_SPR_ENEMY,
+  campSearch: SPR_BUTTON_CAMP_SEARCH,
+  campHireScout: SPR_BUTTON_CAMP_HIRE_SCOUT,
+  campLeave: UI.UI_SPR_RETURN,
+  campFireIcon: 140,
 }
 
 function spriteIdForIconKey(iconKey: RightGridIconKey): number {
@@ -170,6 +178,7 @@ function findMoveSlideAnim(s: State): MoveSlideAnim | null {
 function isMetaCornerCell(cell: Cell): boolean {
   return (
     (cell.row === 0 && cell.col === 0) || // goal
+    (cell.row === 0 && cell.col === 2) || // map
     (cell.row === 2 && cell.col === 0) || // minimap
     (cell.row === 2 && cell.col === 2) // restart
   )
@@ -317,7 +326,7 @@ function buildMoveSlidePlan(s: State, anim: MoveSlideAnim, hover: Cell | null): 
     { row: 0, col: 0, spriteId: SPR_BUTTON_GOAL },
     { row: 2, col: 0, spriteId: SPR_BUTTON_MINIMAP },
     { row: 2, col: 2, spriteId: SPR_BUTTON_RESTART },
-    { row: 0, col: 2, spriteId: null }, // disabled
+    { row: 0, col: 2, spriteId: SPR_BUTTON_MAP },
   ]
 
   for (let i = 0; i < corners.length; i++) {

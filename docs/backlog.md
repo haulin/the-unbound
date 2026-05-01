@@ -1,25 +1,5 @@
 # Tentative roadmap (The Unbound)
 
-
-
-v0.1 — Lost
-
-Coordinate display blanks when lost (teleport events trigger this)
-Swamp and woods can teleport the player (lost mechanic)
-Lost resolves on visiting an orienting feature (signpost, farm)
-Mutually exclusive with combat ambush via single per-move event roll
-Run starts unoriented; starting tile is inert (no auto-orient)
-
-v0.2 — Map & Scout
-
-Scout companion slot (structural only — joins you, reveals nearest unvisited orienting feature on coordinate view)
-Scout acquisition deferred to gold epic
-cell.visited tracking
-Simplified game-map button (4th left-panel slot). Open design questions:
-  - Render visited orienting features as: dots vs tiny 8×8 sprites vs letters (G/L/F/S/T)?
-  - Are signposts shown on the map?
-  - Under Scout, are gate and locksmith revealed (even though they don't orient)?
-
 v0.3 — Towns
 
 Town PoI (named, combined farm+camp+one action)
@@ -57,7 +37,7 @@ This file captures ideas discussed during design, kept out of the current phase'
 
 - No tutorial screens; teach via contextual one-line text when mechanics first appear.
 - Possibly variations for every terrain type, not just one every time.
-- Contextual action pad: extend beyond v0.0.7 combat (farm/shop/town “beats”, loot flows, etc.); combat uses fight/return + corners today.
+- Contextual action pad: (farm/shop/town “beats”, loot flows, etc.); combat uses fight/return + corners today.
 - Event “beats” that remap the 3×3 grid for non-combat encounters (loot → Collect/Leave; etc.), potentially with consistent corner/meta placement.
 - Left panel: reuse combat-style mode transitions for other modes (town, shop) if/when added.
 - Animation scheduling: consider extracting reducer-side animation enqueueing into a dedicated pure helper once iteration stabilizes.
@@ -65,28 +45,30 @@ This file captures ideas discussed during design, kept out of the current phase'
 ## Visibility / navigation
 
 - Minimap with visited/revealed tiles (fog-of-war).
-- “Lost” mechanic: coordinates disappear until a recognizable landmark is found.
+- Replay of the steps at game end.
 
 ## Economy / combat / encounters
 
-- Resources: gold. (Food basics: v0.0.5; hunger→army: v0.0.6; combat food rewards + encounters: v0.0.7; gold economy later.)
+- Resources: gold.
 - Towns sell food and troops.
 - Richer encounter types beyond current combat (traps, loot beats, etc.).
 - Mountains/swamps can cluster: if we increase their food cost, they should also carry “opportunity” (bonus events/loot/higher encounter odds) so they feel like risk/reward.
 - Event spawn probabilities influenced by player stats and time-since-visit (e.g., when poor, more likely to find a chest).
-- Tavern where you pay for rumors explaining game mechanics.
+- Consider making roads cost food only ~50% of the time (mechanics/balance change; would require tests + tuning).
 - Collectibles to find.
 
-## Swamp opportunity (deferred from v0.1)
+## Tavern / rumors (deferred)
 
-Swamps in v0.1 are pure-risk (lost only). If playtest shows swamps are universally avoided:
+- Tavern where you pay for rumors explaining game mechanics.
+- Barkeep/tavern tips pool lives in `src/core/lore.ts` as `BARKEEP_TIPS` (UI not implemented yet).
+
+## Swamp opportunity
+
+Swamps are pure-risk (lost only). If playtest shows swamps are universally avoided:
 
 - Strange-fish food find (1–3 food, RNG-amount, mutually exclusive with the lost roll). Same shape as combat reward; "probabilistic flavor" pattern is already established (deterministic flavor picker + RNG amount).
 - Or: under future Scout (deferred companions), swamps cost less food when Scout slot is filled (Cartographer-style effect).
 
-## Woods fog tuning (potential follow-up to v0.1)
-
-If the lost mechanic feels good on swamp+woods, no further work. If swamp-only feels more lore-pure, woods-lost can be split off as a future toggle (`WOODS_LOST_PERCENT = 0`).
 
 ## Prototype follow-ups
 

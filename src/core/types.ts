@@ -1,11 +1,15 @@
 import type {
   ACTION_FIGHT,
+  ACTION_CAMP_HIRE_SCOUT,
+  ACTION_CAMP_LEAVE,
+  ACTION_CAMP_SEARCH,
   ACTION_MOVE,
   ACTION_NEW_RUN,
   ACTION_RETURN,
   ACTION_RESTART,
   ACTION_SHOW_GOAL,
   ACTION_TICK,
+  ACTION_TOGGLE_MAP,
   ACTION_TOGGLE_MINIMAP,
 } from './constants'
 
@@ -41,11 +45,19 @@ export type GeneratedWorld = { world: World; startPosition: Vec2 }
 export const LEFT_PANEL_KIND_AUTO = 'auto' as const
 export const LEFT_PANEL_KIND_SPRITE = 'sprite' as const
 export const LEFT_PANEL_KIND_MINIMAP = 'minimap' as const
+export const LEFT_PANEL_KIND_MAP = 'map' as const
 
-export type LeftPanel =
-  | { kind: typeof LEFT_PANEL_KIND_AUTO }
-  | { kind: typeof LEFT_PANEL_KIND_SPRITE; spriteId: number }
-  | { kind: typeof LEFT_PANEL_KIND_MINIMAP }
+export type LeftPanelAuto = { kind: typeof LEFT_PANEL_KIND_AUTO }
+export type LeftPanelSprite = { kind: typeof LEFT_PANEL_KIND_SPRITE; spriteId: number }
+export type LeftPanelMinimap = { kind: typeof LEFT_PANEL_KIND_MINIMAP }
+export type LeftPanelBase = LeftPanelAuto | LeftPanelSprite | LeftPanelMinimap
+export type LeftPanelMap = {
+  kind: typeof LEFT_PANEL_KIND_MAP
+  restoreLeftPanel: LeftPanelBase
+  restoreMessage: string
+}
+
+export type LeftPanel = LeftPanelBase | LeftPanelMap
 
 export type UiClock = { frame: number }
 
@@ -88,12 +100,22 @@ export type UiAnim = { nextId: number; active: Anim[] }
 export type Ui = { message: string; leftPanel: LeftPanel; clock: UiClock; anim: UiAnim }
 
 export type Player = { position: Vec2 }
-export type Run = { stepCount: number; hasWon: boolean; isGameOver: boolean; knowsPosition: boolean }
+
+export type RunPathStep = { pos: Vec2; isMapped: boolean }
+export type Run = {
+  stepCount: number
+  hasWon: boolean
+  isGameOver: boolean
+  knowsPosition: boolean
+  path: RunPathStep[]
+  lostBufferStartIndex: number | null
+}
 
 export type Resources = {
   food: number
   armySize: number
   hasBronzeKey: boolean
+  hasScout: boolean
 }
 
 export type CombatEncounter = {
@@ -104,7 +126,14 @@ export type CombatEncounter = {
   restoreMessage: string
 }
 
-export type Encounter = CombatEncounter
+export type CampEncounter = {
+  kind: 'camp'
+  sourceKind: 'camp'
+  sourceCellId: number
+  restoreMessage: string
+}
+
+export type Encounter = CombatEncounter | CampEncounter
 
 export type State = { world: World; player: Player; run: Run; resources: Resources; encounter: Encounter | null; ui: Ui }
 
@@ -113,8 +142,12 @@ export type Action =
   | { type: typeof ACTION_RESTART }
   | { type: typeof ACTION_SHOW_GOAL }
   | { type: typeof ACTION_TOGGLE_MINIMAP }
+  | { type: typeof ACTION_TOGGLE_MAP }
   | { type: typeof ACTION_MOVE; dx: number; dy: number }
   | { type: typeof ACTION_FIGHT }
   | { type: typeof ACTION_RETURN }
   | { type: typeof ACTION_TICK }
+  | { type: typeof ACTION_CAMP_SEARCH }
+  | { type: typeof ACTION_CAMP_HIRE_SCOUT }
+  | { type: typeof ACTION_CAMP_LEAVE }
 

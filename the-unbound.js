@@ -1,6 +1,6 @@
-// title:  The Unbound (prototype 0.1.0)
+// title:  The Unbound (prototype 0.2.0)
 // author: haulin
-// desc:   Prototype 0.1.0 toward the North Star
+// desc:   Prototype 0.2.0 toward the North Star
 // script: js
 // input:  mouse
 
@@ -11,36 +11,10 @@
 
 "use strict";
 (() => {
-  // src/core/constants.ts
-  var WORLD_WIDTH = 10;
-  var WORLD_HEIGHT = 10;
-  var INITIAL_SEED = 14;
-  var ENABLE_ANIMATIONS = true;
-  var TILE_GATE = 68;
-  var TILE_GATE_OPEN = 70;
-  var TILE_LOCKSMITH = 72;
-  var TILE_SIGNPOST = 42;
-  var TILE_FARM = 38;
-  var TILE_CAMP = 36;
-  var TILE_HENGE = 66;
-  var TILE_MOUNTAIN = 6;
-  var TILE_SWAMP = 12;
-  var SIGNPOST_COUNT = 6;
-  var GATE_LOCKSMITH_MIN_DISTANCE = 7;
-  var CAMP_COUNT = 3;
-  var CAMP_COOLDOWN_MOVES = 3;
-  var CAMP_FOOD_GAIN = 2;
-  var HENGE_COUNT = 3;
-  var INITIAL_ARMY_SIZE = 10;
-  var ARMY_SPRITE_ID = 100;
-  var MAP_GEN_NOISE = "NOISE";
-  var MAP_GEN_ALGORITHM = MAP_GEN_NOISE;
-  var NOISE_SMOOTH_PASSES = 2;
-  var NOISE_VALUE_MAX = 1e4;
+  // src/core/lore.ts
   var GOAL_NARRATIVE = "The road never ends. It only returns.\nThey say there is a bronze gate that breaks the circle.\nYou mean to find out.";
-  var BRONZE_KEY_FOOD_COST = 10;
-  var GATE_NAME = "The Gate";
-  var LOCKSMITH_NAME = "Locksmith of the Unbound";
+  var LOST_COORD_LABEL = "??";
+  var MAP_HINT_MESSAGE = "Map\nThis is how the world looks from your point of view.";
   var GATE_LOCKED_LINES = [
     "A keyhole with no key. Not yet.",
     "Bronze, but unyielding. You will need the key.",
@@ -55,15 +29,26 @@
     "A small hammer-song. A key, still warm.",
     "They take what you offer and give you what you came for."
   ];
-  var LOCKSMITH_VISITED_LINES = ["The forge is cold. The work is done.", "Nothing left to make for you here."];
+  var LOCKSMITH_VISITED_LINES = [
+    "The forge is cold. The work is done.",
+    "Nothing left to make for you here."
+  ];
   var LOCKSMITH_NO_FOOD_LINES = [
     "No heat, no key.",
     "Come back with enough. The fire needs feeding first.",
     "Others have paid for this before you. Most of them got further than you'd think."
   ];
   var TERRAIN_LORE_BY_KIND = {
-    grass: ["The grass bends with your passing."],
-    road: ["The road here remembers other feet."],
+    grass: [
+      "The grass bends with your passing.",
+      "You watch the wind arrive before you do.",
+      "A soft field that does not care who crosses it."
+    ],
+    road: [
+      "The road here remembers other feet.",
+      "A track worn down by those who never stopped walking.",
+      "The dust rises and settles like it has done this before."
+    ],
     lake: ["The water is still. Something moves beneath."],
     rainbow: ["The light here bends wrong."],
     mountain: [
@@ -82,6 +67,134 @@
       "The trees rearrange themselves while you blink. You hope it is the wind."
     ]
   };
+  var FARM_NAME_POOL = [
+    "The Oast",
+    "Burnt Acre",
+    "Greyfield",
+    "Hob's Reach",
+    "The Stemming",
+    "Fallow End",
+    "Cotter's Rise"
+  ];
+  var CAMP_NAME_POOL = [
+    "The Wayrest",
+    "Ember Cross",
+    "The Muster",
+    "Cold Haven",
+    "Ashford",
+    "Dusk Halt",
+    "The Holdfast"
+  ];
+  var HENGE_NAME_POOL = [
+    "The Mending",
+    "Old Insistence",
+    "Crows' Argument",
+    "The Recurring",
+    "Patient Circle",
+    "Weather Cross"
+  ];
+  var FARM_HARVEST_LINES = [
+    "Someone left in a hurry. The stores are still full.",
+    "The cellar is cold and deep. You help yourself.",
+    "Enough here to keep moving. You take what you need.",
+    "Unharvested, but not unwelcome. You gather what you can.",
+    "The farmer is long gone. The food remains."
+  ];
+  var FARM_REVISIT_LINES = [
+    "You already took what there was.",
+    "The stores are empty now. Come back later.",
+    "Nothing left here. It will regrow in time."
+  ];
+  var CAMP_RECRUIT_LINES = [
+    "Stragglers around a dying fire. They fall in without a word.",
+    "A few souls with nowhere better to be. They join you.",
+    "They were waiting for someone. You'll do.",
+    "No questions asked. No names given. Your ranks grow.",
+    "They look like they've found something. So have you."
+  ];
+  var CAMP_EMPTY_LINES = [
+    "The fire is cold. Give it time.",
+    "Not yet. The road brings more, but not today.",
+    "The word hasn't spread far enough yet. Return later."
+  ];
+  var HENGE_LORE_LINES = [
+    "The circle remembers old debts.",
+    "The stones do not ask why you are here.",
+    "Whatever drew you here drew them first."
+  ];
+  var HENGE_EMPTY_LINES = [
+    "The spirits here are quiet. Come back later.",
+    "The circle is empty for now.",
+    "You do not look back. You do not need to."
+  ];
+  var HENGE_ENCOUNTER_LINE = "You walked into something that was already happening.";
+  var SCOUT_HIRE_LINES = [
+    "You pay in food. They lead the way.",
+    `"When you have your bearings, I'll mark fires, fields, and stone-rings on your map."`,
+    `"Woods and bog won't steal you as often with me ahead."`
+  ];
+  var SCOUT_ALREADY_HAVE_LINES = [
+    `"I'm already watching the road."`,
+    '"You kept me for a reason. Let me do it."'
+  ];
+  var SCOUT_NO_FOOD_LINES = ["Not enough to pay them.", "No food, no footsteps.", "Come back with 5 food."];
+  var LOST_FLAVOR_LINES = [
+    "The road loops. You do not.",
+    "The horizon reads the same in every direction.",
+    "Further than expected. Not where you were.",
+    "Lost between one step and the next."
+  ];
+  var COMBAT_ENCOUNTER_LINES = [
+    "They were already here.",
+    "Company. The unwanted kind.",
+    "This was always going to happen."
+  ];
+  var COMBAT_FLEE_EXIT_LINES = [
+    "You left one of your own behind so the journey can continue.",
+    "You turned away. Not everyone followed.",
+    "You survived. That is not the same as winning."
+  ];
+  var COMBAT_VICTORY_EXIT_LINES = [
+    "To the victor go the spoils.",
+    "You took what you could and moved on.",
+    "They will not follow you again."
+  ];
+  var GAME_OVER_LINES = [
+    "The last of them fell somewhere you won't remember. The world keeps turning.",
+    "You came with an army. You leave with nothing.\nThe gate remains closed.",
+    "Alone now. The road goes on without you."
+  ];
+
+  // src/core/constants.ts
+  var WORLD_WIDTH = 10;
+  var WORLD_HEIGHT = 10;
+  var INITIAL_SEED = 34;
+  var ENABLE_ANIMATIONS = true;
+  var TILE_GATE = 68;
+  var TILE_GATE_OPEN = 70;
+  var TILE_LOCKSMITH = 72;
+  var TILE_SIGNPOST = 42;
+  var TILE_FARM = 38;
+  var TILE_CAMP = 36;
+  var TILE_HENGE = 66;
+  var TILE_MOUNTAIN = 6;
+  var TILE_SWAMP = 12;
+  var SIGNPOST_COUNT = 6;
+  var GATE_LOCKSMITH_MIN_DISTANCE = 7;
+  var CAMP_COUNT = 3;
+  var CAMP_COOLDOWN_MOVES = 3;
+  var CAMP_FOOD_GAIN = 2;
+  var SCOUT_FOOD_COST = 5;
+  var HENGE_COUNT = 3;
+  var INITIAL_ARMY_SIZE = 10;
+  var ARMY_SPRITE_ID = 100;
+  var MAP_GEN_NOISE = "NOISE";
+  var MAP_GEN_ALGORITHM = MAP_GEN_NOISE;
+  var NOISE_SMOOTH_PASSES = 2;
+  var NOISE_VALUE_MAX = 1e4;
+  var BRONZE_KEY_FOOD_COST = 10;
+  var GATE_NAME = "The Gate";
+  var LOCKSMITH_NAME = "Locksmith of the Unbound";
   var INITIAL_FOOD = 15;
   var FOOD_COST_DEFAULT = 1;
   var FOOD_COST_MOUNTAIN = 2;
@@ -177,112 +290,36 @@
   }
   var FOOD_SPRITE_ID = 98;
   var FOOD_DELTA_FRAMES = 24;
-  var FARM_NAME_POOL = [
-    "The Oast",
-    "Burnt Acre",
-    "Greyfield",
-    "Hob's Reach",
-    "The Stemming",
-    "Fallow End",
-    "Cotter's Rise"
-  ];
-  var FARM_HARVEST_LINES = [
-    "Someone left in a hurry. The stores are still full.",
-    "The cellar is cold and deep. You help yourself.",
-    "Enough here to keep moving. You take what you need.",
-    "Unharvested, but not unwelcome. You gather what you can.",
-    "The farmer is long gone. The food remains."
-  ];
-  var FARM_REVISIT_LINES = [
-    "You already took what there was.",
-    "The stores are empty now. Come back later.",
-    "Nothing left here. It will regrow in time."
-  ];
-  var CAMP_NAME_POOL = [
-    "The Wayrest",
-    "Ember Cross",
-    "The Muster",
-    "Cold Haven",
-    "Ashford",
-    "Dusk Halt",
-    "The Holdfast"
-  ];
-  var HENGE_NAME_POOL = [
-    "The Mending",
-    "Old Insistence",
-    "Crows' Argument",
-    "The Recurring",
-    "Patient Circle",
-    "Weather Cross"
-  ];
-  var HENGE_LORE_LINES = [
-    "The circle remembers old debts.",
-    "The stones do not ask why you are here.",
-    "Whatever drew you here drew them first."
-  ];
-  var HENGE_EMPTY_LINES = [
-    "The spirits here are quiet. Come back later.",
-    "The circle is empty for now.",
-    "You do not look back. You do not need to."
-  ];
-  var CAMP_RECRUIT_LINES = [
-    "Stragglers around a dying fire. They fall in without a word.",
-    "A few souls with nowhere better to be. They join you.",
-    "They were waiting for someone. You'll do.",
-    "No questions asked. No names given. Your ranks grow.",
-    "They look like they've found something. So have you."
-  ];
-  var CAMP_EMPTY_LINES = [
-    "The fire is cold. Give it time.",
-    "Not yet. The road brings more, but not today.",
-    "The word hasn't spread far enough yet. Return later."
-  ];
-  var GAME_OVER_LINES = [
-    "The last of them fell somewhere you won't remember. The world keeps turning.",
-    "You came with an army. You leave with nothing.\nThe gate remains closed.",
-    "Alone now. The road goes on without you."
-  ];
   var WOODS_AMBUSH_PERCENT = 15;
   var WOODS_LOST_PERCENT = 10;
   var MOUNTAIN_AMBUSH_PERCENT = 25;
   var SWAMP_LOST_PERCENT = 20;
   var TELEPORT_MIN_DISTANCE = 4;
-  var LOST_COORD_LABEL = "??";
-  var LOST_FLAVOR_LINES = [
-    "The road loops. You do not.",
-    "The horizon reads the same in every direction.",
-    "Further than expected. Not where you were.",
-    "Lost between one step and the next."
-  ];
   var COMBAT_REWARD_MIN = 5;
   var COMBAT_REWARD_MAX = 15;
   var GRID_TRANSITION_STEP_FRAMES = 5;
-  var COMBAT_ENCOUNTER_LINES = [
-    "They were already here.",
-    "Company. The unwanted kind.",
-    "This was always going to happen."
-  ];
-  var COMBAT_FLEE_EXIT_LINES = [
-    "You left one of your own behind so the journey can continue.",
-    "You turned away. Not everyone followed.",
-    "You survived. That is not the same as winning."
-  ];
-  var COMBAT_VICTORY_EXIT_LINES = ["To the victor go the spoils.", "You took what you could and moved on.", "They will not follow you again."];
-  var HENGE_ENCOUNTER_LINE = "You walked into something that was already happening.";
   var HENGE_COOLDOWN_MOVES = 3;
   var ACTION_NEW_RUN = "NEW_RUN";
   var ACTION_RESTART = "RESTART";
   var ACTION_MOVE = "MOVE";
   var ACTION_SHOW_GOAL = "SHOW_GOAL";
   var ACTION_TOGGLE_MINIMAP = "TOGGLE_MINIMAP";
+  var ACTION_TOGGLE_MAP = "TOGGLE_MAP";
   var ACTION_FIGHT = "FIGHT";
   var ACTION_RETURN = "RETURN";
   var ACTION_TICK = "TICK";
+  var ACTION_CAMP_SEARCH = "CAMP_SEARCH";
+  var ACTION_CAMP_HIRE_SCOUT = "CAMP_HIRE_SCOUT";
+  var ACTION_CAMP_LEAVE = "CAMP_LEAVE";
   var MOVE_SLIDE_FRAMES = 15;
   var LORE_MAX_CHARS_PER_LINE = 19;
   var SPR_BUTTON_GOAL = 44;
   var SPR_BUTTON_RESTART = 46;
   var SPR_BUTTON_MINIMAP = 78;
+  var SPR_BUTTON_MAP = 138;
+  var SPR_BUTTON_CAMP_SEARCH = 110;
+  var SPR_BUTTON_CAMP_HIRE_SCOUT = 142;
+  var SPR_ICON_SCOUT = 108;
 
   // src/core/prng.ts
   function xorshift32(x) {
@@ -317,14 +354,153 @@
     const salt = u32(opts.salt == null ? 0 : opts.salt | 0);
     return xorshift32(u32(base ^ stepMix ^ cellId2 ^ salt));
   }
-  function pickIndex(hash, length) {
+  function pickIndex(state2, length) {
     const m = length | 0;
     if (m <= 0) return 0;
-    return u32(hash) % m;
+    const h = hashSeedStepCell(state2);
+    return u32(h) % m;
   }
-  function pickFromPool(pool, hash) {
+  function pickIntExclusive(state2, maxExclusive) {
+    const m = normalizeMaxExclusive(maxExclusive);
+    const h = hashSeedStepCell(state2);
+    return u32(h) % m;
+  }
+  function pickIntInRange(state2, minInclusive, maxInclusive) {
+    const a = Number.isFinite(minInclusive) ? Math.trunc(minInclusive) : 0;
+    const b = Number.isFinite(maxInclusive) ? Math.trunc(maxInclusive) : 0;
+    const lo = Math.min(a, b);
+    const hi = Math.max(a, b);
+    const span = hi - lo + 1;
+    if (span <= 1) return lo;
+    return lo + pickIntExclusive(state2, span);
+  }
+  function pickFromPool(state2, pool) {
     if (!pool.length) return void 0;
-    return pool[pickIndex(hash, pool.length)];
+    return pool[pickIndex(state2, pool.length)];
+  }
+
+  // src/core/tiles/poiUtils.ts
+  function pickDeterministicLine(lines, seed, poiIndex, stepCount) {
+    if (!lines.length) return "";
+    return pickFromPool({ seed, stepCount, cellId: poiIndex }, lines) || lines[0] || "";
+  }
+
+  // src/core/cells.ts
+  function getCellAt(world, pos) {
+    return world.cells[pos.y][pos.x];
+  }
+  function setCellAt(world, pos, nextCell) {
+    const cells = world.cells;
+    const row = cells[pos.y];
+    const nextRow = row.slice();
+    nextRow[pos.x] = nextCell;
+    const nextCells = cells.slice();
+    nextCells[pos.y] = nextRow;
+    return { ...world, cells: nextCells };
+  }
+
+  // src/core/uiAnim.ts
+  function enqueueAnim(ui, anim) {
+    const id = Math.max(1, Math.trunc(ui.anim.nextId));
+    const a = { id, ...anim };
+    const nextActive = ui.anim.active.concat([a]);
+    return {
+      message: ui.message,
+      leftPanel: ui.leftPanel,
+      clock: ui.clock,
+      anim: { nextId: id + 1, active: nextActive }
+    };
+  }
+
+  // src/core/camp.ts
+  function computeCampArmyGain(args) {
+    return pickIntInRange({ seed: args.seed, stepCount: args.stepCount, cellId: args.campId }, 1, 2);
+  }
+  function computeCampPreviewModel(s) {
+    const pos = s.player.position;
+    const cell = s.world.cells[pos.y][pos.x];
+    if (cell.kind !== "camp") return null;
+    const camp = cell;
+    const campName = camp.name || "A Camp";
+    const stepCount = s.run.stepCount;
+    const readyAt = camp.nextReadyStep ?? 0;
+    const isReady = stepCount >= readyAt;
+    const foodGain = isReady ? CAMP_FOOD_GAIN : 0;
+    const armyGain = isReady ? computeCampArmyGain({ seed: s.world.seed, campId: camp.id, stepCount }) : 0;
+    const scoutFoodCost = s.resources.hasScout ? null : SCOUT_FOOD_COST;
+    return { campName, foodGain, armyGain, scoutFoodCost };
+  }
+  function reduceCampAction(prevState, action) {
+    if (action.type !== ACTION_CAMP_LEAVE && action.type !== ACTION_CAMP_SEARCH && action.type !== ACTION_CAMP_HIRE_SCOUT) return null;
+    const enc = prevState.encounter;
+    if (!enc || enc.kind !== "camp") return prevState;
+    const pos = prevState.player.position;
+    const campCell = prevState.world.cells[pos.y][pos.x];
+    if (campCell.kind !== "camp") return prevState;
+    const campName = campCell.name || "A Camp";
+    const stepCount = prevState.run.stepCount;
+    const prevRes = prevState.resources;
+    if (action.type === ACTION_CAMP_LEAVE) {
+      const restore = enc.restoreMessage;
+      return { ...prevState, encounter: null, ui: { ...prevState.ui, message: restore } };
+    }
+    if (action.type === ACTION_CAMP_SEARCH) {
+      const readyAt = campCell.nextReadyStep ?? 0;
+      if (stepCount < readyAt) {
+        const line3 = pickDeterministicLine(CAMP_EMPTY_LINES, prevState.world.seed, campCell.id, stepCount);
+        return { ...prevState, ui: { ...prevState.ui, message: `${campName} Camp
+${line3}` } };
+      }
+      const armyGain = computeCampArmyGain({ seed: prevState.world.seed, campId: campCell.id, stepCount });
+      const nextCampCell = { ...campCell, nextReadyStep: stepCount + CAMP_COOLDOWN_MOVES };
+      const nextWorld = setCellAt(prevState.world, pos, nextCampCell);
+      const nextResources2 = { ...prevRes, food: prevRes.food + CAMP_FOOD_GAIN, armySize: prevRes.armySize + armyGain };
+      const line2 = pickDeterministicLine(CAMP_RECRUIT_LINES, prevState.world.seed, campCell.id, stepCount);
+      const baseUi2 = { ...prevState.ui, message: `${campName} Camp
+${line2}` };
+      if (!ENABLE_ANIMATIONS) return { ...prevState, world: nextWorld, resources: nextResources2, ui: baseUi2 };
+      const startFrame2 = baseUi2.clock.frame;
+      let uiWith2 = baseUi2;
+      uiWith2 = enqueueAnim(uiWith2, {
+        kind: "foodDelta",
+        startFrame: startFrame2,
+        durationFrames: FOOD_DELTA_FRAMES,
+        blocksInput: false,
+        params: { delta: CAMP_FOOD_GAIN }
+      });
+      uiWith2 = enqueueAnim(uiWith2, {
+        kind: "armyDelta",
+        startFrame: startFrame2,
+        durationFrames: FOOD_DELTA_FRAMES,
+        blocksInput: false,
+        params: { delta: armyGain }
+      });
+      return { ...prevState, world: nextWorld, resources: nextResources2, ui: uiWith2 };
+    }
+    if (prevRes.hasScout) {
+      const line2 = pickDeterministicLine(SCOUT_ALREADY_HAVE_LINES, prevState.world.seed, campCell.id, stepCount);
+      return { ...prevState, ui: { ...prevState.ui, message: `${campName} Camp
+${line2}` } };
+    }
+    if (prevRes.food < SCOUT_FOOD_COST) {
+      const line2 = pickDeterministicLine(SCOUT_NO_FOOD_LINES, prevState.world.seed, campCell.id, stepCount);
+      return { ...prevState, ui: { ...prevState.ui, message: `${campName} Camp
+${line2}` } };
+    }
+    const nextResources = { ...prevRes, hasScout: true, food: prevRes.food - SCOUT_FOOD_COST };
+    const line = pickDeterministicLine(SCOUT_HIRE_LINES, prevState.world.seed, campCell.id, stepCount);
+    const baseUi = { ...prevState.ui, message: `${campName} Camp
+${line}` };
+    if (!ENABLE_ANIMATIONS) return { ...prevState, resources: nextResources, ui: baseUi };
+    const startFrame = baseUi.clock.frame;
+    const uiWith = enqueueAnim(baseUi, {
+      kind: "foodDelta",
+      startFrame,
+      durationFrames: FOOD_DELTA_FRAMES,
+      blocksInput: false,
+      params: { delta: -SCOUT_FOOD_COST }
+    });
+    return { ...prevState, resources: nextResources, ui: uiWith };
   }
 
   // src/core/combat.ts
@@ -332,8 +508,7 @@
     return pos.y * world.width + pos.x;
   }
   function encounterFlavorIndex(opts) {
-    const h = hashSeedStepCell({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId });
-    return pickIndex(h, COMBAT_ENCOUNTER_LINES.length);
+    return pickIndex({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId }, COMBAT_ENCOUNTER_LINES.length);
   }
   function pickCombatEncounterLine(opts) {
     const idx = encounterFlavorIndex(opts);
@@ -342,8 +517,7 @@
   function pickCombatExitLine(opts) {
     const pool = opts.outcome === "victory" ? COMBAT_VICTORY_EXIT_LINES : COMBAT_FLEE_EXIT_LINES;
     const salt = opts.outcome === "victory" ? 2654435769 : 2246822507;
-    const h = hashSeedStepCell({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId, salt });
-    return pickFromPool(pool, h) || pool[0] || "";
+    return pickFromPool({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId, salt }, pool) || pool[0] || "";
   }
   function spawnEnemyArmy(opts) {
     const playerArmy = Math.max(0, Math.trunc(opts.playerArmy));
@@ -378,7 +552,7 @@
 
   // src/core/tileEvents.ts
   function rollTileEvent(args) {
-    const { seed, stepCount, cellId: cellId2, kind, hengeReady } = args;
+    const { seed, stepCount, cellId: cellId2, kind, hengeReady, hasScout } = args;
     if (kind === "henge") {
       return hengeReady ? { kind: "fight", source: "henge" } : null;
     }
@@ -396,8 +570,11 @@
     } else {
       return null;
     }
+    if (hasScout && (kind === "woods" || kind === "swamp")) {
+      lostPct = Math.floor(lostPct / 2);
+    }
     if (ambushPct + lostPct === 0) return null;
-    const p = hashSeedStepCell({ seed, stepCount, cellId: cellId2 }) % 100;
+    const p = pickIntExclusive({ seed, stepCount, cellId: cellId2 }, 100);
     if (p < ambushPct) return { kind: "fight", source: kind };
     if (p < ambushPct + lostPct) return { kind: "lost", source: kind };
     return null;
@@ -465,13 +642,6 @@
     rngState = r.rngState;
     const pick = pool[r.value];
     return { destination: { x: pick.x, y: pick.y }, rngState };
-  }
-
-  // src/core/tiles/poiUtils.ts
-  function pickDeterministicLine(lines, seed, poiIndex, stepCount) {
-    if (!lines.length) return "";
-    const h = hashSeedStepCell({ seed, stepCount, cellId: poiIndex });
-    return pickFromPool(lines, h) || lines[0] || "";
   }
 
   // src/core/world.ts
@@ -671,54 +841,13 @@
     return { world, startPosition: startPick.startPosition };
   }
 
-  // src/core/cells.ts
-  function getCellAt(world, pos) {
-    return world.cells[pos.y][pos.x];
-  }
-  function setCellAt(world, pos, nextCell) {
-    const cells = world.cells;
-    const row = cells[pos.y];
-    const nextRow = row.slice();
-    nextRow[pos.x] = nextCell;
-    const nextCells = cells.slice();
-    nextCells[pos.y] = nextRow;
-    return { ...world, cells: nextCells };
-  }
-
   // src/core/tiles/onEnterCamp.ts
-  var onEnterCamp = ({ cell, world, pos, stepCount, resources }) => {
+  var onEnterCamp = ({ cell, world, pos }) => {
     if (cell.kind !== "camp") return { message: "" };
-    const campCell = getCellAt(world, pos);
-    if (!campCell || campCell.kind !== "camp") return { message: "" };
-    const campName = campCell.name || "A Camp";
-    const readyAt = campCell.nextReadyStep ?? 0;
-    if (stepCount < readyAt) {
-      return {
-        message: `${campName} Camp
-${pickDeterministicLine(CAMP_EMPTY_LINES, world.seed, campCell.id, stepCount)}`
-      };
-    }
-    let rngState = world.rngState;
-    const rGain = randInt(rngState, 2);
-    rngState = rGain.rngState;
-    const gain = rGain.value + 1;
-    const rLine = randInt(rngState, CAMP_RECRUIT_LINES.length);
-    rngState = rLine.rngState;
-    const line = CAMP_RECRUIT_LINES[rLine.value] || CAMP_RECRUIT_LINES[0] || "";
-    const nextCampCell = { ...campCell, nextReadyStep: stepCount + CAMP_COOLDOWN_MOVES };
-    const nextWorld = setCellAt({ ...world, rngState }, pos, nextCampCell);
-    return {
-      world: nextWorld,
-      resources: {
-        ...resources,
-        food: resources.food + CAMP_FOOD_GAIN,
-        armySize: resources.armySize + gain
-      },
-      armyDeltas: [gain],
-      foodDeltas: [CAMP_FOOD_GAIN],
-      message: `${campName} Camp
-${line}`
-    };
+    const camp = getCellAt(world, pos);
+    if (!camp || camp.kind !== "camp") return { message: "" };
+    const name = camp.name || "A Camp";
+    return { message: `${name} Camp` };
   };
 
   // src/core/tiles/onEnterDefaultTerrain.ts
@@ -909,6 +1038,7 @@ ${dir}, ${chosen.d} leagues away.`;
   var LEFT_PANEL_KIND_AUTO = "auto";
   var LEFT_PANEL_KIND_SPRITE = "sprite";
   var LEFT_PANEL_KIND_MINIMAP = "minimap";
+  var LEFT_PANEL_KIND_MAP = "map";
 
   // src/core/reducer.ts
   function getLeftPanel(ui) {
@@ -954,25 +1084,14 @@ ${dir}, ${chosen.d} leagues away.`;
   function gridTransitionDurationFrames() {
     return Math.max(1, Math.trunc(GRID_TRANSITION_STEP_FRAMES)) * 5;
   }
-  function enqueueAnim(ui, anim) {
-    const id = Math.max(1, Math.trunc(ui.anim.nextId));
-    const a = { id, ...anim };
-    const nextActive = ui.anim.active.concat([a]);
-    return {
-      message: ui.message,
-      leftPanel: ui.leftPanel,
-      clock: ui.clock,
-      anim: { nextId: id + 1, active: nextActive }
-    };
-  }
   function clearSpriteFocusIfAny(ui) {
     const lp = getLeftPanel(ui);
     if (lp.kind === LEFT_PANEL_KIND_SPRITE) return { kind: LEFT_PANEL_KIND_AUTO };
     return lp;
   }
   function normalizeResources(_world, raw) {
-    if (!raw) return { food: INITIAL_FOOD, armySize: INITIAL_ARMY_SIZE, hasBronzeKey: false };
-    return { food: raw.food, armySize: raw.armySize, hasBronzeKey: !!raw.hasBronzeKey };
+    if (!raw) return { food: INITIAL_FOOD, armySize: INITIAL_ARMY_SIZE, hasBronzeKey: false, hasScout: false };
+    return { food: raw.food, armySize: raw.armySize, hasBronzeKey: !!raw.hasBronzeKey, hasScout: !!raw.hasScout };
   }
   function gameOverMessage(seed, stepCount) {
     const k = Math.trunc(seed) + Math.trunc(stepCount);
@@ -1004,6 +1123,22 @@ ${dir}, ${chosen.d} leagues away.`;
   function reduceToggleMinimap(s) {
     const prevUi = getUi(s.ui);
     const prevLeftPanel = getLeftPanel(prevUi);
+    if (prevLeftPanel.kind === LEFT_PANEL_KIND_MAP) {
+      const nextMessage = prevUi.message === MAP_HINT_MESSAGE ? prevLeftPanel.restoreMessage : prevUi.message;
+      return {
+        world: s.world,
+        player: s.player,
+        run: s.run,
+        resources: s.resources,
+        encounter: s.encounter,
+        ui: {
+          clock: prevUi.clock,
+          anim: prevUi.anim,
+          message: nextMessage,
+          leftPanel: { kind: LEFT_PANEL_KIND_MINIMAP }
+        }
+      };
+    }
     const nextLeftPanel = prevLeftPanel.kind === LEFT_PANEL_KIND_MINIMAP ? { kind: LEFT_PANEL_KIND_AUTO } : { kind: LEFT_PANEL_KIND_MINIMAP };
     return {
       world: s.world,
@@ -1019,9 +1154,42 @@ ${dir}, ${chosen.d} leagues away.`;
       }
     };
   }
+  function reduceToggleMap(s) {
+    const prevUi = getUi(s.ui);
+    const prevLeftPanel = getLeftPanel(prevUi);
+    if (prevLeftPanel.kind === LEFT_PANEL_KIND_MAP) {
+      const restoreMessage = prevUi.message === MAP_HINT_MESSAGE ? prevLeftPanel.restoreMessage : prevUi.message;
+      return {
+        world: s.world,
+        player: s.player,
+        run: s.run,
+        resources: s.resources,
+        encounter: s.encounter,
+        ui: {
+          clock: prevUi.clock,
+          anim: prevUi.anim,
+          message: restoreMessage,
+          leftPanel: prevLeftPanel.restoreLeftPanel
+        }
+      };
+    }
+    return {
+      world: s.world,
+      player: s.player,
+      run: s.run,
+      resources: s.resources,
+      encounter: s.encounter,
+      ui: {
+        clock: prevUi.clock,
+        anim: prevUi.anim,
+        message: MAP_HINT_MESSAGE,
+        leftPanel: { kind: LEFT_PANEL_KIND_MAP, restoreLeftPanel: prevLeftPanel, restoreMessage: prevUi.message }
+      }
+    };
+  }
   function reduceMove(prevState, dx, dy) {
     if (prevState.run.isGameOver || prevState.run.hasWon) return prevState;
-    if (prevState.encounter && prevState.encounter.kind === "combat") return prevState;
+    if (prevState.encounter) return prevState;
     const world = prevState.world;
     const prevPos = prevState.player.position;
     const nextPos = {
@@ -1075,42 +1243,47 @@ ${dir}, ${chosen.d} leagues away.`;
         const readyAt = hc.nextReadyStep ?? 0;
         hengeReady = nextStepCount >= readyAt;
       }
-      const event = rollTileEvent({
-        seed: nextWorld.seed,
-        stepCount: nextStepCount,
-        cellId: destCellId,
-        kind: destKind,
-        hengeReady
-      });
       const preEncounterMessage = message;
-      if (event && event.kind === "fight") {
-        const spawned = spawnEnemyArmy({ rngState: nextWorld.rngState, playerArmy: nextResources.armySize });
-        nextWorld = { ...nextWorld, rngState: spawned.rngState };
-        nextEncounter = {
-          kind: "combat",
-          enemyArmySize: spawned.enemyArmy,
-          sourceKind: destKind,
-          sourceCellId: destCellId,
-          restoreMessage: preEncounterMessage
-        };
-        didStartCombat = true;
-        if (destKind === "henge") {
-          const hc = destCell;
-          const nextHenge = { ...hc, nextReadyStep: nextStepCount + HENGE_COOLDOWN_MOVES };
-          nextWorld = setCellAt(nextWorld, nextPos, nextHenge);
-        }
-        message = destKind === "henge" ? HENGE_ENCOUNTER_LINE : pickCombatEncounterLine({ seed: nextWorld.seed, stepCount: nextStepCount, cellId: destCellId });
-      }
-      if (event && event.kind === "lost") {
-        const td = pickTeleportDestination({
-          world: nextWorld,
-          origin: nextPos,
-          rngState: nextWorld.rngState
+      if (destKind === "camp") {
+        nextEncounter = { kind: "camp", sourceKind: "camp", sourceCellId: destCellId, restoreMessage: preEncounterMessage };
+      } else {
+        const event = rollTileEvent({
+          seed: nextWorld.seed,
+          stepCount: nextStepCount,
+          cellId: destCellId,
+          kind: destKind,
+          hengeReady,
+          hasScout: !!nextResources.hasScout
         });
-        nextWorld = { ...nextWorld, rngState: td.rngState };
-        landingPos = td.destination;
-        message = pickDeterministicLine(LOST_FLAVOR_LINES, nextWorld.seed, destCellId, nextStepCount);
-        teleported = true;
+        if (event && event.kind === "fight") {
+          const spawned = spawnEnemyArmy({ rngState: nextWorld.rngState, playerArmy: nextResources.armySize });
+          nextWorld = { ...nextWorld, rngState: spawned.rngState };
+          nextEncounter = {
+            kind: "combat",
+            enemyArmySize: spawned.enemyArmy,
+            sourceKind: destKind,
+            sourceCellId: destCellId,
+            restoreMessage: preEncounterMessage
+          };
+          didStartCombat = true;
+          if (destKind === "henge") {
+            const hc = destCell;
+            const nextHenge = { ...hc, nextReadyStep: nextStepCount + HENGE_COOLDOWN_MOVES };
+            nextWorld = setCellAt(nextWorld, nextPos, nextHenge);
+          }
+          message = destKind === "henge" ? HENGE_ENCOUNTER_LINE : pickCombatEncounterLine({ seed: nextWorld.seed, stepCount: nextStepCount, cellId: destCellId });
+        }
+        if (event && event.kind === "lost") {
+          const td = pickTeleportDestination({
+            world: nextWorld,
+            origin: nextPos,
+            rngState: nextWorld.rngState
+          });
+          nextWorld = { ...nextWorld, rngState: td.rngState };
+          landingPos = td.destination;
+          message = pickDeterministicLine(LOST_FLAVOR_LINES, nextWorld.seed, destCellId, nextStepCount);
+          teleported = true;
+        }
       }
     }
     const prevUi = getUi(prevState.ui);
@@ -1122,6 +1295,13 @@ ${dir}, ${chosen.d} leagues away.`;
     };
     const finalPlayerPos = teleported ? landingPos : nextPos;
     const finalKnowsPosition = teleported ? false : nextKnowsPosition;
+    const mem = updateRunPathMemoryAfterMove({
+      prevPath: prevState.run.path,
+      prevLostBufferStartIndex: prevState.run.lostBufferStartIndex,
+      nextPos: finalPlayerPos,
+      nextKnowsPosition: finalKnowsPosition,
+      teleported
+    });
     const baseState = {
       world: nextWorld,
       player: { position: finalPlayerPos },
@@ -1129,7 +1309,9 @@ ${dir}, ${chosen.d} leagues away.`;
         stepCount: nextStepCount,
         hasWon: nextHasWon,
         isGameOver,
-        knowsPosition: finalKnowsPosition
+        knowsPosition: finalKnowsPosition,
+        path: mem.path,
+        lostBufferStartIndex: mem.lostBufferStartIndex
       },
       resources: nextResources,
       encounter: nextEncounter,
@@ -1196,6 +1378,39 @@ ${dir}, ${chosen.d} leagues away.`;
       ui: uiWith
     };
   }
+  function updateRunPathMemoryAfterMove(args) {
+    const prevPath = args.prevPath ?? [];
+    let path = prevPath.concat([{ pos: args.nextPos, isMapped: false }]);
+    let lostBufferStartIndex = args.prevLostBufferStartIndex ?? null;
+    if (args.teleported) {
+      lostBufferStartIndex = path.length - 1;
+    }
+    if (!args.nextKnowsPosition && lostBufferStartIndex == null) {
+      lostBufferStartIndex = path.length - 1;
+    }
+    if (args.nextKnowsPosition) {
+      if (lostBufferStartIndex != null) {
+        const start = Math.max(0, Math.min(lostBufferStartIndex, path.length - 1));
+        const mapped = path.slice();
+        for (let i = start; i < mapped.length; i++) {
+          const step = mapped[i];
+          if (step.isMapped) continue;
+          mapped[i] = { pos: step.pos, isMapped: true };
+        }
+        path = mapped;
+        lostBufferStartIndex = null;
+      } else {
+        const idx = path.length - 1;
+        const step = path[idx];
+        if (!step.isMapped) {
+          const mapped = path.slice();
+          mapped[idx] = { pos: step.pos, isMapped: true };
+          path = mapped;
+        }
+      }
+    }
+    return { path, lostBufferStartIndex };
+  }
   function reduceRestart(s) {
     const next = processAction(null, { type: ACTION_NEW_RUN, seed: s.world.seed + 1 });
     return next || s;
@@ -1226,11 +1441,12 @@ ${dir}, ${chosen.d} leagues away.`;
       return {
         world,
         player: { position: { x: playerPos.x, y: playerPos.y } },
-        run: { stepCount: 0, hasWon, isGameOver: false, knowsPosition: false },
+        run: { stepCount: 0, hasWon, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
         resources: {
           food: INITIAL_FOOD,
           armySize: INITIAL_ARMY_SIZE,
-          hasBronzeKey: false
+          hasBronzeKey: false,
+          hasScout: false
         },
         encounter: null,
         ui
@@ -1240,8 +1456,14 @@ ${dir}, ${chosen.d} leagues away.`;
     if (action.type === ACTION_RESTART) return reduceRestart(prevState);
     if (action.type === ACTION_SHOW_GOAL) return reduceGoal(prevState);
     if (action.type === ACTION_TOGGLE_MINIMAP) return reduceToggleMinimap(prevState);
+    if (action.type === ACTION_TOGGLE_MAP) {
+      return reduceToggleMap(prevState);
+    }
+    const campHandled = reduceCampAction(prevState, action);
+    if (campHandled) return campHandled;
     if (action.type === ACTION_RETURN) {
       if (!prevState.encounter) return prevState;
+      if (prevState.encounter.kind !== "combat") return prevState;
       const prevUi = getUi(prevState.ui);
       if (prevState.run.isGameOver || prevState.run.hasWon) return prevState;
       const prevRes = normalizeResources(prevState.world, prevState.resources);
@@ -1420,12 +1642,21 @@ ${dir}, ${chosen.d} leagues away.`;
     if (row === 0 && col === 0) return { iconKey: "goal", action: { type: ACTION_SHOW_GOAL } };
     if (row === 2 && col === 0) return { iconKey: "minimap", action: { type: ACTION_TOGGLE_MINIMAP } };
     if (row === 2 && col === 2) return { iconKey: "restart", action: { type: ACTION_RESTART } };
-    if (row === 0 && col === 2) return { action: null };
+    if (row === 0 && col === 2) {
+      return { iconKey: "map", action: { type: ACTION_TOGGLE_MAP } };
+    }
     const isRunOver = !!(s.run.isGameOver || s.run.hasWon);
     if (s.encounter && s.encounter.kind === "combat") {
       if (row === 1 && col === 0) return { iconKey: "fight", action: { type: ACTION_FIGHT } };
       if (row === 1 && col === 2) return { iconKey: "return", action: { type: ACTION_RETURN } };
       if (row === 1 && col === 1) return { iconKey: "enemy", action: null };
+      return { action: null };
+    }
+    if (s.encounter && s.encounter.kind === "camp") {
+      if (row === 0 && col === 1) return { iconKey: "campHireScout", action: { type: ACTION_CAMP_HIRE_SCOUT } };
+      if (row === 1 && col === 0) return { iconKey: "campSearch", action: { type: ACTION_CAMP_SEARCH } };
+      if (row === 1 && col === 2) return { iconKey: "campLeave", action: { type: ACTION_CAMP_LEAVE } };
+      if (row === 1 && col === 1) return { iconKey: "campFireIcon", action: null };
       return { action: null };
     }
     if (row === 0 && col === 1) return { tilePreview: { kind: "relativeToPlayer", dx: 0, dy: -1 }, action: isRunOver ? null : { type: ACTION_MOVE, dx: 0, dy: -1 } };
@@ -1488,6 +1719,61 @@ ${dir}, ${chosen.d} leagues away.`;
     return a || null;
   }
 
+  // src/core/gameMap.ts
+  function labelForKind(kind) {
+    if (kind === "farm") return "F";
+    if (kind === "camp") return "C";
+    if (kind === "henge") return "H";
+    if (kind === "gate") return "G";
+    if (kind === "locksmith") return "L";
+    return null;
+  }
+  function computeGameMapView(s) {
+    const showPlayer = !!s.run.knowsPosition;
+    const markers = [];
+    const seen = /* @__PURE__ */ new Set();
+    function push(pos, label) {
+      const k = `${label}@${pos.x},${pos.y}`;
+      if (seen.has(k)) return;
+      seen.add(k);
+      markers.push({ pos, label });
+    }
+    const path = s.run.path ?? [];
+    if (s.run.knowsPosition) {
+      if (s.resources.hasScout) {
+        for (let y = 0; y < s.world.height; y++) {
+          for (let x = 0; x < s.world.width; x++) {
+            const kind = s.world.cells[y][x].kind;
+            const label = kind === "farm" ? "F" : kind === "camp" ? "C" : kind === "henge" ? "H" : null;
+            if (label) push({ x, y }, label);
+          }
+        }
+      }
+      for (let i = 0; i < path.length; i++) {
+        const step = path[i];
+        if (!step.isMapped) continue;
+        const p = step.pos;
+        const kind = s.world.cells[p.y][p.x].kind;
+        const label = labelForKind(kind);
+        if (!label) continue;
+        if (s.resources.hasScout && (label === "G" || label === "L")) push(p, label);
+        else if (!s.resources.hasScout) push(p, label);
+        else if (label === "F" || label === "C" || label === "H") push(p, label);
+      }
+    } else {
+      const start = s.run.lostBufferStartIndex ?? path.length;
+      for (let i = Math.max(0, start); i < path.length; i++) {
+        const step = path[i];
+        const p = step.pos;
+        const kind = s.world.cells[p.y][p.x].kind;
+        const label = labelForKind(kind);
+        if (!label) continue;
+        push(p, label);
+      }
+    }
+    return { markers, showPlayer };
+  }
+
   // src/platform/tic80/uiConstants.ts
   var UI_COLOR_BG = 0;
   var UI_COLOR_TEXT = 12;
@@ -1505,9 +1791,13 @@ ${dir}, ${chosen.d} leagues away.`;
   var UI_SPR_ENEMY = 102;
   var UI_SPR_FIGHT = 74;
   var UI_SPR_RETURN = 76;
+  var UI_SPR_MAP_TILE_BG = 135;
+  var UI_SPR_MAP_PLAYER_OUTLINE = 134;
   var UI_ILLUSTRATION_SCALE = 4;
   var UI_TEXTURE_TILE_PX = 8;
   var UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR = 8;
+  var UI_MAP_VIEWPORT_CELLS = 9;
+  var UI_MAP_CELL_PITCH_PX = 6;
   var UI_COMBAT_PREVIEW_PLATE_PAD = 2;
   var UI_COMBAT_PREVIEW_PLATE_W = 42;
   var UI_COMBAT_PREVIEW_PLATE_INSET = 2;
@@ -1601,10 +1891,15 @@ ${dir}, ${chosen.d} leagues away.`;
   var RIGHT_GRID_SPRITE_ID = {
     goal: SPR_BUTTON_GOAL,
     minimap: SPR_BUTTON_MINIMAP,
+    map: SPR_BUTTON_MAP,
     restart: SPR_BUTTON_RESTART,
     fight: UI_SPR_FIGHT,
     return: UI_SPR_RETURN,
-    enemy: UI_SPR_ENEMY
+    enemy: UI_SPR_ENEMY,
+    campSearch: SPR_BUTTON_CAMP_SEARCH,
+    campHireScout: SPR_BUTTON_CAMP_HIRE_SCOUT,
+    campLeave: UI_SPR_RETURN,
+    campFireIcon: 140
   };
   function spriteIdForIconKey(iconKey) {
     return RIGHT_GRID_SPRITE_ID[iconKey];
@@ -1712,6 +2007,7 @@ ${dir}, ${chosen.d} leagues away.`;
   }
   function isMetaCornerCell(cell) {
     return cell.row === 0 && cell.col === 0 || // goal
+    cell.row === 0 && cell.col === 2 || // map
     cell.row === 2 && cell.col === 0 || // minimap
     cell.row === 2 && cell.col === 2;
   }
@@ -1821,8 +2117,7 @@ ${dir}, ${chosen.d} leagues away.`;
       { row: 0, col: 0, spriteId: SPR_BUTTON_GOAL },
       { row: 2, col: 0, spriteId: SPR_BUTTON_MINIMAP },
       { row: 2, col: 2, spriteId: SPR_BUTTON_RESTART },
-      { row: 0, col: 2, spriteId: null }
-      // disabled
+      { row: 0, col: 2, spriteId: SPR_BUTTON_MAP }
     ];
     for (let i = 0; i < corners.length; i++) {
       const c = corners[i];
@@ -1870,9 +2165,14 @@ ${dir}, ${chosen.d} leagues away.`;
     cls(UI_COLOR_BG);
     drawRightPanel(s, hints);
     drawLeftPanel(s);
-    if (s.resources.hasBronzeKey) {
-      const margin = 2;
-      spr(106, SCREEN_WIDTH - 16 - margin, margin, 0, 1, 0, 0, 2, 2);
+    const iconY = 0;
+    if (s.resources.hasBronzeKey && s.resources.hasScout) {
+      spr(106, SCREEN_WIDTH - 16, iconY, 0, 1, 0, 0, 2, 2);
+      spr(SPR_ICON_SCOUT, SCREEN_WIDTH - 32, iconY, 0, 1, 0, 0, 2, 2);
+    } else if (s.resources.hasBronzeKey) {
+      spr(106, SCREEN_WIDTH - 16, iconY, 0, 1, 0, 0, 2, 2);
+    } else if (s.resources.hasScout) {
+      spr(SPR_ICON_SCOUT, SCREEN_WIDTH - 16, iconY, 0, 1, 0, 0, 2, 2);
     }
   }
   function formatA1(position) {
@@ -1923,6 +2223,33 @@ ${dir}, ${chosen.d} leagues away.`;
       }
     }
   }
+  function drawMap(s, x, y, sizePx) {
+    const { markers } = computeGameMapView(s);
+    const w = Math.max(1, s.world.width);
+    const h = Math.max(1, s.world.height);
+    const viewport = Math.max(1, UI_MAP_VIEWPORT_CELLS);
+    const pitch = Math.max(1, UI_MAP_CELL_PITCH_PX);
+    const radius = Math.floor(viewport / 2);
+    const gridX = x + Math.floor((sizePx - pitch * viewport) / 2);
+    const gridY = y + Math.floor((sizePx - pitch * viewport) / 2);
+    const centerX = gridX + radius * pitch;
+    const centerY = gridY + radius * pitch;
+    const px = s.player.position.x;
+    const py = s.player.position.y;
+    for (let vy = -radius; vy <= radius; vy++) {
+      for (let vx = -radius; vx <= radius; vx++) {
+        spr(UI_SPR_MAP_TILE_BG, centerX + vx * pitch, centerY + vy * pitch, 0);
+      }
+    }
+    for (let i = 0; i < markers.length; i++) {
+      const m = markers[i];
+      const dx = torusDelta(px, m.pos.x, w);
+      const dy = torusDelta(py, m.pos.y, h);
+      if (Math.abs(dx) > radius || Math.abs(dy) > radius) continue;
+      print(m.label, centerX + dx * pitch, centerY + dy * pitch, UI_COLOR_POI_DESC);
+    }
+    spr(UI_SPR_MAP_PLAYER_OUTLINE, centerX - 1, centerY - 1, 0);
+  }
   function drawLeftPanel(s) {
     rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, UI_COLOR_BG);
     const frame = s.resources.hasBronzeKey ? SPR_HUD_FRAME_BRONZE : SPR_HUD_FRAME;
@@ -1933,6 +2260,7 @@ ${dir}, ${chosen.d} leagues away.`;
       fallbackBorderColor: UI_COLOR_DIM
     });
     const isCombat = !!(s.encounter && s.encounter.kind === "combat");
+    const isCamp = !!(s.encounter && s.encounter.kind === "camp");
     const pos = s.player.position;
     const spriteIdAtPos = getSpriteIdAt(s.world, pos.x, pos.y);
     const leftPanel = s.ui.leftPanel;
@@ -1941,14 +2269,16 @@ ${dir}, ${chosen.d} leagues away.`;
     const illY = UI_LEFT_PANEL_PADDING;
     if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
       drawMinimap(s);
+    } else if (leftPanel.kind === LEFT_PANEL_KIND_MAP) {
+      drawMap(s, illX, illY, illSize);
     } else if (leftPanel.kind === LEFT_PANEL_KIND_SPRITE) {
       drawIllustrationWithTextureOverlay(leftPanel.spriteId, illX, illY);
     } else if (s.run.isGameOver) {
       drawIllustrationWithTextureOverlay(40, illX, illY);
     } else {
-      if (!isCombat) {
+      if (!isCombat && !isCamp) {
         drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
-      } else {
+      } else if (isCombat) {
         drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
         const platePad = UI_COMBAT_PREVIEW_PLATE_PAD;
         const plateW = UI_COMBAT_PREVIEW_PLATE_W;
@@ -1983,6 +2313,37 @@ ${dir}, ${chosen.d} leagues away.`;
             const dy = UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI_FOOD_DELTA_RISE_PX);
             print(label, xCursor, enemyIconY + dy, color);
             xCursor += label.length * 6 + UI_FOOD_DELTA_GAP_PX;
+          }
+        }
+      } else {
+        drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
+        const preview = computeCampPreviewModel(s);
+        if (preview) {
+          const lines = [];
+          if (preview.foodGain > 0) {
+            lines.push({ spriteId: FOOD_SPRITE_ID, text: `+${preview.foodGain}`, color: UI_COLOR_TEXT });
+            lines.push({ spriteId: ARMY_SPRITE_ID, text: `+${preview.armyGain}`, color: UI_COLOR_TEXT });
+          }
+          if (preview.scoutFoodCost != null) {
+            lines.push({ spriteId: SPR_ICON_SCOUT, text: `-${preview.scoutFoodCost}`, color: UI_COLOR_TEXT });
+          }
+          if (lines.length) {
+            const platePad = UI_COMBAT_PREVIEW_PLATE_PAD;
+            const plateW = UI_COMBAT_PREVIEW_PLATE_W;
+            const plateH = 16 * lines.length + platePad * 2;
+            const plateX = illX + illSize - plateW - UI_COMBAT_PREVIEW_PLATE_INSET;
+            const plateY = illY + UI_COMBAT_PREVIEW_PLATE_INSET;
+            rect(plateX, plateY, plateW, plateH, UI_COLOR_BG);
+            rectb(plateX, plateY, plateW, plateH, UI_COLOR_DIM);
+            for (let i = 0; i < lines.length; i++) {
+              const ln = lines[i];
+              const iconX = plateX + platePad;
+              const iconY = plateY + platePad + i * 16;
+              spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2);
+              const valueX = iconX + UI_FOOD_VALUE_OFFSET_X;
+              const valueY = iconY + UI_FOOD_VALUE_OFFSET_Y;
+              print(ln.text, valueX, valueY, ln.color);
+            }
           }
         }
       }
@@ -2168,9 +2529,9 @@ ${dir}, ${chosen.d} leagues away.`;
   globalThis.TIC = TIC;
 })();
 
-// title:  The Unbound (prototype 0.1.0)
+// title:  The Unbound (prototype 0.2.0)
 // author: haulin
-// desc:   Prototype 0.1.0 toward the North Star
+// desc:   Prototype 0.2.0 toward the North Star
 // script: js
 // input:  mouse
 

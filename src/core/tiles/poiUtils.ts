@@ -1,4 +1,4 @@
-import { hashSeedStepCell, pickFromPool } from '../prng'
+import { pickFromPool } from '../prng'
 
 export function pickDeterministicLine(
   lines: readonly string[],
@@ -7,6 +7,5 @@ export function pickDeterministicLine(
   stepCount: number,
 ): string {
   if (!lines.length) return ''
-  const h = hashSeedStepCell({ seed, stepCount, cellId: poiIndex })
-  return pickFromPool(lines, h) || lines[0] || ''
+  return pickFromPool({ seed, stepCount, cellId: poiIndex }, lines) || lines[0] || ''
 }

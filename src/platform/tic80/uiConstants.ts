@@ -24,10 +24,18 @@ export const UI_SPR_ENEMY = 102
 export const UI_SPR_FIGHT = 74
 export const UI_SPR_RETURN = 76
 
+// In-game map sprites (8x8 each).
+export const UI_SPR_MAP_TILE_BG = 135
+export const UI_SPR_MAP_PLAYER_OUTLINE = 134
+
 // 64×64 illustration preview (16×16 sprite scaled up).
 export const UI_ILLUSTRATION_SCALE = 4 // 16->64
 export const UI_TEXTURE_TILE_PX = 8
 export const UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR = 8
+
+// In-game map: fixed viewport centered on player, torus-wrapped.
+export const UI_MAP_VIEWPORT_CELLS = 9 // odd so player sits at exact center
+export const UI_MAP_CELL_PITCH_PX = 6
 
 // Combat preview plate layout inside illustration block.
 export const UI_COMBAT_PREVIEW_PLATE_PAD = 2

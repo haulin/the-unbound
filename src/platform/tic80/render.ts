@@ -5,9 +5,14 @@ import {
   FOOD_WARNING_THRESHOLD,
   LORE_MAX_CHARS_PER_LINE,
   LOST_COORD_LABEL,
+  SPR_ICON_SCOUT,
 } from '../../core/constants'
+import { computeCampPreviewModel } from '../../core/camp'
+import { computeGameMapView } from '../../core/gameMap'
 import { getSpriteIdAt } from '../../core/world'
+import { torusDelta } from '../../core/math'
 import {
+  LEFT_PANEL_KIND_MAP,
   LEFT_PANEL_KIND_MINIMAP,
   LEFT_PANEL_KIND_SPRITE,
   type ArmyDeltaAnim,
@@ -56,9 +61,14 @@ export function renderFrame(s: State, hints: RenderHints) {
   drawLeftPanel(s)
 
   // Global status icons (top-right of whole screen).
-  if (s.resources.hasBronzeKey) {
-    const margin = 2
-    spr(106, SCREEN_WIDTH - 16 - margin, margin, 0, 1, 0, 0, 2, 2)
+  const iconY = 0
+  if (s.resources.hasBronzeKey && s.resources.hasScout) {
+    spr(106, SCREEN_WIDTH - 16, iconY, 0, 1, 0, 0, 2, 2)
+    spr(SPR_ICON_SCOUT, SCREEN_WIDTH - 32, iconY, 0, 1, 0, 0, 2, 2)
+  } else if (s.resources.hasBronzeKey) {
+    spr(106, SCREEN_WIDTH - 16, iconY, 0, 1, 0, 0, 2, 2)
+  } else if (s.resources.hasScout) {
+    spr(SPR_ICON_SCOUT, SCREEN_WIDTH - 16, iconY, 0, 1, 0, 0, 2, 2)
   }
 }
 
@@ -137,6 +147,42 @@ function drawIllustrationWithTextureOverlay(spriteId: number, x: number, y: numb
   }
 }
 
+function drawMap(s: State, x: number, y: number, sizePx: number) {
+  const { markers } = computeGameMapView(s)
+  const w = Math.max(1, s.world.width)
+  const h = Math.max(1, s.world.height)
+
+  const viewport = Math.max(1, UI.UI_MAP_VIEWPORT_CELLS)
+  const pitch = Math.max(1, UI.UI_MAP_CELL_PITCH_PX)
+  const radius = Math.floor(viewport / 2)
+  const gridX = x + Math.floor((sizePx - pitch * viewport) / 2)
+  const gridY = y + Math.floor((sizePx - pitch * viewport) / 2)
+  const centerX = gridX + radius * pitch
+  const centerY = gridY + radius * pitch
+
+  const px = s.player.position.x
+  const py = s.player.position.y
+
+  // Tile background: stamp the 8×8 sprite (#135) whose visible area is 6×6, aligned top-left.
+  for (let vy = -radius; vy <= radius; vy++) {
+    for (let vx = -radius; vx <= radius; vx++) {
+      spr(UI.UI_SPR_MAP_TILE_BG, centerX + vx * pitch, centerY + vy * pitch, 0)
+    }
+  }
+
+  for (let i = 0; i < markers.length; i++) {
+    const m = markers[i]!
+    const dx = torusDelta(px, m.pos.x, w)
+    const dy = torusDelta(py, m.pos.y, h)
+    if (Math.abs(dx) > radius || Math.abs(dy) > radius) continue
+    print(m.label, centerX + dx * pitch, centerY + dy * pitch, UI.UI_COLOR_POI_DESC)
+  }
+
+  // Player marker never disappears on the rolling map.
+  // 8×8 outline sprite, inset -1,-1 so it surrounds the full pitch cell.
+  spr(UI.UI_SPR_MAP_PLAYER_OUTLINE, centerX - 1, centerY - 1, 0)
+}
+
 function drawLeftPanel(s: State) {
   rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, UI.UI_COLOR_BG)
   const frame = s.resources.hasBronzeKey ? SPR_HUD_FRAME_BRONZE : SPR_HUD_FRAME
@@ -148,6 +194,7 @@ function drawLeftPanel(s: State) {
   })
 
   const isCombat = !!(s.encounter && s.encounter.kind === 'combat')
+  const isCamp = !!(s.encounter && s.encounter.kind === 'camp')
   const pos = s.player.position
   const spriteIdAtPos = getSpriteIdAt(s.world, pos.x, pos.y)
   const leftPanel = s.ui.leftPanel
@@ -159,15 +206,17 @@ function drawLeftPanel(s: State) {
   // defaults (tombstone on game over, combat plate during combat, tile preview otherwise).
   if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
     drawMinimap(s)
+  } else if (leftPanel.kind === LEFT_PANEL_KIND_MAP) {
+    drawMap(s, illX, illY, illSize)
   } else if (leftPanel.kind === LEFT_PANEL_KIND_SPRITE) {
     drawIllustrationWithTextureOverlay(leftPanel.spriteId, illX, illY)
   } else if (s.run.isGameOver) {
     // Game over: use a fixed tombstone illustration.
     drawIllustrationWithTextureOverlay(40, illX, illY)
   } else {
-    if (!isCombat) {
+    if (!isCombat && !isCamp) {
       drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
-    } else {
+    } else if (isCombat) {
       // Combat preview: use the 64×64 illustration space as a composite.
       // - Render the underlying tile as a full 64×64 preview.
       // - Overlay a small "enemy stats" plate on top (filled + bordered),
@@ -213,6 +262,43 @@ function drawLeftPanel(s: State) {
           const dy = UI.UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI.UI_FOOD_DELTA_RISE_PX)
           print(label, xCursor, enemyIconY + dy, color)
           xCursor += label.length * 6 + UI.UI_FOOD_DELTA_GAP_PX
+        }
+      }
+    } else {
+      // Camp preview: underlying tile + up to three stacked stat lines.
+      drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
+
+      const preview = computeCampPreviewModel(s)
+      if (preview) {
+        type Line = { spriteId: number; text: string; color: number }
+        const lines: Line[] = []
+        if (preview.foodGain > 0) {
+          lines.push({ spriteId: FOOD_SPRITE_ID, text: `+${preview.foodGain}`, color: UI.UI_COLOR_TEXT })
+          lines.push({ spriteId: ARMY_SPRITE_ID, text: `+${preview.armyGain}`, color: UI.UI_COLOR_TEXT })
+        }
+        if (preview.scoutFoodCost != null) {
+          lines.push({ spriteId: SPR_ICON_SCOUT, text: `-${preview.scoutFoodCost}`, color: UI.UI_COLOR_TEXT })
+        }
+
+        if (lines.length) {
+          const platePad = UI.UI_COMBAT_PREVIEW_PLATE_PAD
+          const plateW = UI.UI_COMBAT_PREVIEW_PLATE_W
+          const plateH = 16 * lines.length + platePad * 2
+          const plateX = illX + illSize - plateW - UI.UI_COMBAT_PREVIEW_PLATE_INSET
+          const plateY = illY + UI.UI_COMBAT_PREVIEW_PLATE_INSET
+          rect(plateX, plateY, plateW, plateH, UI.UI_COLOR_BG)
+          rectb(plateX, plateY, plateW, plateH, UI.UI_COLOR_DIM)
+
+          for (let i = 0; i < lines.length; i++) {
+            const ln = lines[i]!
+            const iconX = plateX + platePad
+            const iconY = plateY + platePad + i * 16
+            spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2)
+
+            const valueX = iconX + UI.UI_FOOD_VALUE_OFFSET_X
+            const valueY = iconY + UI.UI_FOOD_VALUE_OFFSET_Y
+            print(ln.text, valueX, valueY, ln.color)
+          }
         }
       }
     }
