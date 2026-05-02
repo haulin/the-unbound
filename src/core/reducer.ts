@@ -8,8 +8,9 @@ import {
   ACTION_TICK,
   ACTION_TOGGLE_MAP,
   ACTION_TOGGLE_MINIMAP,
-  COMBAT_REWARD_MAX,
-  COMBAT_REWARD_MIN,
+  COMBAT_FOOD_BONUS_MAX,
+  COMBAT_GOLD_REWARD_MAX,
+  COMBAT_GOLD_REWARD_MIN,
   ENABLE_ANIMATIONS,
   FOOD_DELTA_FRAMES,
   GAME_OVER_LINES,
@@ -19,14 +20,16 @@ import {
   HENGE_ENCOUNTER_LINE,
   INITIAL_ARMY_SIZE,
   INITIAL_FOOD,
+  INITIAL_GOLD,
   LOST_FLAVOR_LINES,
   MAP_HINT_MESSAGE,
   MOVE_SLIDE_FRAMES,
-  SPR_BUTTON_GOAL,
   enterFoodCostForKind,
 } from './constants'
+import { SPRITES } from './spriteIds'
 import { reduceCampAction } from './camp'
 import { cellIdForPos, pickCombatEncounterLine, pickCombatExitLine, resolveFightRound, spawnEnemyArmy } from './combat'
+import { reduceTownAction } from './town'
 import { rollTileEvent } from './tileEvents'
 import { pickTeleportDestination } from './teleport'
 import { pickDeterministicLine } from './tiles/poiUtils'
@@ -112,8 +115,14 @@ function clearSpriteFocusIfAny(ui: Ui): LeftPanel {
 }
 
 function normalizeResources(_world: World, raw: Resources | null | undefined): Resources {
-  if (!raw) return { food: INITIAL_FOOD, armySize: INITIAL_ARMY_SIZE, hasBronzeKey: false, hasScout: false }
-  return { food: raw.food, armySize: raw.armySize, hasBronzeKey: !!raw.hasBronzeKey, hasScout: !!raw.hasScout }
+  if (!raw) return { food: INITIAL_FOOD, gold: INITIAL_GOLD, armySize: INITIAL_ARMY_SIZE, hasBronzeKey: false, hasScout: false }
+  return {
+    food: raw.food,
+    gold: raw.gold ?? 0,
+    armySize: raw.armySize,
+    hasBronzeKey: !!raw.hasBronzeKey,
+    hasScout: !!raw.hasScout,
+  }
 }
 
 function gameOverMessage(seed: number, stepCount: number): string {
@@ -134,7 +143,7 @@ function reduceGoal(s: State): State {
   const nextLeftPanel: LeftPanel =
     prevLeftPanel.kind === LEFT_PANEL_KIND_MINIMAP
       ? prevLeftPanel
-      : { kind: LEFT_PANEL_KIND_SPRITE, spriteId: SPR_BUTTON_GOAL }
+      : { kind: LEFT_PANEL_KIND_SPRITE, spriteId: SPRITES.buttons.goal }
   return {
     world: s.world,
     player: s.player,
@@ -278,6 +287,8 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
 
   let nextEncounter: Encounter | null = prevState.encounter
   let didStartCombat = false
+  let didStartCamp = false
+  let didStartTown = false
   let teleported = false
   let landingPos = nextPos
   if (!isGameOver && !prevState.encounter) {
@@ -297,6 +308,10 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
 
     if (destKind === 'camp') {
       nextEncounter = { kind: 'camp', sourceKind: 'camp', sourceCellId: destCellId, restoreMessage: preEncounterMessage }
+      didStartCamp = true
+    } else if (destKind === 'town') {
+      nextEncounter = { kind: 'town', sourceKind: 'town', sourceCellId: destCellId, restoreMessage: preEncounterMessage, rumorCursor: 0 }
+      didStartTown = true
     } else {
       const event = rollTileEvent({
         seed: nextWorld.seed,
@@ -390,22 +405,22 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
     const delta = foodDeltas[i]!
     if (!delta) continue
     uiWith = enqueueAnim(uiWith, {
-      kind: 'foodDelta',
+      kind: 'delta',
       startFrame,
       durationFrames: FOOD_DELTA_FRAMES,
       blocksInput: false,
-      params: { delta },
+      params: { target: 'food', delta },
     })
   }
   for (let i = 0; i < armyDeltas.length; i++) {
     const delta = armyDeltas[i]!
     if (!delta) continue
     uiWith = enqueueAnim(uiWith, {
-      kind: 'armyDelta',
+      kind: 'delta',
       startFrame,
       durationFrames: FOOD_DELTA_FRAMES,
       blocksInput: false,
-      params: { delta },
+      params: { target: 'army', delta },
     })
   }
 
@@ -417,6 +432,26 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
       durationFrames: gridTransitionDurationFrames(),
       blocksInput: true,
       params: { from: 'overworld', to: 'combat' },
+    })
+  }
+  if (didStartCamp) {
+    const revealStart = startFrame + MOVE_SLIDE_FRAMES
+    uiWith = enqueueAnim(uiWith, {
+      kind: 'gridTransition',
+      startFrame: revealStart,
+      durationFrames: gridTransitionDurationFrames(),
+      blocksInput: true,
+      params: { from: 'overworld', to: 'camp' },
+    })
+  }
+  if (didStartTown) {
+    const revealStart = startFrame + MOVE_SLIDE_FRAMES
+    uiWith = enqueueAnim(uiWith, {
+      kind: 'gridTransition',
+      startFrame: revealStart,
+      durationFrames: gridTransitionDurationFrames(),
+      blocksInput: true,
+      params: { from: 'overworld', to: 'town' },
     })
   }
   if (teleported) {
@@ -532,6 +567,7 @@ export function processAction(prevState: State | null, action: Action): State | 
       run: { stepCount: 0, hasWon, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
       resources: {
         food: INITIAL_FOOD,
+        gold: INITIAL_GOLD,
         armySize: INITIAL_ARMY_SIZE,
         hasBronzeKey: false,
         hasScout: false,
@@ -552,6 +588,9 @@ export function processAction(prevState: State | null, action: Action): State | 
 
   const campHandled = reduceCampAction(prevState, action)
   if (campHandled) return campHandled
+
+  const townHandled = reduceTownAction(prevState, action)
+  if (townHandled) return townHandled
 
   if (action.type === ACTION_RETURN) {
     if (!prevState.encounter) return prevState
@@ -587,11 +626,11 @@ export function processAction(prevState: State | null, action: Action): State | 
     const startFrame = baseUi.clock.frame
     let uiWith = baseUi
     uiWith = enqueueAnim(uiWith, {
-      kind: 'armyDelta',
+      kind: 'delta',
       startFrame,
       durationFrames: FOOD_DELTA_FRAMES,
       blocksInput: false,
-      params: { delta: -1 },
+      params: { target: 'army', delta: -1 },
     })
     return {
       world: prevState.world,
@@ -630,6 +669,7 @@ export function processAction(prevState: State | null, action: Action): State | 
     })
 
     const foodDeltas: number[] = []
+    const goldDeltas: number[] = []
     const armyDeltas: number[] = []
     const enemyDeltas: number[] = []
 
@@ -651,12 +691,20 @@ export function processAction(prevState: State | null, action: Action): State | 
 
     // Combat reward is paid once, at the end, when the enemy is eliminated.
     if (round.outcome === 'playerHit' && nextEncounter == null && !prevState.run.isGameOver && !prevState.run.hasWon) {
-      const span = COMBAT_REWARD_MAX - COMBAT_REWARD_MIN + 1
-      const r = randInt(nextWorld.rngState, span)
-      nextWorld = { ...nextWorld, rngState: r.rngState }
-      const reward = COMBAT_REWARD_MIN + r.value
-      nextResources = { ...nextResources, food: nextResources.food + reward }
-      foodDeltas.push(reward)
+      const goldSpan = COMBAT_GOLD_REWARD_MAX - COMBAT_GOLD_REWARD_MIN + 1
+      const g = randInt(nextWorld.rngState, goldSpan)
+      nextWorld = { ...nextWorld, rngState: g.rngState }
+      const gold = COMBAT_GOLD_REWARD_MIN + g.value
+      nextResources = { ...nextResources, gold: nextResources.gold + gold }
+      goldDeltas.push(gold)
+
+      const fb = randInt(nextWorld.rngState, COMBAT_FOOD_BONUS_MAX + 1)
+      nextWorld = { ...nextWorld, rngState: fb.rngState }
+      const foodBonus = fb.value | 0
+      if (foodBonus) {
+        nextResources = { ...nextResources, food: nextResources.food + foodBonus }
+        foodDeltas.push(foodBonus)
+      }
     }
     const isGameOver = nextResources.armySize <= 0
     const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : prevState.run
@@ -689,33 +737,44 @@ export function processAction(prevState: State | null, action: Action): State | 
       const delta = foodDeltas[i]!
       if (!delta) continue
       uiWith = enqueueAnim(uiWith, {
-        kind: 'foodDelta',
+        kind: 'delta',
         startFrame,
         durationFrames: FOOD_DELTA_FRAMES,
         blocksInput: false,
-        params: { delta },
+        params: { target: 'food', delta },
+      })
+    }
+    for (let i = 0; i < goldDeltas.length; i++) {
+      const delta = goldDeltas[i]!
+      if (!delta) continue
+      uiWith = enqueueAnim(uiWith, {
+        kind: 'delta',
+        startFrame,
+        durationFrames: FOOD_DELTA_FRAMES,
+        blocksInput: false,
+        params: { target: 'gold', delta },
       })
     }
     for (let i = 0; i < armyDeltas.length; i++) {
       const delta = armyDeltas[i]!
       if (!delta) continue
       uiWith = enqueueAnim(uiWith, {
-        kind: 'armyDelta',
+        kind: 'delta',
         startFrame,
         durationFrames: FOOD_DELTA_FRAMES,
         blocksInput: false,
-        params: { delta },
+        params: { target: 'army', delta },
       })
     }
     for (let i = 0; i < enemyDeltas.length; i++) {
       const delta = enemyDeltas[i]!
       if (!delta) continue
       uiWith = enqueueAnim(uiWith, {
-        kind: 'enemyArmyDelta',
+        kind: 'delta',
         startFrame,
         durationFrames: FOOD_DELTA_FRAMES,
         blocksInput: false,
-        params: { delta },
+        params: { target: 'enemyArmy', delta },
       })
     }
 

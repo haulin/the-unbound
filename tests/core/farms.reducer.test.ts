@@ -7,7 +7,7 @@ import {
   FARM_REVISIT_LINES,
   INITIAL_FOOD,
 } from '../../src/core/constants'
-import type { ArmyDeltaAnim, FoodDeltaAnim, State, World } from '../../src/core/types'
+import type { DeltaAnim, State, World } from '../../src/core/types'
 
 function makeWorld(): World {
   return {
@@ -49,10 +49,10 @@ describe('farms + food reducer', () => {
     expect(next.resources.armySize).toBe(4)
 
     if (ENABLE_ANIMATIONS) {
-      const foodDeltas = next.ui.anim.active.filter((a): a is FoodDeltaAnim => a.kind === 'foodDelta')
+      const foodDeltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'food')
       expect(foodDeltas.length).toBe(0)
 
-      const armyDeltas = next.ui.anim.active.filter((a): a is ArmyDeltaAnim => a.kind === 'armyDelta')
+      const armyDeltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'army')
       expect(armyDeltas.length).toBe(1)
       expect(armyDeltas[0]!.params.delta).toBe(-1)
     }
@@ -69,7 +69,7 @@ describe('farms + food reducer', () => {
     expect(cell.kind === 'farm' ? cell.nextReadyStep : null).toBe(next.run.stepCount + FARM_COOLDOWN_MOVES)
     expect(next.world.rngState).not.toBe(beforeRng)
 
-    const deltas = next.ui.anim.active.filter((a): a is FoodDeltaAnim => a.kind === 'foodDelta')
+    const deltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'food')
     // expect at least -1 and +gain
     expect(deltas.length).toBeGreaterThanOrEqual(2)
   })

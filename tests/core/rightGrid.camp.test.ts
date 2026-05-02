@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getRightGridCellDef } from '../../src/core/rightGrid'
-import { ACTION_CAMP_HIRE_SCOUT, ACTION_CAMP_LEAVE, ACTION_CAMP_SEARCH, ACTION_TOGGLE_MAP } from '../../src/core/constants'
+import { ACTION_CAMP_LEAVE, ACTION_CAMP_SEARCH, ACTION_TOGGLE_MAP } from '../../src/core/constants'
 import type { State, World, Cell } from '../../src/core/types'
 
 function makeWorld(): World {
@@ -24,7 +24,7 @@ function makeState(): State {
     world: makeWorld(),
     player: { position: { x: 1, y: 1 } },
     run: { stepCount: 1, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: 10, armySize: 5, hasBronzeKey: false, hasScout: false },
+    resources: { food: 10, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false },
     encounter: { kind: 'camp', sourceKind: 'camp', sourceCellId: 4, restoreMessage: 'x' },
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -33,7 +33,7 @@ function makeState(): State {
 describe('rightGrid camp layout', () => {
   it('maps camp cross actions (map corner enabled)', () => {
     const s = makeState()
-    expect(getRightGridCellDef(s, 0, 1).action).toEqual({ type: ACTION_CAMP_HIRE_SCOUT }) // North
+    expect(getRightGridCellDef(s, 0, 1).action).toBe(null) // North disabled
     expect(getRightGridCellDef(s, 1, 0).action).toEqual({ type: ACTION_CAMP_SEARCH }) // West
     expect(getRightGridCellDef(s, 1, 2).action).toEqual({ type: ACTION_CAMP_LEAVE }) // East
     expect(getRightGridCellDef(s, 1, 1).action).toBe(null) // Center no-op

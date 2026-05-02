@@ -1,12 +1,10 @@
 import {
-  ARMY_SPRITE_ID,
   ENABLE_ANIMATIONS,
-  FOOD_SPRITE_ID,
   FOOD_WARNING_THRESHOLD,
   LORE_MAX_CHARS_PER_LINE,
   LOST_COORD_LABEL,
-  SPR_ICON_SCOUT,
 } from '../../core/constants'
+import { SPRITES } from '../../core/spriteIds'
 import { computeCampPreviewModel } from '../../core/camp'
 import { computeGameMapView } from '../../core/gameMap'
 import { getSpriteIdAt } from '../../core/world'
@@ -15,61 +13,20 @@ import {
   LEFT_PANEL_KIND_MAP,
   LEFT_PANEL_KIND_MINIMAP,
   LEFT_PANEL_KIND_SPRITE,
-  type ArmyDeltaAnim,
-  type EnemyArmyDeltaAnim,
-  type FoodDeltaAnim,
   type State,
 } from '../../core/types'
-import {
-  PANEL_LEFT_WIDTH,
-  SCREEN_WIDTH,
-  SCREEN_HEIGHT,
-} from './layout'
+import { PANEL_LEFT_WIDTH, SCREEN_HEIGHT } from './layout'
+import * as Layout from './layout'
 import * as UI from './uiConstants'
 import type { RenderHints } from './input'
-import { drawNineSliceFrame, type NineSlice3x3 } from './nineSlice'
+import { drawNineSliceFrame } from './nineSlice'
 import { buildRightGridRenderPlan, type RightGridRenderOp } from './rightGridRenderPlan'
-
-const SPR_HUD_FRAME: NineSlice3x3 = {
-  tl: 146,
-  t: 147,
-  tr: 148,
-  l: 162,
-  c: 163,
-  r: 164,
-  bl: 178,
-  b: 179,
-  br: 180,
-}
-
-const SPR_HUD_FRAME_BRONZE: NineSlice3x3 = {
-  tl: 149,
-  t: 150,
-  tr: 151,
-  l: 165,
-  c: 166,
-  r: 167,
-  bl: 181,
-  b: 182,
-  br: 183,
-}
 
 export function renderFrame(s: State, hints: RenderHints) {
   cls(UI.UI_COLOR_BG)
   drawRightPanel(s, hints)
   // Draw left panel last so it masks any right-panel animation overflow into x < PANEL_LEFT_WIDTH.
   drawLeftPanel(s)
-
-  // Global status icons (top-right of whole screen).
-  const iconY = 0
-  if (s.resources.hasBronzeKey && s.resources.hasScout) {
-    spr(106, SCREEN_WIDTH - 16, iconY, 0, 1, 0, 0, 2, 2)
-    spr(SPR_ICON_SCOUT, SCREEN_WIDTH - 32, iconY, 0, 1, 0, 0, 2, 2)
-  } else if (s.resources.hasBronzeKey) {
-    spr(106, SCREEN_WIDTH - 16, iconY, 0, 1, 0, 0, 2, 2)
-  } else if (s.resources.hasScout) {
-    spr(SPR_ICON_SCOUT, SCREEN_WIDTH - 16, iconY, 0, 1, 0, 0, 2, 2)
-  }
 }
 
 // ----------------------------
@@ -142,7 +99,7 @@ function drawIllustrationWithTextureOverlay(spriteId: number, x: number, y: numb
   const illPx = 16 * UI.UI_ILLUSTRATION_SCALE
   for (let oy = 0; oy < illPx; oy += UI.UI_TEXTURE_TILE_PX) {
     for (let ox = 0; ox < illPx; ox += UI.UI_TEXTURE_TILE_PX) {
-      spr(UI.UI_SPR_TEXTURE_OVERLAY, x + ox, y + oy, UI.UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR, 1)
+      spr(SPRITES.ui8x8.previewGrain, x + ox, y + oy, UI.UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR, 1)
     }
   }
 }
@@ -163,10 +120,10 @@ function drawMap(s: State, x: number, y: number, sizePx: number) {
   const px = s.player.position.x
   const py = s.player.position.y
 
-  // Tile background: stamp the 8×8 sprite (#135) whose visible area is 6×6, aligned top-left.
+  // Tile background: stamp the 8×8 map background sprite (visible area is 6×6), aligned top-left.
   for (let vy = -radius; vy <= radius; vy++) {
     for (let vx = -radius; vx <= radius; vx++) {
-      spr(UI.UI_SPR_MAP_TILE_BG, centerX + vx * pitch, centerY + vy * pitch, 0)
+      spr(SPRITES.ui8x8.mapBackground, centerX + vx * pitch, centerY + vy * pitch, 0)
     }
   }
 
@@ -180,12 +137,12 @@ function drawMap(s: State, x: number, y: number, sizePx: number) {
 
   // Player marker never disappears on the rolling map.
   // 8×8 outline sprite, inset -1,-1 so it surrounds the full pitch cell.
-  spr(UI.UI_SPR_MAP_PLAYER_OUTLINE, centerX - 1, centerY - 1, 0)
+  spr(SPRITES.ui8x8.mapHereMarker, centerX - 1, centerY - 1, 0)
 }
 
 function drawLeftPanel(s: State) {
   rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, UI.UI_COLOR_BG)
-  const frame = s.resources.hasBronzeKey ? SPR_HUD_FRAME_BRONZE : SPR_HUD_FRAME
+  const frame = s.resources.hasBronzeKey ? SPRITES.ui8x8.panelBorderBronze : SPRITES.ui8x8.panelBorder
   drawNineSliceFrame(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, frame, {
     tilePx: 8,
     scale: 1,
@@ -195,6 +152,7 @@ function drawLeftPanel(s: State) {
 
   const isCombat = !!(s.encounter && s.encounter.kind === 'combat')
   const isCamp = !!(s.encounter && s.encounter.kind === 'camp')
+  const isTown = !!(s.encounter && s.encounter.kind === 'town')
   const pos = s.player.position
   const spriteIdAtPos = getSpriteIdAt(s.world, pos.x, pos.y)
   const leftPanel = s.ui.leftPanel
@@ -212,9 +170,9 @@ function drawLeftPanel(s: State) {
     drawIllustrationWithTextureOverlay(leftPanel.spriteId, illX, illY)
   } else if (s.run.isGameOver) {
     // Game over: use a fixed tombstone illustration.
-    drawIllustrationWithTextureOverlay(40, illX, illY)
+    drawIllustrationWithTextureOverlay(SPRITES.cosmetics.tombstoneIllustration, illX, illY)
   } else {
-    if (!isCombat && !isCamp) {
+    if (!isCombat && !isCamp && !isTown) {
       drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
     } else if (isCombat) {
       // Combat preview: use the 64×64 illustration space as a composite.
@@ -234,7 +192,7 @@ function drawLeftPanel(s: State) {
       const enemyIconX = plateX + platePad
       const enemyIconY = plateY + platePad
       // Use color 0 as transparent for UI-like overlay sprites.
-      spr(UI.UI_SPR_ENEMY, enemyIconX, enemyIconY, 0, 1, 0, 0, 2, 2)
+      spr(SPRITES.stats.enemy, enemyIconX, enemyIconY, 0, 1, 0, 0, 2, 2)
 
       const enemyArmy = s.encounter && s.encounter.kind === 'combat' ? (s.encounter.enemyArmySize | 0) : 0
       const enemyCountX = enemyIconX + UI.UI_FOOD_VALUE_OFFSET_X
@@ -244,27 +202,27 @@ function drawLeftPanel(s: State) {
       // Enemy delta overlay near the count.
       if (ENABLE_ANIMATIONS) {
         const anims = s.ui.anim.active
-        const frame = s.ui.clock.frame | 0
-        let xCursor = enemyIconX + UI.UI_FOOD_DELTA_OFFSET_X
+        const frame = s.ui.clock.frame
+        let xCursor = enemyIconX + UI.UI_DELTA_OFFSET_X
         for (let i = 0; i < anims.length; i++) {
           const a = anims[i]!
-          if (a.kind !== 'enemyArmyDelta') continue
-          const ea = a as EnemyArmyDeltaAnim
-          const start = ea.startFrame | 0
-          const dur = Math.max(1, ea.durationFrames | 0)
+          if (a.kind !== 'delta') continue
+          if (a.params.target !== 'enemyArmy') continue
+          const start = a.startFrame
+          const dur = Math.max(1, a.durationFrames)
           const t = Math.max(0, Math.min(dur, frame - start))
           const p = t / dur
-          const delta = ea.params.delta | 0
+          const delta = a.params.delta
           if (!delta) continue
 
           const label = delta > 0 ? `+${delta}` : `${delta}`
           const color = delta < 0 ? UI.UI_COLOR_GOOD : UI.UI_COLOR_BAD
-          const dy = UI.UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI.UI_FOOD_DELTA_RISE_PX)
+          const dy = UI.UI_DELTA_OFFSET_Y - Math.floor(p * UI.UI_DELTA_RISE_PX)
           print(label, xCursor, enemyIconY + dy, color)
-          xCursor += label.length * 6 + UI.UI_FOOD_DELTA_GAP_PX
+          xCursor += label.length * 6 + UI.UI_DELTA_GAP_PX
         }
       }
-    } else {
+    } else if (isCamp) {
       // Camp preview: underlying tile + up to three stacked stat lines.
       drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
 
@@ -273,11 +231,57 @@ function drawLeftPanel(s: State) {
         type Line = { spriteId: number; text: string; color: number }
         const lines: Line[] = []
         if (preview.foodGain > 0) {
-          lines.push({ spriteId: FOOD_SPRITE_ID, text: `+${preview.foodGain}`, color: UI.UI_COLOR_TEXT })
-          lines.push({ spriteId: ARMY_SPRITE_ID, text: `+${preview.armyGain}`, color: UI.UI_COLOR_TEXT })
+          lines.push({ spriteId: SPRITES.stats.food, text: `+${preview.foodGain}`, color: UI.UI_COLOR_TEXT })
+          lines.push({ spriteId: SPRITES.stats.troop, text: `+${preview.armyGain}`, color: UI.UI_COLOR_TEXT })
         }
         if (preview.scoutFoodCost != null) {
-          lines.push({ spriteId: SPR_ICON_SCOUT, text: `-${preview.scoutFoodCost}`, color: UI.UI_COLOR_TEXT })
+          lines.push({ spriteId: SPRITES.stats.scout, text: `-${preview.scoutFoodCost}`, color: UI.UI_COLOR_TEXT })
+        }
+
+        if (lines.length) {
+          const platePad = UI.UI_COMBAT_PREVIEW_PLATE_PAD
+          const plateW = UI.UI_COMBAT_PREVIEW_PLATE_W
+          const plateH = 16 * lines.length + platePad * 2
+          const plateX = illX + illSize - plateW - UI.UI_COMBAT_PREVIEW_PLATE_INSET
+          const plateY = illY + UI.UI_COMBAT_PREVIEW_PLATE_INSET
+          rect(plateX, plateY, plateW, plateH, UI.UI_COLOR_BG)
+          rectb(plateX, plateY, plateW, plateH, UI.UI_COLOR_DIM)
+
+          for (let i = 0; i < lines.length; i++) {
+            const ln = lines[i]!
+            const iconX = plateX + platePad
+            const iconY = plateY + platePad + i * 16
+            spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2)
+
+            const valueX = iconX + UI.UI_FOOD_VALUE_OFFSET_X
+            const valueY = iconY + UI.UI_FOOD_VALUE_OFFSET_Y
+            print(ln.text, valueX, valueY, ln.color)
+          }
+        }
+      }
+    } else {
+      // Town preview: show offer prices.
+      drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
+
+      const here = s.world.cells[pos.y]![pos.x]!
+      if (here.kind === 'town') {
+        type Line = { spriteId: number; text: string; color: number }
+        const lines: Line[] = []
+        const offers = here.offers || []
+        for (let i = 0; i < offers.length; i++) {
+          const o = offers[i]!
+          if (o === 'buyFood')
+            lines.push({ spriteId: SPRITES.stats.food, text: `-${here.prices.foodGold | 0}`, color: UI.UI_COLOR_TEXT })
+          else if (o === 'buyTroops')
+            lines.push({ spriteId: SPRITES.stats.troop, text: `-${here.prices.troopsGold | 0}`, color: UI.UI_COLOR_TEXT })
+          else if (o === 'hireScout')
+            lines.push({ spriteId: SPRITES.stats.scout, text: `-${here.prices.scoutGold | 0}`, color: UI.UI_COLOR_TEXT })
+          else if (o === 'buyRumors')
+            lines.push({
+              spriteId: SPRITES.cosmetics.rumorIllustration,
+              text: `-${here.prices.rumorGold | 0}`,
+              color: UI.UI_COLOR_TEXT,
+            })
         }
 
         if (lines.length) {
@@ -306,18 +310,13 @@ function drawLeftPanel(s: State) {
 
   const statusX = illX + illSize + UI.UI_LEFT_PANEL_INNER_GAP
   const statusY = illY
-  const statusIconSize = UI.UI_STATUS_ICON_SIZE
-  const statusIconGap = UI.UI_STATUS_ICON_GAP
   const fontH = 6
-  const statusLineGap = UI.UI_STATUS_LINE_GAP
-  const statusLineH = fontH + statusLineGap
   const messageLineH = fontH + 1
-  const textOffsetY = UI.UI_STATUS_TEXT_OFFSET_Y
 
   // Army gets the hero slot in v0.0.6.
   const armyX = statusX
   const armyY = statusY
-  spr(ARMY_SPRITE_ID, armyX, armyY, -1, 1, 0, 0, 2, 2) // 16×16
+  spr(SPRITES.stats.troop, armyX, armyY, -1, 1, 0, 0, 2, 2) // 16×16
   const armyValueX = armyX + UI.UI_ARMY_VALUE_OFFSET_X
   const armyValueY = armyY + UI.UI_ARMY_VALUE_OFFSET_Y
   const armyColor = s.resources.armySize < 6 ? UI.UI_COLOR_WARN : UI.UI_COLOR_TEXT
@@ -325,81 +324,61 @@ function drawLeftPanel(s: State) {
 
   const foodX = statusX
   const foodY = armyY + UI.UI_ARMY_ICON_H_PX + UI.UI_HERO_RESOURCE_GAP_PX
-  spr(FOOD_SPRITE_ID, foodX, foodY, -1, 1, 0, 0, 2, 2) // 16×16
+  spr(SPRITES.stats.food, foodX, foodY, -1, 1, 0, 0, 2, 2) // 16×16
   const foodValueX = foodX + UI.UI_FOOD_VALUE_OFFSET_X
   const foodValueY = foodY + UI.UI_FOOD_VALUE_OFFSET_Y
   const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? UI.UI_COLOR_WARN : UI.UI_COLOR_TEXT
   print(`${s.resources.food}`, foodValueX, foodValueY, foodColor)
 
-  const smallStartY = statusY + UI.UI_SMALL_STATS_START_OFFSET_Y
-  const seedY = smallStartY + 0 * statusLineH
-  const posY = smallStartY + 1 * statusLineH
-  const stepsY = smallStartY + 2 * statusLineH
+  const goldX = statusX
+  const goldY = foodY + UI.UI_FOOD_ICON_H_PX + UI.UI_HERO_RESOURCE_GAP_PX
+  spr(SPRITES.stats.gold, goldX, goldY, -1, 1, 0, 0, 2, 2) // 16×16
+  const goldValueX = goldX + UI.UI_GOLD_VALUE_OFFSET_X
+  const goldValueY = goldY + UI.UI_GOLD_VALUE_OFFSET_Y
+  print(`${s.resources.gold}`, goldValueX, goldValueY, UI.UI_COLOR_TEXT)
 
-  // Seed (least important, but still useful)
-  spr(UI.UI_SPR_STATUS_SEED, statusX, seedY, -1)
-  print(`${s.world.seed}`, statusX + statusIconSize + statusIconGap, seedY + textOffsetY, UI.UI_COLOR_TEXT)
-
-  // Position (arguably important, keep it)
-  spr(UI.UI_SPR_STATUS_POS, statusX, posY, -1)
-  print(formatPositionLabel(s), statusX + statusIconSize + statusIconGap, posY + textOffsetY, UI.UI_COLOR_TEXT)
-
-  // Steps
-  spr(UI.UI_SPR_STATUS_STEPS, statusX, stepsY, -1)
-  print(`${s.run.stepCount}`, statusX + statusIconSize + statusIconGap, stepsY + textOffsetY, UI.UI_COLOR_TEXT)
-
-  // Army delta flashes (non-blocking)
+  // Resource delta flashes (non-blocking).
   {
     const anims = s.ui.anim.active
-    const frame = s.ui.clock.frame | 0
-    let xCursor = armyX + UI.UI_ARMY_DELTA_OFFSET_X
-    for (let i = 0; i < anims.length; i++) {
-      const a = anims[i]!
-      if (a.kind !== 'armyDelta') continue
-      const aa = a as ArmyDeltaAnim
-      const start = aa.startFrame | 0
-      const dur = Math.max(1, aa.durationFrames | 0)
-      const t = Math.max(0, Math.min(dur, frame - start))
-      const p = t / dur
-      const delta = aa.params.delta | 0
-      if (!delta) continue
+    const frame = s.ui.clock.frame
+    const bases = {
+      army: { x: armyX, y: armyY },
+      food: { x: foodX, y: foodY },
+      gold: { x: goldX, y: goldY },
+    } as const
 
-      const label = delta > 0 ? `+${delta}` : `${delta}`
-      const color = delta > 0 ? UI.UI_COLOR_GOOD : UI.UI_COLOR_BAD
-      const dy = UI.UI_ARMY_DELTA_OFFSET_Y - Math.floor(p * UI.UI_ARMY_DELTA_RISE_PX)
-      print(label, xCursor, armyY + dy, color)
-      xCursor += label.length * 6 + UI.UI_ARMY_DELTA_GAP_PX
+    const cursorByTarget: Record<'army' | 'food' | 'gold', number> = {
+      army: bases.army.x + UI.UI_DELTA_OFFSET_X,
+      food: bases.food.x + UI.UI_DELTA_OFFSET_X,
+      gold: bases.gold.x + UI.UI_DELTA_OFFSET_X,
     }
-  }
 
-  // Food delta flashes (non-blocking)
-  {
-    const anims = s.ui.anim.active
-    const frame = s.ui.clock.frame | 0
-    let xCursor = foodX + UI.UI_FOOD_DELTA_OFFSET_X
-    for (let i = 0; i < anims.length; i++) {
-      const a = anims[i]!
-      if (a.kind !== 'foodDelta') continue
-      const fa = a as FoodDeltaAnim
-      const start = fa.startFrame | 0
-      const dur = Math.max(1, fa.durationFrames | 0)
-      const t = Math.max(0, Math.min(dur, frame - start))
+    const draw = (target: 'army' | 'food' | 'gold', delta: number, startFrame: number, durationFrames: number) => {
+      if (!delta) return
+      const base = bases[target]
+      const dur = Math.max(1, durationFrames)
+      const t = Math.max(0, Math.min(dur, frame - startFrame))
       const p = t / dur
-
-      const delta = fa.params.delta | 0
-      if (!delta) continue
 
       const label = delta > 0 ? `+${delta}` : `${delta}`
       const color = delta > 0 ? UI.UI_COLOR_GOOD : UI.UI_COLOR_BAD
+      const dy = UI.UI_DELTA_OFFSET_Y - Math.floor(p * UI.UI_DELTA_RISE_PX)
 
       // Anchor over the icon, and stack horizontally so +N stays readable.
-      const dy = UI.UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI.UI_FOOD_DELTA_RISE_PX)
-      print(label, xCursor, foodY + dy, color)
-      xCursor += label.length * 6 + UI.UI_FOOD_DELTA_GAP_PX
+      const xCursor = cursorByTarget[target]
+      print(label, xCursor, base.y + dy, color)
+      cursorByTarget[target] = xCursor + label.length * 6 + UI.UI_DELTA_GAP_PX
+    }
+
+    for (let i = 0; i < anims.length; i++) {
+      const a = anims[i]!
+      if (a.kind !== 'delta') continue
+      if (a.params.target === 'enemyArmy') continue
+      draw(a.params.target, a.params.delta, a.startFrame, a.durationFrames)
     }
   }
 
-  const statusBottomY = stepsY + statusLineH
+  const statusBottomY = goldY + UI.UI_GOLD_ICON_H_PX + UI.UI_AFTER_RESOURCES_GAP_PX
   const headerBottomY = Math.max(illY + illSize, statusBottomY)
   const msgY = headerBottomY + 4
   const headline = s.run.isGameOver
@@ -426,6 +405,70 @@ function drawLeftPanel(s: State) {
 function drawRightPanel(s: State, hints: RenderHints) {
   const plan = buildRightGridRenderPlan(s, hints)
   drawRightGridOps(plan.ops)
+  drawRightTopBar(s)
+}
+
+function drawRightTopBar(s: State) {
+  const x0 = Layout.GRID_ORIGIN_X
+  const y0 = 0
+  const w = Layout.GRID_WIDTH_PX
+  const h = Layout.RIGHT_PANEL_HEADER_H
+
+  rect(x0, y0, w, h, UI.UI_COLOR_BG)
+  rectb(x0, y0, w, h, UI.UI_COLOR_DIM)
+
+  const padX = 2
+  const iconY = y0 + 2
+  const valueY = y0 + 11
+
+  // Right → left status icons inside the bar.
+  const iconGap = 2
+  let rightInset = 0
+  if (s.resources.hasBronzeKey) rightInset += 16 + iconGap
+  if (s.resources.hasScout) rightInset += 16 + iconGap
+  if (rightInset) rightInset -= iconGap
+
+  const statsMaxX = x0 + w - padX - rightInset
+
+  const itemW = 18 // 3 chars @ 6px, right-aligned
+  const itemGap = 2
+  const valueMaxChars = 3
+
+  const formatValue = (raw: string) => {
+    const s = String(raw || '')
+    if (s.length <= valueMaxChars) return s
+    return s.slice(-valueMaxChars)
+  }
+
+  const drawStatItem = (idx: number, iconSpriteId: number, rawValue: string) => {
+    const xItem = x0 + padX + idx * (itemW + itemGap)
+    if (xItem + itemW > statsMaxX) return
+
+    const value = formatValue(rawValue)
+    const valueW = value.length * 6
+    const xRight = xItem + itemW
+    const valueX = xRight - valueW
+    const iconX = xRight - UI.UI_STATUS_ICON_SIZE
+
+    spr(iconSpriteId, iconX, iconY, -1)
+    print(value, valueX, valueY, UI.UI_COLOR_TEXT)
+  }
+
+  drawStatItem(0, SPRITES.smallStats8x8.seed, `${s.world.seed}`)
+  drawStatItem(1, SPRITES.smallStats8x8.position, formatPositionLabel(s))
+  drawStatItem(2, SPRITES.smallStats8x8.steps, `${s.run.stepCount}`)
+
+  // Right → left status icons inside the bar.
+  let xr = x0 + w - padX - 16
+  const bigIconY = y0 + 1
+  if (s.resources.hasBronzeKey) {
+    spr(SPRITES.stats.key, xr, bigIconY, 0, 1, 0, 0, 2, 2)
+    xr -= 16 + 2
+  }
+  if (s.resources.hasScout) {
+    spr(SPRITES.stats.scout, xr, bigIconY, 0, 1, 0, 0, 2, 2)
+    xr -= 16 + 2
+  }
 }
 
 function drawRightGridOps(ops: RightGridRenderOp[]) {

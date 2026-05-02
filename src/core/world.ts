@@ -11,6 +11,18 @@ import {
   NOISE_VALUE_MAX,
   SIGNPOST_COUNT,
   TERRAIN_KINDS,
+  TOWN_COUNT,
+  TOWN_FOOD_BUNDLE,
+  TOWN_NAME_POOL,
+  TOWN_PRICE_FOOD_MAX,
+  TOWN_PRICE_FOOD_MIN,
+  TOWN_PRICE_RUMOR_MAX,
+  TOWN_PRICE_RUMOR_MIN,
+  TOWN_PRICE_SCOUT_MAX,
+  TOWN_PRICE_SCOUT_MIN,
+  TOWN_PRICE_TROOPS_MAX,
+  TOWN_PRICE_TROOPS_MIN,
+  TOWN_TROOPS_BUNDLE,
   WORLD_HEIGHT,
   WORLD_WIDTH,
   spriteIdForKind,
@@ -23,7 +35,7 @@ function cellId(x: number, y: number): number {
   return y * WORLD_WIDTH + x
 }
 
-const TERRAIN_KIND_SET = new Set<string>(TERRAIN_KINDS as unknown as string[])
+const TERRAIN_KIND_SET = new Set<string>(TERRAIN_KINDS)
 
 function isTerrainCell(cell: Cell): boolean {
   return TERRAIN_KIND_SET.has(cell.kind)
@@ -172,6 +184,33 @@ function placeNamedFeature(cells: CellGrid, rngState: number, opts: PlaceNamedFe
   return res.rngState
 }
 
+type PlaceNamedFeatureRngOpts = {
+  count: number
+  namePool: readonly string[]
+  fallbackName: string
+  canPlaceAt: (x: number, y: number, here: Cell) => boolean
+  buildCell: (x: number, y: number, name: string, rngState: number) => { cell: Cell; rngState: number }
+}
+
+function placeNamedFeatureRng(cells: CellGrid, rngState: number, opts: PlaceNamedFeatureRngOpts): number {
+  const remainingNames: string[] = [...opts.namePool]
+  const res = placeFeature(cells, rngState, {
+    count: opts.count,
+    canPlaceAt: opts.canPlaceAt,
+    buildCell: (x, y, nextRng) => {
+      let name = opts.fallbackName
+      if (remainingNames.length > 0) {
+        const pick = randInt(nextRng, remainingNames.length)
+        nextRng = pick.rngState
+        name = remainingNames.splice(pick.value, 1)[0] || opts.fallbackName
+      }
+      const built = opts.buildCell(x, y, name, nextRng)
+      return { cell: built.cell, rngState: built.rngState }
+    },
+  })
+  return res.rngState
+}
+
 function placeNamedFarms(cells: CellGrid, rngState: number): number {
   return placeNamedFeature(cells, rngState, {
     count: FARM_COUNT,
@@ -189,6 +228,72 @@ function placeNamedCamps(cells: CellGrid, rngState: number): number {
     fallbackName: 'A Camp',
     canPlaceAt: (_x, _y, here) => isTerrainCell(here),
     buildCell: (x, y, name) => ({ kind: 'camp', id: cellId(x, y), name, nextReadyStep: 0 }),
+  })
+}
+
+function placeNamedTowns(cells: CellGrid, rngState: number): number {
+  const baseOffers: Array<'buyFood' | 'buyTroops' | 'hireScout' | 'buyRumors'> = ['buyFood', 'buyTroops', 'hireScout', 'buyRumors']
+  const omitNoScoutIndices = [0, 1, 3] as const // baseOffers indices excluding hireScout
+
+  let townIndex = 0
+
+  return placeNamedFeatureRng(cells, rngState, {
+    count: TOWN_COUNT,
+    namePool: TOWN_NAME_POOL,
+    fallbackName: 'A Town',
+    canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+    buildCell: (x, y, name, nextRng) => {
+      // Offer set: omit exactly 1 kind, keep the remaining 3 in base order.
+      let omitIdx: number
+      if (townIndex === 0) {
+        const pick = randInt(nextRng, omitNoScoutIndices.length)
+        nextRng = pick.rngState
+        omitIdx = omitNoScoutIndices[pick.value]!
+      } else {
+        const pick = randInt(nextRng, baseOffers.length)
+        nextRng = pick.rngState
+        omitIdx = pick.value
+      }
+
+      const offers = baseOffers.filter((_k, idx) => idx !== omitIdx)
+
+      // Prices: fixed per town, derived from RNG in a fixed order.
+      const loFood = Math.min(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX)
+      const hiFood = Math.max(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX)
+      const rf = randInt(nextRng, hiFood - loFood + 1)
+      nextRng = rf.rngState
+      const foodGold = loFood + rf.value
+
+      const loTroops = Math.min(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX)
+      const hiTroops = Math.max(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX)
+      const rt = randInt(nextRng, hiTroops - loTroops + 1)
+      nextRng = rt.rngState
+      const troopsGold = loTroops + rt.value
+
+      const loScout = Math.min(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX)
+      const hiScout = Math.max(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX)
+      const rs = randInt(nextRng, hiScout - loScout + 1)
+      nextRng = rs.rngState
+      const scoutGold = loScout + rs.value
+
+      const loRumor = Math.min(TOWN_PRICE_RUMOR_MIN, TOWN_PRICE_RUMOR_MAX)
+      const hiRumor = Math.max(TOWN_PRICE_RUMOR_MIN, TOWN_PRICE_RUMOR_MAX)
+      const rr = randInt(nextRng, hiRumor - loRumor + 1)
+      nextRng = rr.rngState
+      const rumorGold = loRumor + rr.value
+
+      const cell: Cell = {
+        kind: 'town',
+        id: cellId(x, y),
+        name,
+        offers,
+        prices: { foodGold, troopsGold, scoutGold, rumorGold },
+        bundles: { food: TOWN_FOOD_BUNDLE, troops: TOWN_TROOPS_BUNDLE },
+      }
+
+      townIndex++
+      return { cell, rngState: nextRng }
+    },
   })
 }
 
@@ -240,6 +345,7 @@ export function generateWorld(seed: number): GeneratedWorld {
 
   rngState = placeNamedFarms(cells, rngState)
   rngState = placeNamedCamps(cells, rngState)
+  rngState = placeNamedTowns(cells, rngState)
   rngState = placeHenges(cells, rngState)
   rngState = placeSignposts(cells, rngState)
 

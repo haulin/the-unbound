@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
+import { getRightGridCellDef } from '../../src/core/rightGrid'
 import {
-  ACTION_CAMP_HIRE_SCOUT,
   ACTION_CAMP_LEAVE,
   ACTION_CAMP_SEARCH,
   ACTION_MOVE,
@@ -13,10 +13,6 @@ import {
   CAMP_RECRUIT_LINES,
   INITIAL_FOOD,
   MAP_HINT_MESSAGE,
-  SCOUT_ALREADY_HAVE_LINES,
-  SCOUT_FOOD_COST,
-  SCOUT_HIRE_LINES,
-  SCOUT_NO_FOOD_LINES,
   SWAMP_LOST_PERCENT,
 } from '../../src/core/constants'
 import { computeCampArmyGain } from '../../src/core/camp'
@@ -48,7 +44,7 @@ function makeState(world: World): State {
     world,
     player: { position: { x: 1, y: 0 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: INITIAL_FOOD, armySize: 5, hasBronzeKey: false, hasScout: false },
+    resources: { food: INITIAL_FOOD, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false },
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -133,40 +129,14 @@ describe('v0.2 map+scout acceptance', () => {
     if (campCell.kind === 'camp') expect(campCell.nextReadyStep).toBe(stepCount + CAMP_COOLDOWN_MOVES)
   })
 
-  it('Hire Scout success: pays cost, sets hasScout, shows hire lore', () => {
+  it('camp does not offer Hire Scout (moved to towns)', () => {
     const s0 = makeState(makeWorld(7))
     const onto = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!
-    const stepCount = onto.run.stepCount
-    onto.resources.food = SCOUT_FOOD_COST
+    expect(onto.encounter?.kind).toBe('camp')
 
-    const after = processAction(onto, { type: ACTION_CAMP_HIRE_SCOUT })!
-    expect(after.resources.hasScout).toBe(true)
-    expect(after.resources.food).toBe(onto.resources.food - SCOUT_FOOD_COST)
-    expect(after.ui.message).toBe(`Ember Cross Camp\n${pickDeterministicLine(SCOUT_HIRE_LINES, onto.world.seed, 4, stepCount)}`)
-  })
-
-  it('Hire Scout when already owned shows lore and changes nothing', () => {
-    const s0 = makeState(makeWorld(7))
-    const onto = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!
-    const stepCount = onto.run.stepCount
-    onto.resources.hasScout = true
-    onto.resources.food = 999
-
-    const after = processAction(onto, { type: ACTION_CAMP_HIRE_SCOUT })!
-    expect(after.resources).toEqual(onto.resources)
-    expect(after.ui.message).toBe(`Ember Cross Camp\n${pickDeterministicLine(SCOUT_ALREADY_HAVE_LINES, onto.world.seed, 4, stepCount)}`)
-  })
-
-  it('Hire Scout without enough food shows lore and changes nothing', () => {
-    const s0 = makeState(makeWorld(7))
-    const onto = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!
-    const stepCount = onto.run.stepCount
-    onto.resources.food = 0
-
-    const after = processAction(onto, { type: ACTION_CAMP_HIRE_SCOUT })!
-    expect(after.resources.hasScout).toBe(false)
-    expect(after.resources.food).toBe(0)
-    expect(after.ui.message).toBe(`Ember Cross Camp\n${pickDeterministicLine(SCOUT_NO_FOOD_LINES, onto.world.seed, 4, stepCount)}`)
+    // North is disabled in camp.
+    const north = getRightGridCellDef(onto, 0, 1)
+    expect(north.action).toBe(null)
   })
 
   it('while lost, MOVE appends an unmapped path step', () => {

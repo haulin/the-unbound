@@ -1,16 +1,11 @@
 import {
   ENABLE_ANIMATIONS,
   GRID_TRANSITION_STEP_FRAMES,
-  SPR_BUTTON_GOAL,
-  SPR_BUTTON_MAP,
-  SPR_BUTTON_CAMP_HIRE_SCOUT,
-  SPR_BUTTON_CAMP_SEARCH,
-  SPR_BUTTON_MINIMAP,
-  SPR_BUTTON_RESTART,
 } from '../../core/constants'
-import { type RightGridIconKey, getRightGridCellDef } from '../../core/rightGrid'
+import { getRightGridCellDef, spriteIdForTownOffer } from '../../core/rightGrid'
 import { getSpriteIdAt } from '../../core/world'
 import type { GridTransitionAnim, MoveSlideAnim, State } from '../../core/types'
+import { SPRITES } from '../../core/spriteIds'
 import * as Layout from './layout'
 import type { RenderHints } from './input'
 import * as UI from './uiConstants'
@@ -37,25 +32,6 @@ export type RightGridRenderPlan = {
   ops: RightGridRenderOp[]
 }
 
-// Keep all right-grid UI sprite IDs together so future remaps are localized.
-const RIGHT_GRID_SPRITE_ID: Record<RightGridIconKey, number> = {
-  goal: SPR_BUTTON_GOAL,
-  minimap: SPR_BUTTON_MINIMAP,
-  map: SPR_BUTTON_MAP,
-  restart: SPR_BUTTON_RESTART,
-  fight: UI.UI_SPR_FIGHT,
-  return: UI.UI_SPR_RETURN,
-  enemy: UI.UI_SPR_ENEMY,
-  campSearch: SPR_BUTTON_CAMP_SEARCH,
-  campHireScout: SPR_BUTTON_CAMP_HIRE_SCOUT,
-  campLeave: UI.UI_SPR_RETURN,
-  campFireIcon: 140,
-}
-
-function spriteIdForIconKey(iconKey: RightGridIconKey): number {
-  return RIGHT_GRID_SPRITE_ID[iconKey]
-}
-
 function crossRevealIndex(row: number, col: number): number {
   // Reveal order: N, W, S, E, C
   if (row === 0 && col === 1) return 0
@@ -66,13 +42,34 @@ function crossRevealIndex(row: number, col: number): number {
   return -1
 }
 
-function spriteIdForModeCrossCell(s: State, mode: 'blank' | 'overworld' | 'combat', row: number, col: number): number | null {
+function spriteIdForModeCrossCell(s: State, mode: 'blank' | 'overworld' | 'combat' | 'camp' | 'town', row: number, col: number): number | null {
   if (mode === 'blank') return null
   if (mode === 'combat') {
     // Combat layout: W=fight, E=return, C=enemy, N/S empty.
-    if (row === 1 && col === 0) return RIGHT_GRID_SPRITE_ID.fight
-    if (row === 1 && col === 2) return RIGHT_GRID_SPRITE_ID.return
-    if (row === 1 && col === 1) return RIGHT_GRID_SPRITE_ID.enemy
+    if (row === 1 && col === 0) return SPRITES.buttons.fight
+    if (row === 1 && col === 2) return SPRITES.buttons.return
+    if (row === 1 && col === 1) return SPRITES.stats.enemy
+    return null
+  }
+  if (mode === 'camp') {
+    // Camp layout: N=hire, W=search, E=leave, C=camp icon, S empty.
+    // North disabled in v0.3+ (Hire Scout moved to towns).
+    if (row === 0 && col === 1) return null
+    if (row === 1 && col === 0) return SPRITES.buttons.search
+    if (row === 1 && col === 2) return SPRITES.buttons.return
+    if (row === 1 && col === 1) return SPRITES.cosmetics.campfireIcon
+    return null
+  }
+  if (mode === 'town') {
+    const p = s.player.position
+    const here = s.world.cells[p.y]![p.x]!
+    if (here.kind !== 'town') return null
+
+    if (row === 0 && col === 1) return spriteIdForTownOffer(here.offers[0])
+    if (row === 1 && col === 0) return spriteIdForTownOffer(here.offers[1])
+    if (row === 2 && col === 1) return spriteIdForTownOffer(here.offers[2])
+    if (row === 1 && col === 2) return SPRITES.buttons.return
+    if (row === 1 && col === 1) return SPRITES.cosmetics.marketStall
     return null
   }
 
@@ -117,7 +114,7 @@ function previewSpriteIdForCell(s: State, row: number, col: number): number | nu
   }
 
   const def = getRightGridCellDef(s, row, col)
-  if (def.iconKey) return spriteIdForIconKey(def.iconKey) ?? null
+  if (def.spriteId != null) return def.spriteId
   if (def.tilePreview && def.tilePreview.kind === 'relativeToPlayer') {
     const p = s.player.position
     return getSpriteIdAt(s.world, p.x + def.tilePreview.dx, p.y + def.tilePreview.dy)
@@ -323,10 +320,10 @@ function buildMoveSlidePlan(s: State, anim: MoveSlideAnim, hover: Cell | null): 
 
   // Keep corners stable UI (mask + redraw icons).
   const corners: Array<{ row: number; col: number; spriteId: number | null }> = [
-    { row: 0, col: 0, spriteId: SPR_BUTTON_GOAL },
-    { row: 2, col: 0, spriteId: SPR_BUTTON_MINIMAP },
-    { row: 2, col: 2, spriteId: SPR_BUTTON_RESTART },
-    { row: 0, col: 2, spriteId: SPR_BUTTON_MAP },
+    { row: 0, col: 0, spriteId: SPRITES.buttons.goal },
+    { row: 2, col: 0, spriteId: SPRITES.buttons.minimap },
+    { row: 2, col: 2, spriteId: SPRITES.buttons.restart },
+    { row: 0, col: 2, spriteId: SPRITES.buttons.map },
   ]
 
   for (let i = 0; i < corners.length; i++) {

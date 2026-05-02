@@ -107,6 +107,58 @@ describe('signpost', () => {
     expect(msg).toBe('Ember Cross Camp\nSE, 5 leagues away.')
   })
 
+  it('prefers farm over town on ties', () => {
+    const msg = formatNearestPoiSignpostMessage(
+      { x: 0, y: 0 },
+      {
+        width: 10,
+        height: 10,
+        cells: makeCells(10, 10, [
+          // Both are distance 5; farm wins over town.
+          { x: 3, y: 2, cell: { kind: 'farm', id: 23, name: 'Greyfield', nextReadyStep: 0 } },
+          {
+            x: 2,
+            y: 3,
+            cell: {
+              kind: 'town',
+              id: 32,
+              name: 'Stonebridge',
+              offers: ['buyFood', 'buyTroops', 'hireScout'],
+              prices: { foodGold: 3, troopsGold: 5, scoutGold: 12, rumorGold: 3 },
+              bundles: { food: 3, troops: 2 },
+            },
+          },
+        ]),
+      }
+    )
+    expect(msg).toBe('Greyfield Farm\nSE, 5 leagues away.')
+  })
+
+  it('formats nearest town when it is nearest', () => {
+    const msg = formatNearestPoiSignpostMessage(
+      { x: 0, y: 0 },
+      {
+        width: 10,
+        height: 10,
+        cells: makeCells(10, 10, [
+          {
+            x: 3,
+            y: 2,
+            cell: {
+              kind: 'town',
+              id: 23,
+              name: 'Stonebridge',
+              offers: ['buyFood', 'buyTroops', 'hireScout'],
+              prices: { foodGold: 3, troopsGold: 5, scoutGold: 12, rumorGold: 3 },
+              bundles: { food: 3, troops: 2 },
+            },
+          },
+        ]),
+      }
+    )
+    expect(msg).toBe('Stonebridge Town\nSE, 5 leagues away.')
+  })
+
   it('prefers gate over locksmith/farm/camp/henge on ties', () => {
     const msg = formatNearestPoiSignpostMessage(
       { x: 0, y: 0 },

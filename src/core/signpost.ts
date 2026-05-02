@@ -1,4 +1,4 @@
-import { GATE_NAME, LOCKSMITH_NAME } from './constants'
+import { GATE_NAME, LOCKSMITH_NAME } from './lore'
 import { dirLabel, manhattan, torusDelta } from './math'
 import type { CellGrid } from './types'
 
@@ -9,13 +9,22 @@ export type PoiWorldView = {
 }
 
 export function formatNearestPoiSignpostMessage(playerPos: { x: number; y: number }, world: PoiWorldView) {
-  type PoiKind = 'gate' | 'gateOpen' | 'locksmith' | 'farm' | 'camp' | 'henge'
+  type PoiKind = 'gate' | 'gateOpen' | 'locksmith' | 'farm' | 'camp' | 'henge' | 'town'
   type Candidate = { kind: PoiKind; id: number; name: string; pos: { x: number; y: number } }
 
   const SIGNPOST_MIN_TARGET_DISTANCE = 2
 
-  const kindRank = (k: PoiKind) =>
-    k === 'gate' || k === 'gateOpen' ? 0 : k === 'locksmith' ? 1 : k === 'farm' ? 2 : k === 'camp' ? 3 : 4
+  const POI_KIND_RANK: Record<PoiKind, number> = {
+    gate: 0,
+    gateOpen: 0,
+    locksmith: 1,
+    farm: 2,
+    town: 3,
+    camp: 4,
+    henge: 5,
+  }
+
+  const kindRank = (k: PoiKind) => POI_KIND_RANK[k]
 
   function candidateId(x: number, y: number) {
     return y * world.width + x
@@ -51,6 +60,9 @@ export function formatNearestPoiSignpostMessage(playerPos: { x: number; y: numbe
           break
         case 'henge':
           pushNamedCandidate('henge', cell.id, cell.name || 'A Henge', 'Henge', x, y)
+          break
+        case 'town':
+          pushNamedCandidate('town', cell.id, cell.name || 'A Town', 'Town', x, y)
           break
       }
     }

@@ -5,15 +5,17 @@ import {
   ACTION_MOVE,
   ACTION_RETURN,
   COMBAT_ENCOUNTER_LINES,
-  COMBAT_REWARD_MAX,
-  COMBAT_REWARD_MIN,
+  COMBAT_FOOD_BONUS_MAX,
+  COMBAT_GOLD_REWARD_MAX,
+  COMBAT_GOLD_REWARD_MIN,
   ENABLE_ANIMATIONS,
   HENGE_ENCOUNTER_LINE,
   INITIAL_FOOD,
+  INITIAL_GOLD,
   WOODS_AMBUSH_PERCENT,
 } from '../../src/core/constants'
 import { randInt, seedToRngState, xorshift32 } from '../../src/core/prng'
-import type { EnemyArmyDeltaAnim, FoodDeltaAnim, State, World } from '../../src/core/types'
+import type { DeltaAnim, State, World } from '../../src/core/types'
 
 function makeWorld(opts: { seed: number; dstKind: 'henge' | 'woods'; rngState: number }): World {
   return {
@@ -38,8 +40,8 @@ function makeState(w: World): State {
   return {
     world: w,
     player: { position: { x: 1, y: 0 } },
-    run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false },
-    resources: { food: INITIAL_FOOD, armySize: 5, hasBronzeKey: false },
+    run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
+    resources: { food: INITIAL_FOOD, gold: INITIAL_GOLD, armySize: 5, hasBronzeKey: false, hasScout: false },
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -127,10 +129,11 @@ describe('combat reducer (v0.0.7)', () => {
     expect(COMBAT_ENCOUNTER_LINES.includes(next.ui.message as any)).toBe(true)
   })
 
-  it('FIGHT win uses floor-halving (1->0), pays food once at the end (5..15), enqueues enemy delta, and ends combat', () => {
+  it('FIGHT win uses floor-halving (1->0), pays gold once at the end (5..15) plus 0..2 food, and ends combat', () => {
     const w = makeWorld({ seed: 1, dstKind: 'henge', rngState: 1 })
     const s = makeState(w)
     s.resources.food = 0
+    s.resources.gold = 0
     s.resources.armySize = 5
     s.encounter = { kind: 'combat', enemyArmySize: 1, sourceKind: 'henge', sourceCellId: 4, restoreMessage: 'The Mending Henge\nThe circle remembers old debts.' }
     s.ui.message = HENGE_ENCOUNTER_LINE
@@ -140,23 +143,29 @@ describe('combat reducer (v0.0.7)', () => {
 
     const wRoll = randInt(startRng, 5 + 5)
     const bRoll = randInt(wRoll.rngState, 1 + 5)
-    const rewardRoll = randInt(bRoll.rngState, (COMBAT_REWARD_MAX - COMBAT_REWARD_MIN + 1) | 0)
-    const expectedReward = (COMBAT_REWARD_MIN | 0) + (rewardRoll.value | 0)
+    const goldRoll = randInt(bRoll.rngState, (COMBAT_GOLD_REWARD_MAX - COMBAT_GOLD_REWARD_MIN + 1) | 0)
+    const expectedGold = (COMBAT_GOLD_REWARD_MIN | 0) + (goldRoll.value | 0)
+    const foodBonusRoll = randInt(goldRoll.rngState, (COMBAT_FOOD_BONUS_MAX + 1) | 0)
+    const expectedFoodBonus = foodBonusRoll.value | 0
 
     const next = processAction(s, { type: ACTION_FIGHT })!
 
     expect(next.encounter).toBe(null)
-    expect(next.resources.food).toBe(expectedReward)
-    expect(next.world.rngState >>> 0).toBe(rewardRoll.rngState >>> 0)
+    expect(next.resources.gold).toBe(expectedGold)
+    expect(next.resources.food).toBe(expectedFoodBonus)
+    expect(next.world.rngState >>> 0).toBe(foodBonusRoll.rngState >>> 0)
     expect(next.ui.message).not.toBe(HENGE_ENCOUNTER_LINE)
 
     if (ENABLE_ANIMATIONS) {
-      const enemyDeltas = next.ui.anim.active.filter((a): a is EnemyArmyDeltaAnim => a.kind === 'enemyArmyDelta')
+      const enemyDeltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'enemyArmy')
       expect(enemyDeltas.length).toBe(1)
       expect(enemyDeltas[0]!.params.delta).toBe(-1)
 
-      const foodDeltas = next.ui.anim.active.filter((a): a is FoodDeltaAnim => a.kind === 'foodDelta')
-      expect(foodDeltas.some((d) => d.params.delta === expectedReward)).toBe(true)
+      const foodDeltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'food')
+      if (expectedFoodBonus) expect(foodDeltas.some((d) => d.params.delta === expectedFoodBonus)).toBe(true)
+
+      const goldDeltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'gold')
+      expect(goldDeltas.some((d) => d.params.delta === expectedGold)).toBe(true)
     }
 
     // Sanity: ensure our chosen rngState is actually a win for this test.

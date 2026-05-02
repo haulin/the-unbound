@@ -15,18 +15,7 @@ export const UI_COLOR_POI_NAME = 11
 export const UI_COLOR_POI_DESC = 13
 export const UI_COLOR_GRID_HOVER_TINT = 15
 
-// Sprite IDs used by the TIC-80 UI renderer.
-export const UI_SPR_STATUS_STEPS = 130
-export const UI_SPR_STATUS_POS = 131
-export const UI_SPR_STATUS_SEED = 132
-export const UI_SPR_TEXTURE_OVERLAY = 133
-export const UI_SPR_ENEMY = 102
-export const UI_SPR_FIGHT = 74
-export const UI_SPR_RETURN = 76
-
-// In-game map sprites (8x8 each).
-export const UI_SPR_MAP_TILE_BG = 135
-export const UI_SPR_MAP_PLAYER_OUTLINE = 134
+// Sprite IDs are referenced directly from `SPRITES` in the renderer.
 
 // 64×64 illustration preview (16×16 sprite scaled up).
 export const UI_ILLUSTRATION_SCALE = 4 // 16->64
@@ -68,10 +57,10 @@ export const UI_ARMY_VALUE_OFFSET_X = UI_ARMY_ICON_W_PX + 3
 export const UI_ARMY_VALUE_OFFSET_Y = 5
 
 // Army delta overlay (relative to army icon origin)
-export const UI_ARMY_DELTA_OFFSET_X = 2
-export const UI_ARMY_DELTA_OFFSET_Y = 2
-export const UI_ARMY_DELTA_RISE_PX = 6
-export const UI_ARMY_DELTA_GAP_PX = -4
+export const UI_DELTA_OFFSET_X = 2
+export const UI_DELTA_OFFSET_Y = 2
+export const UI_DELTA_RISE_PX = 6
+export const UI_DELTA_GAP_PX = -4
 
 // Food line (hero)
 export const UI_FOOD_ICON_W_PX = 16
@@ -79,11 +68,11 @@ export const UI_FOOD_ICON_H_PX = 16
 export const UI_FOOD_VALUE_OFFSET_X = UI_FOOD_ICON_W_PX + 3
 export const UI_FOOD_VALUE_OFFSET_Y = 5
 
-// Food delta overlay (relative to food icon origin)
-export const UI_FOOD_DELTA_OFFSET_X = 2
-export const UI_FOOD_DELTA_OFFSET_Y = 2
-export const UI_FOOD_DELTA_RISE_PX = 6
-export const UI_FOOD_DELTA_GAP_PX = -4
+// Gold line (hero)
+export const UI_GOLD_ICON_W_PX = 16
+export const UI_GOLD_ICON_H_PX = 16
+export const UI_GOLD_VALUE_OFFSET_X = UI_GOLD_ICON_W_PX + 3
+export const UI_GOLD_VALUE_OFFSET_Y = 5
 
 // Small stats (seed/pos/steps) are placed relative to the hero block (army+food).
 export const UI_SMALL_STATS_START_OFFSET_Y =

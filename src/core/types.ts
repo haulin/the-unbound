@@ -1,6 +1,5 @@
 import type {
   ACTION_FIGHT,
-  ACTION_CAMP_HIRE_SCOUT,
   ACTION_CAMP_LEAVE,
   ACTION_CAMP_SEARCH,
   ACTION_MOVE,
@@ -9,6 +8,11 @@ import type {
   ACTION_RESTART,
   ACTION_SHOW_GOAL,
   ACTION_TICK,
+  ACTION_TOWN_BUY_FOOD,
+  ACTION_TOWN_BUY_RUMOR,
+  ACTION_TOWN_BUY_TROOPS,
+  ACTION_TOWN_HIRE_SCOUT,
+  ACTION_TOWN_LEAVE,
   ACTION_TOGGLE_MAP,
   ACTION_TOGGLE_MINIMAP,
 } from './constants'
@@ -16,7 +20,7 @@ import type {
 export type Vec2 = { x: number; y: number }
 
 export type TerrainKind = 'grass' | 'road' | 'mountain' | 'lake' | 'swamp' | 'woods' | 'rainbow'
-export type FeatureKind = 'gate' | 'gateOpen' | 'locksmith' | 'signpost' | 'farm' | 'camp' | 'henge'
+export type FeatureKind = 'gate' | 'gateOpen' | 'locksmith' | 'signpost' | 'farm' | 'camp' | 'henge' | 'town'
 export type CellKind = TerrainKind | FeatureKind
 
 export type TerrainCell = { kind: TerrainKind }
@@ -27,7 +31,18 @@ export type SignpostCell = { kind: 'signpost' }
 export type FarmCell = { kind: 'farm'; id: number; name: string; nextReadyStep: number }
 export type CampCell = { kind: 'camp'; id: number; name: string; nextReadyStep: number }
 export type HengeCell = { kind: 'henge'; id: number; name: string; nextReadyStep: number }
-export type Cell = TerrainCell | GateCell | GateOpenCell | LocksmithCell | SignpostCell | FarmCell | CampCell | HengeCell
+
+export type TownOfferKind = 'buyFood' | 'buyTroops' | 'hireScout' | 'buyRumors'
+export type TownCell = {
+  kind: 'town'
+  id: number
+  name: string
+  offers: readonly TownOfferKind[]
+  prices: { foodGold: number; troopsGold: number; scoutGold: number; rumorGold: number }
+  bundles: { food: number; troops: number }
+}
+
+export type Cell = TerrainCell | GateCell | GateOpenCell | LocksmithCell | SignpostCell | FarmCell | CampCell | HengeCell | TownCell
 
 export type CellGrid = Cell[][]
 
@@ -73,27 +88,19 @@ export type MoveSlideAnim = BaseAnim & {
   params: { fromPos: Vec2; toPos: Vec2; dx: number; dy: number }
 }
 
-export type FoodDeltaAnim = BaseAnim & {
-  kind: 'foodDelta'
-  params: { delta: number }
-}
+export type DeltaAnimTarget = 'food' | 'gold' | 'army' | 'enemyArmy'
 
-export type ArmyDeltaAnim = BaseAnim & {
-  kind: 'armyDelta'
-  params: { delta: number }
-}
-
-export type EnemyArmyDeltaAnim = BaseAnim & {
-  kind: 'enemyArmyDelta'
-  params: { delta: number }
+export type DeltaAnim = BaseAnim & {
+  kind: 'delta'
+  params: { target: DeltaAnimTarget; delta: number }
 }
 
 export type GridTransitionAnim = BaseAnim & {
   kind: 'gridTransition'
-  params: { from: 'blank' | 'overworld' | 'combat'; to: 'overworld' | 'combat' }
+  params: { from: 'blank' | 'overworld' | 'combat' | 'camp' | 'town'; to: 'overworld' | 'combat' | 'camp' | 'town' }
 }
 
-export type Anim = MoveSlideAnim | FoodDeltaAnim | ArmyDeltaAnim | EnemyArmyDeltaAnim | GridTransitionAnim
+export type Anim = MoveSlideAnim | DeltaAnim | GridTransitionAnim
 
 export type UiAnim = { nextId: number; active: Anim[] }
 
@@ -113,6 +120,7 @@ export type Run = {
 
 export type Resources = {
   food: number
+  gold: number
   armySize: number
   hasBronzeKey: boolean
   hasScout: boolean
@@ -133,7 +141,15 @@ export type CampEncounter = {
   restoreMessage: string
 }
 
-export type Encounter = CombatEncounter | CampEncounter
+export type TownEncounter = {
+  kind: 'town'
+  sourceKind: 'town'
+  sourceCellId: number
+  restoreMessage: string
+  rumorCursor: number
+}
+
+export type Encounter = CombatEncounter | CampEncounter | TownEncounter
 
 export type State = { world: World; player: Player; run: Run; resources: Resources; encounter: Encounter | null; ui: Ui }
 
@@ -148,6 +164,10 @@ export type Action =
   | { type: typeof ACTION_RETURN }
   | { type: typeof ACTION_TICK }
   | { type: typeof ACTION_CAMP_SEARCH }
-  | { type: typeof ACTION_CAMP_HIRE_SCOUT }
   | { type: typeof ACTION_CAMP_LEAVE }
+  | { type: typeof ACTION_TOWN_BUY_FOOD }
+  | { type: typeof ACTION_TOWN_BUY_TROOPS }
+  | { type: typeof ACTION_TOWN_HIRE_SCOUT }
+  | { type: typeof ACTION_TOWN_BUY_RUMOR }
+  | { type: typeof ACTION_TOWN_LEAVE }
 

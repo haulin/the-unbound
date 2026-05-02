@@ -1,13 +1,14 @@
 import type { CellKind, State, Vec2 } from './types'
 
-export type GameMapLabel = 'F' | 'C' | 'H' | 'G' | 'L'
+export type GameMapLabel = 'F' | 'C' | 'H' | 'T' | 'G' | 'L'
 export type GameMapMarker = { pos: Vec2; label: GameMapLabel }
 
 function labelForKind(kind: CellKind): GameMapLabel | null {
   if (kind === 'farm') return 'F'
   if (kind === 'camp') return 'C'
   if (kind === 'henge') return 'H'
-  if (kind === 'gate') return 'G'
+  if (kind === 'town') return 'T'
+  if (kind === 'gate' || kind === 'gateOpen') return 'G'
   if (kind === 'locksmith') return 'L'
   return null
 }
@@ -51,6 +52,7 @@ export function computeGameMapView(s: State): { markers: GameMapMarker[]; showPl
       if (s.resources.hasScout && (label === 'G' || label === 'L')) push(p, label)
       else if (!s.resources.hasScout) push(p, label)
       else if (label === 'F' || label === 'C' || label === 'H') push(p, label)
+      else if (label === 'T') push(p, label)
     }
   } else {
     // Lost: build a local fragment from the lost-buffer segment (even though it's not mapped yet).

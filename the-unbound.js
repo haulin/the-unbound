@@ -1,6 +1,6 @@
-// title:  The Unbound (prototype 0.2.0)
+// title:  The Unbound (prototype 0.3.0)
 // author: haulin
-// desc:   Prototype 0.2.0 toward the North Star
+// desc:   Prototype 0.3.0 toward the North Star
 // script: js
 // input:  mouse
 
@@ -14,7 +14,28 @@
   // src/core/lore.ts
   var GOAL_NARRATIVE = "The road never ends. It only returns.\nThey say there is a bronze gate that breaks the circle.\nYou mean to find out.";
   var LOST_COORD_LABEL = "??";
-  var MAP_HINT_MESSAGE = "Map\nThis is how the world looks from your point of view.";
+  var MAP_HINT_MESSAGE = "Map\nThe world, as best you can read it.";
+  var BARKEEP_TIPS = {
+    movementAndHunger: [
+      "Most steps cost 1 ration. Mountains and swamps cost 2.",
+      "If you don't have rations, your soldiers will start to starve."
+    ],
+    lostAndOrientation: [
+      "Woods and swamps can pull you off course.",
+      "When lost, find a signpost, farm, or town to get your bearings again."
+    ],
+    map: [
+      "The map shows landmarks, not terrain.",
+      "While lost, map only shows what you've found since you went off course."
+    ],
+    scout: [
+      "A Scout halves your odds of getting lost in woods and swamps.",
+      "When you're oriented, a Scout points out farms, camps, and henges."
+    ],
+    goal: [
+      "Someone saw the Locksmith three nights ago."
+    ]
+  };
   var GATE_LOCKED_LINES = [
     "A keyhole with no key. Not yet.",
     "Bronze, but unyielding. You will need the key.",
@@ -93,6 +114,15 @@
     "Patient Circle",
     "Weather Cross"
   ];
+  var TOWN_NAME_POOL = [
+    "Stonebridge",
+    "Cinder Row",
+    "Ember Crossroads",
+    "The Long Return",
+    "Market of Ash"
+  ];
+  var GATE_NAME = "The Gate";
+  var LOCKSMITH_NAME = "Locksmith of the Unbound";
   var FARM_HARVEST_LINES = [
     "Someone left in a hurry. The stores are still full.",
     "The cellar is cold and deep. You help yourself.",
@@ -128,16 +158,29 @@
     "You do not look back. You do not need to."
   ];
   var HENGE_ENCOUNTER_LINE = "You walked into something that was already happening.";
-  var SCOUT_HIRE_LINES = [
+  var TOWN_ENTER_LINES = [
+    "A market that learned to survive the loop.",
+    "You smell bread, smoke, and old arguments.",
+    "A place that pretends the road is straight."
+  ];
+  var TOWN_BUY_LINES = [
+    "Coins change hands. You keep moving.",
+    "No ceremony. Just trade."
+  ];
+  var TOWN_NO_GOLD_LINES = [
+    "Not enough to pay.",
+    "Your purse is light."
+  ];
+  var TOWN_SCOUT_HIRE_LINES = [
+    "You pay. They fall in beside you.",
     "You pay in food. They lead the way.",
-    `"When you have your bearings, I'll mark fires, fields, and stone-rings on your map."`,
+    `"When you have your bearings, I'll mark what matters."`,
     `"Woods and bog won't steal you as often with me ahead."`
   ];
-  var SCOUT_ALREADY_HAVE_LINES = [
+  var TOWN_SCOUT_ALREADY_HAVE_LINES = [
     `"I'm already watching the road."`,
     '"You kept me for a reason. Let me do it."'
   ];
-  var SCOUT_NO_FOOD_LINES = ["Not enough to pay them.", "No food, no footsteps.", "Come back with 5 food."];
   var LOST_FLAVOR_LINES = [
     "The road loops. You do not.",
     "The horizon reads the same in every direction.",
@@ -165,37 +208,122 @@
     "Alone now. The road goes on without you."
   ];
 
+  // src/core/spriteIds.ts
+  var SPRITES = {
+    tiles: {
+      // Terrain / tiles
+      farm: 2,
+      mountains: 4,
+      plains: 6,
+      gravel: 8,
+      signpost: 10,
+      rainbow: 12,
+      lake: 34,
+      woods: 36,
+      swamp: 38
+    },
+    interactivePois: {
+      locksmith: 66,
+      henge: 68,
+      town: 72,
+      // castle/town
+      camp: 74,
+      gate: 78,
+      gateOpen: 206
+    },
+    buttons: {
+      return: 98,
+      fight: 100,
+      map: 102,
+      troop: 104,
+      goal: 110,
+      food: 130,
+      scout: 134,
+      rumorTip: 136,
+      search: 138,
+      minimap: 140,
+      // "debug map" in sheet notes; used as minimap toggle
+      restart: 142
+    },
+    cosmetics: {
+      rumorIllustration: 168,
+      campfireIcon: 170,
+      tombstoneIllustration: 174,
+      marketStall: 200
+    },
+    stats: {
+      food: 226,
+      enemy: 228,
+      scout: 230,
+      troop: 232,
+      gold: 236,
+      key: 238
+    },
+    smallStats8x8: {
+      seed: 234,
+      position: 235,
+      steps: 250
+    },
+    ui8x8: {
+      // Nine-slice 3×3, arranged as 3 columns × 3 rows (row stride is +16 sprite ids).
+      panelBorder: {
+        tl: 258,
+        t: 259,
+        tr: 260,
+        l: 274,
+        c: 275,
+        r: 276,
+        bl: 290,
+        b: 291,
+        br: 292
+      },
+      panelBorderBronze: {
+        tl: 261,
+        t: 262,
+        tr: 263,
+        l: 277,
+        c: 278,
+        r: 279,
+        bl: 293,
+        b: 294,
+        br: 295
+      },
+      mapHereMarker: 306,
+      mapBackground: 307,
+      previewGrain: 308
+    }
+  };
+
   // src/core/constants.ts
   var WORLD_WIDTH = 10;
   var WORLD_HEIGHT = 10;
   var INITIAL_SEED = 34;
   var ENABLE_ANIMATIONS = true;
-  var TILE_GATE = 68;
-  var TILE_GATE_OPEN = 70;
-  var TILE_LOCKSMITH = 72;
-  var TILE_SIGNPOST = 42;
-  var TILE_FARM = 38;
-  var TILE_CAMP = 36;
-  var TILE_HENGE = 66;
-  var TILE_MOUNTAIN = 6;
-  var TILE_SWAMP = 12;
   var SIGNPOST_COUNT = 6;
   var GATE_LOCKSMITH_MIN_DISTANCE = 7;
   var CAMP_COUNT = 3;
   var CAMP_COOLDOWN_MOVES = 3;
   var CAMP_FOOD_GAIN = 2;
-  var SCOUT_FOOD_COST = 5;
+  var TOWN_COUNT = 2;
+  var TOWN_FOOD_BUNDLE = 3;
+  var TOWN_TROOPS_BUNDLE = 2;
+  var TOWN_PRICE_FOOD_MIN = 3;
+  var TOWN_PRICE_FOOD_MAX = 6;
+  var TOWN_PRICE_TROOPS_MIN = 5;
+  var TOWN_PRICE_TROOPS_MAX = 10;
+  var TOWN_PRICE_SCOUT_MIN = 8;
+  var TOWN_PRICE_SCOUT_MAX = 12;
+  var TOWN_PRICE_RUMOR_MIN = 3;
+  var TOWN_PRICE_RUMOR_MAX = 6;
   var HENGE_COUNT = 3;
   var INITIAL_ARMY_SIZE = 10;
-  var ARMY_SPRITE_ID = 100;
   var MAP_GEN_NOISE = "NOISE";
   var MAP_GEN_ALGORITHM = MAP_GEN_NOISE;
   var NOISE_SMOOTH_PASSES = 2;
   var NOISE_VALUE_MAX = 1e4;
   var BRONZE_KEY_FOOD_COST = 10;
-  var GATE_NAME = "The Gate";
-  var LOCKSMITH_NAME = "Locksmith of the Unbound";
   var INITIAL_FOOD = 15;
+  var INITIAL_GOLD = 15;
   var FOOD_COST_DEFAULT = 1;
   var FOOD_COST_MOUNTAIN = 2;
   var FOOD_COST_SWAMP = 2;
@@ -203,30 +331,31 @@
   var FARM_COUNT = 3;
   var FARM_COOLDOWN_MOVES = 3;
   var TERRAIN_KINDS = ["grass", "road", "mountain", "lake", "swamp", "woods", "rainbow"];
-  var FEATURE_KINDS = ["gate", "gateOpen", "locksmith", "signpost", "farm", "camp", "henge"];
+  var FEATURE_KINDS = ["gate", "gateOpen", "locksmith", "signpost", "farm", "camp", "henge", "town"];
   var TERRAIN = {
-    grass: { spriteId: 2, enterFoodCost: FOOD_COST_DEFAULT },
-    road: { spriteId: 4, enterFoodCost: FOOD_COST_DEFAULT },
-    mountain: { spriteId: TILE_MOUNTAIN, enterFoodCost: FOOD_COST_MOUNTAIN },
-    lake: { spriteId: 10, enterFoodCost: FOOD_COST_DEFAULT },
-    swamp: { spriteId: TILE_SWAMP, enterFoodCost: FOOD_COST_SWAMP },
-    woods: { spriteId: 14, enterFoodCost: FOOD_COST_DEFAULT },
-    rainbow: { spriteId: 34, enterFoodCost: FOOD_COST_DEFAULT }
+    grass: { spriteId: SPRITES.tiles.plains, enterFoodCost: FOOD_COST_DEFAULT },
+    road: { spriteId: SPRITES.tiles.gravel, enterFoodCost: FOOD_COST_DEFAULT },
+    mountain: { spriteId: SPRITES.tiles.mountains, enterFoodCost: FOOD_COST_MOUNTAIN },
+    lake: { spriteId: SPRITES.tiles.lake, enterFoodCost: FOOD_COST_DEFAULT },
+    swamp: { spriteId: SPRITES.tiles.swamp, enterFoodCost: FOOD_COST_SWAMP },
+    woods: { spriteId: SPRITES.tiles.woods, enterFoodCost: FOOD_COST_DEFAULT },
+    rainbow: { spriteId: SPRITES.tiles.rainbow, enterFoodCost: FOOD_COST_DEFAULT }
   };
   var FEATURES = {
-    gate: { spriteId: TILE_GATE, enterFoodCost: FOOD_COST_DEFAULT },
-    gateOpen: { spriteId: TILE_GATE_OPEN, enterFoodCost: FOOD_COST_DEFAULT },
-    locksmith: { spriteId: TILE_LOCKSMITH, enterFoodCost: FOOD_COST_DEFAULT },
-    signpost: { spriteId: TILE_SIGNPOST, enterFoodCost: FOOD_COST_DEFAULT, count: SIGNPOST_COUNT },
-    farm: { spriteId: TILE_FARM, enterFoodCost: FOOD_COST_DEFAULT, count: FARM_COUNT, cooldownMoves: FARM_COOLDOWN_MOVES },
+    gate: { spriteId: SPRITES.interactivePois.gate, enterFoodCost: FOOD_COST_DEFAULT },
+    gateOpen: { spriteId: SPRITES.interactivePois.gateOpen, enterFoodCost: FOOD_COST_DEFAULT },
+    locksmith: { spriteId: SPRITES.interactivePois.locksmith, enterFoodCost: FOOD_COST_DEFAULT },
+    signpost: { spriteId: SPRITES.tiles.signpost, enterFoodCost: FOOD_COST_DEFAULT, count: SIGNPOST_COUNT },
+    farm: { spriteId: SPRITES.tiles.farm, enterFoodCost: FOOD_COST_DEFAULT, count: FARM_COUNT, cooldownMoves: FARM_COOLDOWN_MOVES },
     camp: {
-      spriteId: TILE_CAMP,
+      spriteId: SPRITES.interactivePois.camp,
       enterFoodCost: FOOD_COST_DEFAULT,
       count: CAMP_COUNT,
       cooldownMoves: CAMP_COOLDOWN_MOVES,
       foodGain: CAMP_FOOD_GAIN
     },
-    henge: { spriteId: TILE_HENGE, enterFoodCost: FOOD_COST_DEFAULT, count: HENGE_COUNT }
+    henge: { spriteId: SPRITES.interactivePois.henge, enterFoodCost: FOOD_COST_DEFAULT, count: HENGE_COUNT },
+    town: { spriteId: SPRITES.interactivePois.town, enterFoodCost: FOOD_COST_DEFAULT, count: TOWN_COUNT }
   };
   function spriteIdForKind(kind) {
     switch (kind) {
@@ -245,6 +374,7 @@
       case "farm":
       case "camp":
       case "henge":
+      case "town":
         return FEATURES[kind].spriteId;
     }
   }
@@ -265,6 +395,7 @@
       case "farm":
       case "camp":
       case "henge":
+      case "town":
         return FEATURES[kind].enterFoodCost;
     }
   }
@@ -285,18 +416,19 @@
       case "farm":
       case "camp":
       case "henge":
+      case "town":
         return [];
     }
   }
-  var FOOD_SPRITE_ID = 98;
   var FOOD_DELTA_FRAMES = 24;
   var WOODS_AMBUSH_PERCENT = 15;
   var WOODS_LOST_PERCENT = 10;
   var MOUNTAIN_AMBUSH_PERCENT = 25;
   var SWAMP_LOST_PERCENT = 20;
   var TELEPORT_MIN_DISTANCE = 4;
-  var COMBAT_REWARD_MIN = 5;
-  var COMBAT_REWARD_MAX = 15;
+  var COMBAT_GOLD_REWARD_MIN = 8;
+  var COMBAT_GOLD_REWARD_MAX = 20;
+  var COMBAT_FOOD_BONUS_MAX = 4;
   var GRID_TRANSITION_STEP_FRAMES = 5;
   var HENGE_COOLDOWN_MOVES = 3;
   var ACTION_NEW_RUN = "NEW_RUN";
@@ -309,17 +441,14 @@
   var ACTION_RETURN = "RETURN";
   var ACTION_TICK = "TICK";
   var ACTION_CAMP_SEARCH = "CAMP_SEARCH";
-  var ACTION_CAMP_HIRE_SCOUT = "CAMP_HIRE_SCOUT";
   var ACTION_CAMP_LEAVE = "CAMP_LEAVE";
+  var ACTION_TOWN_BUY_FOOD = "TOWN_BUY_FOOD";
+  var ACTION_TOWN_BUY_TROOPS = "TOWN_BUY_TROOPS";
+  var ACTION_TOWN_HIRE_SCOUT = "TOWN_HIRE_SCOUT";
+  var ACTION_TOWN_BUY_RUMOR = "TOWN_BUY_RUMOR";
+  var ACTION_TOWN_LEAVE = "TOWN_LEAVE";
   var MOVE_SLIDE_FRAMES = 15;
   var LORE_MAX_CHARS_PER_LINE = 19;
-  var SPR_BUTTON_GOAL = 44;
-  var SPR_BUTTON_RESTART = 46;
-  var SPR_BUTTON_MINIMAP = 78;
-  var SPR_BUTTON_MAP = 138;
-  var SPR_BUTTON_CAMP_SEARCH = 110;
-  var SPR_BUTTON_CAMP_HIRE_SCOUT = 142;
-  var SPR_ICON_SCOUT = 108;
 
   // src/core/prng.ts
   function xorshift32(x) {
@@ -427,11 +556,14 @@
     const isReady = stepCount >= readyAt;
     const foodGain = isReady ? CAMP_FOOD_GAIN : 0;
     const armyGain = isReady ? computeCampArmyGain({ seed: s.world.seed, campId: camp.id, stepCount }) : 0;
-    const scoutFoodCost = s.resources.hasScout ? null : SCOUT_FOOD_COST;
+    const scoutFoodCost = null;
     return { campName, foodGain, armyGain, scoutFoodCost };
   }
+  function gridTransitionDurationFrames() {
+    return Math.max(1, Math.trunc(GRID_TRANSITION_STEP_FRAMES)) * 5;
+  }
   function reduceCampAction(prevState, action) {
-    if (action.type !== ACTION_CAMP_LEAVE && action.type !== ACTION_CAMP_SEARCH && action.type !== ACTION_CAMP_HIRE_SCOUT) return null;
+    if (action.type !== ACTION_CAMP_LEAVE && action.type !== ACTION_CAMP_SEARCH) return null;
     const enc = prevState.encounter;
     if (!enc || enc.kind !== "camp") return prevState;
     const pos = prevState.player.position;
@@ -442,65 +574,52 @@
     const prevRes = prevState.resources;
     if (action.type === ACTION_CAMP_LEAVE) {
       const restore = enc.restoreMessage;
-      return { ...prevState, encounter: null, ui: { ...prevState.ui, message: restore } };
+      const baseUi = { ...prevState.ui, message: restore };
+      if (!ENABLE_ANIMATIONS) return { ...prevState, encounter: null, ui: baseUi };
+      const startFrame = baseUi.clock.frame;
+      const uiWith = enqueueAnim(baseUi, {
+        kind: "gridTransition",
+        startFrame,
+        durationFrames: gridTransitionDurationFrames(),
+        blocksInput: true,
+        params: { from: "camp", to: "overworld" }
+      });
+      return { ...prevState, encounter: null, ui: uiWith };
     }
     if (action.type === ACTION_CAMP_SEARCH) {
       const readyAt = campCell.nextReadyStep ?? 0;
       if (stepCount < readyAt) {
-        const line3 = pickDeterministicLine(CAMP_EMPTY_LINES, prevState.world.seed, campCell.id, stepCount);
+        const line2 = pickDeterministicLine(CAMP_EMPTY_LINES, prevState.world.seed, campCell.id, stepCount);
         return { ...prevState, ui: { ...prevState.ui, message: `${campName} Camp
-${line3}` } };
+${line2}` } };
       }
       const armyGain = computeCampArmyGain({ seed: prevState.world.seed, campId: campCell.id, stepCount });
       const nextCampCell = { ...campCell, nextReadyStep: stepCount + CAMP_COOLDOWN_MOVES };
       const nextWorld = setCellAt(prevState.world, pos, nextCampCell);
-      const nextResources2 = { ...prevRes, food: prevRes.food + CAMP_FOOD_GAIN, armySize: prevRes.armySize + armyGain };
-      const line2 = pickDeterministicLine(CAMP_RECRUIT_LINES, prevState.world.seed, campCell.id, stepCount);
-      const baseUi2 = { ...prevState.ui, message: `${campName} Camp
-${line2}` };
-      if (!ENABLE_ANIMATIONS) return { ...prevState, world: nextWorld, resources: nextResources2, ui: baseUi2 };
-      const startFrame2 = baseUi2.clock.frame;
-      let uiWith2 = baseUi2;
-      uiWith2 = enqueueAnim(uiWith2, {
-        kind: "foodDelta",
-        startFrame: startFrame2,
-        durationFrames: FOOD_DELTA_FRAMES,
-        blocksInput: false,
-        params: { delta: CAMP_FOOD_GAIN }
-      });
-      uiWith2 = enqueueAnim(uiWith2, {
-        kind: "armyDelta",
-        startFrame: startFrame2,
-        durationFrames: FOOD_DELTA_FRAMES,
-        blocksInput: false,
-        params: { delta: armyGain }
-      });
-      return { ...prevState, world: nextWorld, resources: nextResources2, ui: uiWith2 };
-    }
-    if (prevRes.hasScout) {
-      const line2 = pickDeterministicLine(SCOUT_ALREADY_HAVE_LINES, prevState.world.seed, campCell.id, stepCount);
-      return { ...prevState, ui: { ...prevState.ui, message: `${campName} Camp
-${line2}` } };
-    }
-    if (prevRes.food < SCOUT_FOOD_COST) {
-      const line2 = pickDeterministicLine(SCOUT_NO_FOOD_LINES, prevState.world.seed, campCell.id, stepCount);
-      return { ...prevState, ui: { ...prevState.ui, message: `${campName} Camp
-${line2}` } };
-    }
-    const nextResources = { ...prevRes, hasScout: true, food: prevRes.food - SCOUT_FOOD_COST };
-    const line = pickDeterministicLine(SCOUT_HIRE_LINES, prevState.world.seed, campCell.id, stepCount);
-    const baseUi = { ...prevState.ui, message: `${campName} Camp
+      const nextResources = { ...prevRes, food: prevRes.food + CAMP_FOOD_GAIN, armySize: prevRes.armySize + armyGain };
+      const line = pickDeterministicLine(CAMP_RECRUIT_LINES, prevState.world.seed, campCell.id, stepCount);
+      const baseUi = { ...prevState.ui, message: `${campName} Camp
 ${line}` };
-    if (!ENABLE_ANIMATIONS) return { ...prevState, resources: nextResources, ui: baseUi };
-    const startFrame = baseUi.clock.frame;
-    const uiWith = enqueueAnim(baseUi, {
-      kind: "foodDelta",
-      startFrame,
-      durationFrames: FOOD_DELTA_FRAMES,
-      blocksInput: false,
-      params: { delta: -SCOUT_FOOD_COST }
-    });
-    return { ...prevState, resources: nextResources, ui: uiWith };
+      if (!ENABLE_ANIMATIONS) return { ...prevState, world: nextWorld, resources: nextResources, ui: baseUi };
+      const startFrame = baseUi.clock.frame;
+      let uiWith = baseUi;
+      uiWith = enqueueAnim(uiWith, {
+        kind: "delta",
+        startFrame,
+        durationFrames: FOOD_DELTA_FRAMES,
+        blocksInput: false,
+        params: { target: "food", delta: CAMP_FOOD_GAIN }
+      });
+      uiWith = enqueueAnim(uiWith, {
+        kind: "delta",
+        startFrame,
+        durationFrames: FOOD_DELTA_FRAMES,
+        blocksInput: false,
+        params: { target: "army", delta: armyGain }
+      });
+      return { ...prevState, world: nextWorld, resources: nextResources, ui: uiWith };
+    }
+    return prevState;
   }
 
   // src/core/combat.ts
@@ -548,6 +667,168 @@ ${line}` };
       enemyDelta: 0,
       killed: 0
     };
+  }
+
+  // src/core/town.ts
+  function gridTransitionDurationFrames2() {
+    return Math.max(1, Math.trunc(GRID_TRANSITION_STEP_FRAMES)) * 5;
+  }
+  function getTownAtPlayer(s) {
+    const p = s.player.position;
+    const cell = s.world.cells[p.y][p.x];
+    return cell.kind === "town" ? cell : null;
+  }
+  function townPrefix(town) {
+    const name = town.name || "A Town";
+    return `${name} Town`;
+  }
+  function shuffledRumors(seed, townId) {
+    const pool = [];
+    const groups = Object.values(BARKEEP_TIPS);
+    for (let i = 0; i < groups.length; i++) {
+      const lines = groups[i];
+      for (let j = 0; j < lines.length; j++) pool.push(lines[j]);
+    }
+    if (pool.length <= 1) return pool;
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = pickIntExclusive({ seed, stepCount: 0, cellId: townId, salt: i }, i + 1);
+      const tmp = pool[i];
+      pool[i] = pool[j];
+      pool[j] = tmp;
+    }
+    return pool;
+  }
+  function reduceTownAction(prevState, action) {
+    if (action.type !== ACTION_TOWN_BUY_FOOD && action.type !== ACTION_TOWN_BUY_TROOPS && action.type !== ACTION_TOWN_HIRE_SCOUT && action.type !== ACTION_TOWN_BUY_RUMOR && action.type !== ACTION_TOWN_LEAVE) {
+      return null;
+    }
+    const enc = prevState.encounter;
+    if (!enc || enc.kind !== "town") return prevState;
+    const town = getTownAtPlayer(prevState);
+    if (!town) return prevState;
+    const seed = prevState.world.seed;
+    const stepCount = prevState.run.stepCount;
+    const townId = town.id;
+    const prefix = townPrefix(town);
+    const prevRes = prevState.resources;
+    const setMessage = (line2) => ({ ...prevState, ui: { ...prevState.ui, message: `${prefix}
+${line2}` } });
+    const noGold = () => setMessage(pickDeterministicLine(TOWN_NO_GOLD_LINES, seed, townId, stepCount));
+    if (action.type === ACTION_TOWN_LEAVE) {
+      const restore = enc.restoreMessage;
+      const baseUi2 = { ...prevState.ui, message: restore };
+      if (!ENABLE_ANIMATIONS) return { ...prevState, encounter: null, ui: baseUi2 };
+      const startFrame2 = baseUi2.clock.frame;
+      const uiWith2 = enqueueAnim(baseUi2, {
+        kind: "gridTransition",
+        startFrame: startFrame2,
+        durationFrames: gridTransitionDurationFrames2(),
+        blocksInput: true,
+        params: { from: "town", to: "overworld" }
+      });
+      return { ...prevState, encounter: null, ui: uiWith2 };
+    }
+    if (action.type === ACTION_TOWN_BUY_FOOD) {
+      const cost2 = town.prices.foodGold;
+      if (prevRes.gold < cost2) return noGold();
+      const nextResources2 = {
+        ...prevRes,
+        gold: prevRes.gold - cost2,
+        food: prevRes.food + town.bundles.food
+      };
+      const line2 = pickDeterministicLine(TOWN_BUY_LINES, seed, townId, stepCount);
+      const baseUi2 = { ...prevState.ui, message: `${prefix}
+${line2}` };
+      if (!ENABLE_ANIMATIONS) return { ...prevState, resources: nextResources2, ui: baseUi2 };
+      const startFrame2 = baseUi2.clock.frame;
+      let uiWith2 = baseUi2;
+      uiWith2 = enqueueAnim(uiWith2, {
+        kind: "delta",
+        startFrame: startFrame2,
+        durationFrames: FOOD_DELTA_FRAMES,
+        blocksInput: false,
+        params: { target: "gold", delta: -cost2 }
+      });
+      uiWith2 = enqueueAnim(uiWith2, {
+        kind: "delta",
+        startFrame: startFrame2,
+        durationFrames: FOOD_DELTA_FRAMES,
+        blocksInput: false,
+        params: { target: "food", delta: town.bundles.food }
+      });
+      return { ...prevState, resources: nextResources2, ui: uiWith2 };
+    }
+    if (action.type === ACTION_TOWN_BUY_TROOPS) {
+      const cost2 = town.prices.troopsGold;
+      if (prevRes.gold < cost2) return noGold();
+      const nextResources2 = {
+        ...prevRes,
+        gold: prevRes.gold - cost2,
+        armySize: prevRes.armySize + town.bundles.troops
+      };
+      const line2 = pickDeterministicLine(TOWN_BUY_LINES, seed, townId, stepCount);
+      const baseUi2 = { ...prevState.ui, message: `${prefix}
+${line2}` };
+      if (!ENABLE_ANIMATIONS) return { ...prevState, resources: nextResources2, ui: baseUi2 };
+      const startFrame2 = baseUi2.clock.frame;
+      let uiWith2 = baseUi2;
+      uiWith2 = enqueueAnim(uiWith2, {
+        kind: "delta",
+        startFrame: startFrame2,
+        durationFrames: FOOD_DELTA_FRAMES,
+        blocksInput: false,
+        params: { target: "gold", delta: -cost2 }
+      });
+      uiWith2 = enqueueAnim(uiWith2, {
+        kind: "delta",
+        startFrame: startFrame2,
+        durationFrames: FOOD_DELTA_FRAMES,
+        blocksInput: false,
+        params: { target: "army", delta: town.bundles.troops }
+      });
+      return { ...prevState, resources: nextResources2, ui: uiWith2 };
+    }
+    if (action.type === ACTION_TOWN_HIRE_SCOUT) {
+      if (prevRes.hasScout) {
+        return setMessage(pickDeterministicLine(TOWN_SCOUT_ALREADY_HAVE_LINES, seed, townId, stepCount));
+      }
+      const cost2 = town.prices.scoutGold;
+      if (prevRes.gold < cost2) return noGold();
+      const nextResources2 = { ...prevRes, hasScout: true, gold: prevRes.gold - cost2 };
+      const line2 = pickDeterministicLine(TOWN_SCOUT_HIRE_LINES, seed, townId, stepCount);
+      const baseUi2 = { ...prevState.ui, message: `${prefix}
+${line2}` };
+      if (!ENABLE_ANIMATIONS) return { ...prevState, resources: nextResources2, ui: baseUi2 };
+      const startFrame2 = baseUi2.clock.frame;
+      const uiWith2 = enqueueAnim(baseUi2, {
+        kind: "delta",
+        startFrame: startFrame2,
+        durationFrames: FOOD_DELTA_FRAMES,
+        blocksInput: false,
+        params: { target: "gold", delta: -cost2 }
+      });
+      return { ...prevState, resources: nextResources2, ui: uiWith2 };
+    }
+    const cost = town.prices.rumorGold;
+    if (prevRes.gold < cost) return noGold();
+    const nextResources = { ...prevRes, gold: prevRes.gold - cost };
+    const cursor = enc.rumorCursor;
+    const pool = shuffledRumors(seed, townId);
+    const idx = pool.length > 0 ? cursor % pool.length : 0;
+    const line = pool[idx] || pool[0] || "";
+    const nextEncounter = { ...enc, rumorCursor: cursor + 1 };
+    const baseUi = { ...prevState.ui, message: `${prefix}
+${line}` };
+    if (!ENABLE_ANIMATIONS) return { ...prevState, resources: nextResources, ui: baseUi };
+    const startFrame = baseUi.clock.frame;
+    const uiWith = enqueueAnim(baseUi, {
+      kind: "delta",
+      startFrame,
+      durationFrames: FOOD_DELTA_FRAMES,
+      blocksInput: false,
+      params: { target: "gold", delta: -cost }
+    });
+    return { ...prevState, resources: nextResources, encounter: nextEncounter, ui: uiWith };
   }
 
   // src/core/tileEvents.ts
@@ -767,6 +1048,24 @@ ${line}` };
     });
     return res.rngState;
   }
+  function placeNamedFeatureRng(cells, rngState, opts) {
+    const remainingNames = [...opts.namePool];
+    const res = placeFeature(cells, rngState, {
+      count: opts.count,
+      canPlaceAt: opts.canPlaceAt,
+      buildCell: (x, y, nextRng) => {
+        let name = opts.fallbackName;
+        if (remainingNames.length > 0) {
+          const pick = randInt(nextRng, remainingNames.length);
+          nextRng = pick.rngState;
+          name = remainingNames.splice(pick.value, 1)[0] || opts.fallbackName;
+        }
+        const built = opts.buildCell(x, y, name, nextRng);
+        return { cell: built.cell, rngState: built.rngState };
+      }
+    });
+    return res.rngState;
+  }
   function placeNamedFarms(cells, rngState) {
     return placeNamedFeature(cells, rngState, {
       count: FARM_COUNT,
@@ -783,6 +1082,60 @@ ${line}` };
       fallbackName: "A Camp",
       canPlaceAt: (_x, _y, here) => isTerrainCell(here),
       buildCell: (x, y, name) => ({ kind: "camp", id: cellId(x, y), name, nextReadyStep: 0 })
+    });
+  }
+  function placeNamedTowns(cells, rngState) {
+    const baseOffers = ["buyFood", "buyTroops", "hireScout", "buyRumors"];
+    const omitNoScoutIndices = [0, 1, 3];
+    let townIndex = 0;
+    return placeNamedFeatureRng(cells, rngState, {
+      count: TOWN_COUNT,
+      namePool: TOWN_NAME_POOL,
+      fallbackName: "A Town",
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: (x, y, name, nextRng) => {
+        let omitIdx;
+        if (townIndex === 0) {
+          const pick = randInt(nextRng, omitNoScoutIndices.length);
+          nextRng = pick.rngState;
+          omitIdx = omitNoScoutIndices[pick.value];
+        } else {
+          const pick = randInt(nextRng, baseOffers.length);
+          nextRng = pick.rngState;
+          omitIdx = pick.value;
+        }
+        const offers = baseOffers.filter((_k, idx) => idx !== omitIdx);
+        const loFood = Math.min(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX);
+        const hiFood = Math.max(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX);
+        const rf = randInt(nextRng, hiFood - loFood + 1);
+        nextRng = rf.rngState;
+        const foodGold = loFood + rf.value;
+        const loTroops = Math.min(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX);
+        const hiTroops = Math.max(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX);
+        const rt = randInt(nextRng, hiTroops - loTroops + 1);
+        nextRng = rt.rngState;
+        const troopsGold = loTroops + rt.value;
+        const loScout = Math.min(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX);
+        const hiScout = Math.max(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX);
+        const rs = randInt(nextRng, hiScout - loScout + 1);
+        nextRng = rs.rngState;
+        const scoutGold = loScout + rs.value;
+        const loRumor = Math.min(TOWN_PRICE_RUMOR_MIN, TOWN_PRICE_RUMOR_MAX);
+        const hiRumor = Math.max(TOWN_PRICE_RUMOR_MIN, TOWN_PRICE_RUMOR_MAX);
+        const rr = randInt(nextRng, hiRumor - loRumor + 1);
+        nextRng = rr.rngState;
+        const rumorGold = loRumor + rr.value;
+        const cell = {
+          kind: "town",
+          id: cellId(x, y),
+          name,
+          offers,
+          prices: { foodGold, troopsGold, scoutGold, rumorGold },
+          bundles: { food: TOWN_FOOD_BUNDLE, troops: TOWN_TROOPS_BUNDLE }
+        };
+        townIndex++;
+        return { cell, rngState: nextRng };
+      }
     });
   }
   function placeHenges(cells, rngState) {
@@ -826,6 +1179,7 @@ ${line}` };
     rngState = locksmith.rngState;
     rngState = placeNamedFarms(cells, rngState);
     rngState = placeNamedCamps(cells, rngState);
+    rngState = placeNamedTowns(cells, rngState);
     rngState = placeHenges(cells, rngState);
     rngState = placeSignposts(cells, rngState);
     const startPick = pickStart({ rngState });
@@ -949,7 +1303,16 @@ ${line}` };
   // src/core/signpost.ts
   function formatNearestPoiSignpostMessage(playerPos, world) {
     const SIGNPOST_MIN_TARGET_DISTANCE = 2;
-    const kindRank = (k) => k === "gate" || k === "gateOpen" ? 0 : k === "locksmith" ? 1 : k === "farm" ? 2 : k === "camp" ? 3 : 4;
+    const POI_KIND_RANK = {
+      gate: 0,
+      gateOpen: 0,
+      locksmith: 1,
+      farm: 2,
+      town: 3,
+      camp: 4,
+      henge: 5
+    };
+    const kindRank = (k) => POI_KIND_RANK[k];
     function candidateId(x, y) {
       return y * world.width + x;
     }
@@ -981,6 +1344,9 @@ ${line}` };
             break;
           case "henge":
             pushNamedCandidate("henge", cell.id, cell.name || "A Henge", "Henge", x, y);
+            break;
+          case "town":
+            pushNamedCandidate("town", cell.id, cell.name || "A Town", "Town", x, y);
             break;
         }
       }
@@ -1020,6 +1386,17 @@ ${dir}, ${chosen.d} leagues away.`;
     knowsPosition: true
   });
 
+  // src/core/tiles/onEnterTown.ts
+  var onEnterTown = ({ cell, world, pos, stepCount }) => {
+    if (cell.kind !== "town") return { message: "" };
+    const town = getCellAt(world, pos);
+    if (!town || town.kind !== "town") return { message: "" };
+    const name = town.name || "A Town";
+    const line = pickDeterministicLine(TOWN_ENTER_LINES, world.seed, town.id, stepCount);
+    return { message: `${name} Town
+${line}`, knowsPosition: true };
+  };
+
   // src/core/tiles/registry.ts
   var onEnterByKind = {
     camp: onEnterCamp,
@@ -1028,7 +1405,8 @@ ${dir}, ${chosen.d} leagues away.`;
     gateOpen: onEnterGate,
     henge: onEnterHenge,
     locksmith: onEnterLocksmith,
-    signpost: onEnterSignpost
+    signpost: onEnterSignpost,
+    town: onEnterTown
   };
   function getOnEnterHandler(kind) {
     return onEnterByKind[kind] || onEnterDefaultTerrain;
@@ -1081,7 +1459,7 @@ ${dir}, ${chosen.d} leagues away.`;
     }
     return false;
   }
-  function gridTransitionDurationFrames() {
+  function gridTransitionDurationFrames3() {
     return Math.max(1, Math.trunc(GRID_TRANSITION_STEP_FRAMES)) * 5;
   }
   function clearSpriteFocusIfAny(ui) {
@@ -1090,8 +1468,14 @@ ${dir}, ${chosen.d} leagues away.`;
     return lp;
   }
   function normalizeResources(_world, raw) {
-    if (!raw) return { food: INITIAL_FOOD, armySize: INITIAL_ARMY_SIZE, hasBronzeKey: false, hasScout: false };
-    return { food: raw.food, armySize: raw.armySize, hasBronzeKey: !!raw.hasBronzeKey, hasScout: !!raw.hasScout };
+    if (!raw) return { food: INITIAL_FOOD, gold: INITIAL_GOLD, armySize: INITIAL_ARMY_SIZE, hasBronzeKey: false, hasScout: false };
+    return {
+      food: raw.food,
+      gold: raw.gold ?? 0,
+      armySize: raw.armySize,
+      hasBronzeKey: !!raw.hasBronzeKey,
+      hasScout: !!raw.hasScout
+    };
   }
   function gameOverMessage(seed, stepCount) {
     const k = Math.trunc(seed) + Math.trunc(stepCount);
@@ -1105,7 +1489,7 @@ ${dir}, ${chosen.d} leagues away.`;
   function reduceGoal(s) {
     const prevUi = getUi(s.ui);
     const prevLeftPanel = getLeftPanel(prevUi);
-    const nextLeftPanel = prevLeftPanel.kind === LEFT_PANEL_KIND_MINIMAP ? prevLeftPanel : { kind: LEFT_PANEL_KIND_SPRITE, spriteId: SPR_BUTTON_GOAL };
+    const nextLeftPanel = prevLeftPanel.kind === LEFT_PANEL_KIND_MINIMAP ? prevLeftPanel : { kind: LEFT_PANEL_KIND_SPRITE, spriteId: SPRITES.buttons.goal };
     return {
       world: s.world,
       player: s.player,
@@ -1231,6 +1615,8 @@ ${dir}, ${chosen.d} leagues away.`;
     }
     let nextEncounter = prevState.encounter;
     let didStartCombat = false;
+    let didStartCamp = false;
+    let didStartTown = false;
     let teleported = false;
     let landingPos = nextPos;
     if (!isGameOver && !prevState.encounter) {
@@ -1246,6 +1632,10 @@ ${dir}, ${chosen.d} leagues away.`;
       const preEncounterMessage = message;
       if (destKind === "camp") {
         nextEncounter = { kind: "camp", sourceKind: "camp", sourceCellId: destCellId, restoreMessage: preEncounterMessage };
+        didStartCamp = true;
+      } else if (destKind === "town") {
+        nextEncounter = { kind: "town", sourceKind: "town", sourceCellId: destCellId, restoreMessage: preEncounterMessage, rumorCursor: 0 };
+        didStartTown = true;
       } else {
         const event = rollTileEvent({
           seed: nextWorld.seed,
@@ -1324,22 +1714,22 @@ ${dir}, ${chosen.d} leagues away.`;
       const delta = foodDeltas[i];
       if (!delta) continue;
       uiWith = enqueueAnim(uiWith, {
-        kind: "foodDelta",
+        kind: "delta",
         startFrame,
         durationFrames: FOOD_DELTA_FRAMES,
         blocksInput: false,
-        params: { delta }
+        params: { target: "food", delta }
       });
     }
     for (let i = 0; i < armyDeltas.length; i++) {
       const delta = armyDeltas[i];
       if (!delta) continue;
       uiWith = enqueueAnim(uiWith, {
-        kind: "armyDelta",
+        kind: "delta",
         startFrame,
         durationFrames: FOOD_DELTA_FRAMES,
         blocksInput: false,
-        params: { delta }
+        params: { target: "army", delta }
       });
     }
     if (didStartCombat) {
@@ -1347,16 +1737,36 @@ ${dir}, ${chosen.d} leagues away.`;
       uiWith = enqueueAnim(uiWith, {
         kind: "gridTransition",
         startFrame: revealStart,
-        durationFrames: gridTransitionDurationFrames(),
+        durationFrames: gridTransitionDurationFrames3(),
         blocksInput: true,
         params: { from: "overworld", to: "combat" }
+      });
+    }
+    if (didStartCamp) {
+      const revealStart = startFrame + MOVE_SLIDE_FRAMES;
+      uiWith = enqueueAnim(uiWith, {
+        kind: "gridTransition",
+        startFrame: revealStart,
+        durationFrames: gridTransitionDurationFrames3(),
+        blocksInput: true,
+        params: { from: "overworld", to: "camp" }
+      });
+    }
+    if (didStartTown) {
+      const revealStart = startFrame + MOVE_SLIDE_FRAMES;
+      uiWith = enqueueAnim(uiWith, {
+        kind: "gridTransition",
+        startFrame: revealStart,
+        durationFrames: gridTransitionDurationFrames3(),
+        blocksInput: true,
+        params: { from: "overworld", to: "town" }
       });
     }
     if (teleported) {
       uiWith = enqueueAnim(uiWith, {
         kind: "gridTransition",
         startFrame,
-        durationFrames: gridTransitionDurationFrames(),
+        durationFrames: gridTransitionDurationFrames3(),
         blocksInput: true,
         params: { from: "blank", to: "overworld" }
       });
@@ -1434,7 +1844,7 @@ ${dir}, ${chosen.d} leagues away.`;
       const ui = ENABLE_ANIMATIONS ? enqueueAnim(baseUi, {
         kind: "gridTransition",
         startFrame: 0,
-        durationFrames: gridTransitionDurationFrames(),
+        durationFrames: gridTransitionDurationFrames3(),
         blocksInput: true,
         params: { from: "blank", to: "overworld" }
       }) : baseUi;
@@ -1444,6 +1854,7 @@ ${dir}, ${chosen.d} leagues away.`;
         run: { stepCount: 0, hasWon, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
         resources: {
           food: INITIAL_FOOD,
+          gold: INITIAL_GOLD,
           armySize: INITIAL_ARMY_SIZE,
           hasBronzeKey: false,
           hasScout: false
@@ -1461,6 +1872,8 @@ ${dir}, ${chosen.d} leagues away.`;
     }
     const campHandled = reduceCampAction(prevState, action);
     if (campHandled) return campHandled;
+    const townHandled = reduceTownAction(prevState, action);
+    if (townHandled) return townHandled;
     if (action.type === ACTION_RETURN) {
       if (!prevState.encounter) return prevState;
       if (prevState.encounter.kind !== "combat") return prevState;
@@ -1491,11 +1904,11 @@ ${dir}, ${chosen.d} leagues away.`;
       const startFrame = baseUi.clock.frame;
       let uiWith = baseUi;
       uiWith = enqueueAnim(uiWith, {
-        kind: "armyDelta",
+        kind: "delta",
         startFrame,
         durationFrames: FOOD_DELTA_FRAMES,
         blocksInput: false,
-        params: { delta: -1 }
+        params: { target: "army", delta: -1 }
       });
       return {
         world: prevState.world,
@@ -1506,7 +1919,7 @@ ${dir}, ${chosen.d} leagues away.`;
         ui: isGameOver ? uiWith : enqueueAnim(uiWith, {
           kind: "gridTransition",
           startFrame,
-          durationFrames: gridTransitionDurationFrames(),
+          durationFrames: gridTransitionDurationFrames3(),
           blocksInput: true,
           params: { from: "combat", to: "overworld" }
         })
@@ -1528,6 +1941,7 @@ ${dir}, ${chosen.d} leagues away.`;
         enemyArmy: prevEnemy
       });
       const foodDeltas = [];
+      const goldDeltas = [];
       const armyDeltas = [];
       const enemyDeltas = [];
       let nextResources = prevRes;
@@ -1543,12 +1957,19 @@ ${dir}, ${chosen.d} leagues away.`;
       }
       let nextWorld = { ...prevState.world, rngState: round.rngState };
       if (round.outcome === "playerHit" && nextEncounter == null && !prevState.run.isGameOver && !prevState.run.hasWon) {
-        const span = COMBAT_REWARD_MAX - COMBAT_REWARD_MIN + 1;
-        const r = randInt(nextWorld.rngState, span);
-        nextWorld = { ...nextWorld, rngState: r.rngState };
-        const reward = COMBAT_REWARD_MIN + r.value;
-        nextResources = { ...nextResources, food: nextResources.food + reward };
-        foodDeltas.push(reward);
+        const goldSpan = COMBAT_GOLD_REWARD_MAX - COMBAT_GOLD_REWARD_MIN + 1;
+        const g = randInt(nextWorld.rngState, goldSpan);
+        nextWorld = { ...nextWorld, rngState: g.rngState };
+        const gold = COMBAT_GOLD_REWARD_MIN + g.value;
+        nextResources = { ...nextResources, gold: nextResources.gold + gold };
+        goldDeltas.push(gold);
+        const fb = randInt(nextWorld.rngState, COMBAT_FOOD_BONUS_MAX + 1);
+        nextWorld = { ...nextWorld, rngState: fb.rngState };
+        const foodBonus = fb.value | 0;
+        if (foodBonus) {
+          nextResources = { ...nextResources, food: nextResources.food + foodBonus };
+          foodDeltas.push(foodBonus);
+        }
       }
       const isGameOver = nextResources.armySize <= 0;
       const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : prevState.run;
@@ -1575,40 +1996,51 @@ ${dir}, ${chosen.d} leagues away.`;
         const delta = foodDeltas[i];
         if (!delta) continue;
         uiWith = enqueueAnim(uiWith, {
-          kind: "foodDelta",
+          kind: "delta",
           startFrame,
           durationFrames: FOOD_DELTA_FRAMES,
           blocksInput: false,
-          params: { delta }
+          params: { target: "food", delta }
+        });
+      }
+      for (let i = 0; i < goldDeltas.length; i++) {
+        const delta = goldDeltas[i];
+        if (!delta) continue;
+        uiWith = enqueueAnim(uiWith, {
+          kind: "delta",
+          startFrame,
+          durationFrames: FOOD_DELTA_FRAMES,
+          blocksInput: false,
+          params: { target: "gold", delta }
         });
       }
       for (let i = 0; i < armyDeltas.length; i++) {
         const delta = armyDeltas[i];
         if (!delta) continue;
         uiWith = enqueueAnim(uiWith, {
-          kind: "armyDelta",
+          kind: "delta",
           startFrame,
           durationFrames: FOOD_DELTA_FRAMES,
           blocksInput: false,
-          params: { delta }
+          params: { target: "army", delta }
         });
       }
       for (let i = 0; i < enemyDeltas.length; i++) {
         const delta = enemyDeltas[i];
         if (!delta) continue;
         uiWith = enqueueAnim(uiWith, {
-          kind: "enemyArmyDelta",
+          kind: "delta",
           startFrame,
           durationFrames: FOOD_DELTA_FRAMES,
           blocksInput: false,
-          params: { delta }
+          params: { target: "enemyArmy", delta }
         });
       }
       if (!isGameOver && nextEncounter == null) {
         uiWith = enqueueAnim(uiWith, {
           kind: "gridTransition",
           startFrame,
-          durationFrames: gridTransitionDurationFrames(),
+          durationFrames: gridTransitionDurationFrames3(),
           blocksInput: true,
           params: { from: "combat", to: "overworld" }
         });
@@ -1638,25 +2070,59 @@ ${dir}, ${chosen.d} leagues away.`;
   }
 
   // src/core/rightGrid.ts
+  function spriteIdForTownOffer(o) {
+    if (!o) return null;
+    if (o === "buyFood") return SPRITES.buttons.food;
+    if (o === "buyTroops") return SPRITES.buttons.troop;
+    if (o === "hireScout") return SPRITES.buttons.scout;
+    if (o === "buyRumors") return SPRITES.buttons.rumorTip;
+    return null;
+  }
   function getRightGridCellDef(s, row, col) {
-    if (row === 0 && col === 0) return { iconKey: "goal", action: { type: ACTION_SHOW_GOAL } };
-    if (row === 2 && col === 0) return { iconKey: "minimap", action: { type: ACTION_TOGGLE_MINIMAP } };
-    if (row === 2 && col === 2) return { iconKey: "restart", action: { type: ACTION_RESTART } };
+    if (row === 0 && col === 0) return { spriteId: SPRITES.buttons.goal, action: { type: ACTION_SHOW_GOAL } };
+    if (row === 2 && col === 0) return { spriteId: SPRITES.buttons.minimap, action: { type: ACTION_TOGGLE_MINIMAP } };
+    if (row === 2 && col === 2) return { spriteId: SPRITES.buttons.restart, action: { type: ACTION_RESTART } };
     if (row === 0 && col === 2) {
-      return { iconKey: "map", action: { type: ACTION_TOGGLE_MAP } };
+      return { spriteId: SPRITES.buttons.map, action: { type: ACTION_TOGGLE_MAP } };
     }
     const isRunOver = !!(s.run.isGameOver || s.run.hasWon);
     if (s.encounter && s.encounter.kind === "combat") {
-      if (row === 1 && col === 0) return { iconKey: "fight", action: { type: ACTION_FIGHT } };
-      if (row === 1 && col === 2) return { iconKey: "return", action: { type: ACTION_RETURN } };
-      if (row === 1 && col === 1) return { iconKey: "enemy", action: null };
+      if (row === 1 && col === 0) return { spriteId: SPRITES.buttons.fight, action: { type: ACTION_FIGHT } };
+      if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_RETURN } };
+      if (row === 1 && col === 1) return { spriteId: SPRITES.stats.enemy, action: null };
       return { action: null };
     }
     if (s.encounter && s.encounter.kind === "camp") {
-      if (row === 0 && col === 1) return { iconKey: "campHireScout", action: { type: ACTION_CAMP_HIRE_SCOUT } };
-      if (row === 1 && col === 0) return { iconKey: "campSearch", action: { type: ACTION_CAMP_SEARCH } };
-      if (row === 1 && col === 2) return { iconKey: "campLeave", action: { type: ACTION_CAMP_LEAVE } };
-      if (row === 1 && col === 1) return { iconKey: "campFireIcon", action: null };
+      if (row === 0 && col === 1) return { action: null };
+      if (row === 1 && col === 0) return { spriteId: SPRITES.buttons.search, action: { type: ACTION_CAMP_SEARCH } };
+      if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_CAMP_LEAVE } };
+      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.campfireIcon, action: null };
+      return { action: null };
+    }
+    if (s.encounter && s.encounter.kind === "town") {
+      let actionForOffer2 = function(o) {
+        if (o === "buyFood") return { type: ACTION_TOWN_BUY_FOOD };
+        if (o === "buyTroops") return { type: ACTION_TOWN_BUY_TROOPS };
+        if (o === "hireScout") return { type: ACTION_TOWN_HIRE_SCOUT };
+        return { type: ACTION_TOWN_BUY_RUMOR };
+      };
+      var actionForOffer = actionForOffer2;
+      const pos = s.player.position;
+      const cell = s.world.cells[pos.y][pos.x];
+      if (cell.kind !== "town") return { action: null };
+      const town = cell;
+      const offerAt = (idx) => {
+        const o = town.offers[idx];
+        if (!o) return { action: null };
+        const spriteId = spriteIdForTownOffer(o);
+        if (spriteId == null) return { action: null };
+        return { spriteId, action: actionForOffer2(o) };
+      };
+      if (row === 0 && col === 1) return offerAt(0);
+      if (row === 1 && col === 0) return offerAt(1);
+      if (row === 2 && col === 1) return offerAt(2);
+      if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_TOWN_LEAVE } };
+      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.marketStall, action: null };
       return { action: null };
     }
     if (row === 0 && col === 1) return { tilePreview: { kind: "relativeToPlayer", dx: 0, dy: -1 }, action: isRunOver ? null : { type: ACTION_MOVE, dx: 0, dy: -1 } };
@@ -1679,7 +2145,8 @@ ${dir}, ${chosen.d} leagues away.`;
   var GRID_WIDTH_PX = GRID_COLS * CELL_SIZE_PX + (GRID_COLS - 1) * CELL_GAP_PX;
   var GRID_HEIGHT_PX = GRID_ROWS * CELL_SIZE_PX + (GRID_ROWS - 1) * CELL_GAP_PX;
   var GRID_ORIGIN_X = PANEL_LEFT_WIDTH + Math.floor((PANEL_RIGHT_WIDTH - GRID_WIDTH_PX) / 2);
-  var GRID_ORIGIN_Y = Math.floor((SCREEN_HEIGHT - GRID_HEIGHT_PX) / 2);
+  var RIGHT_PANEL_HEADER_H = 18;
+  var GRID_ORIGIN_Y = RIGHT_PANEL_HEADER_H + 4;
   function hitTestGridCell(mouseX, mouseY) {
     if (mouseX < GRID_ORIGIN_X) return null;
     if (mouseX >= GRID_ORIGIN_X + GRID_WIDTH_PX) return null;
@@ -1724,7 +2191,8 @@ ${dir}, ${chosen.d} leagues away.`;
     if (kind === "farm") return "F";
     if (kind === "camp") return "C";
     if (kind === "henge") return "H";
-    if (kind === "gate") return "G";
+    if (kind === "town") return "T";
+    if (kind === "gate" || kind === "gateOpen") return "G";
     if (kind === "locksmith") return "L";
     return null;
   }
@@ -1759,6 +2227,7 @@ ${dir}, ${chosen.d} leagues away.`;
         if (s.resources.hasScout && (label === "G" || label === "L")) push(p, label);
         else if (!s.resources.hasScout) push(p, label);
         else if (label === "F" || label === "C" || label === "H") push(p, label);
+        else if (label === "T") push(p, label);
       }
     } else {
       const start = s.run.lostBufferStartIndex ?? path.length;
@@ -1784,15 +2253,6 @@ ${dir}, ${chosen.d} leagues away.`;
   var UI_COLOR_POI_NAME = 11;
   var UI_COLOR_POI_DESC = 13;
   var UI_COLOR_GRID_HOVER_TINT = 15;
-  var UI_SPR_STATUS_STEPS = 130;
-  var UI_SPR_STATUS_POS = 131;
-  var UI_SPR_STATUS_SEED = 132;
-  var UI_SPR_TEXTURE_OVERLAY = 133;
-  var UI_SPR_ENEMY = 102;
-  var UI_SPR_FIGHT = 74;
-  var UI_SPR_RETURN = 76;
-  var UI_SPR_MAP_TILE_BG = 135;
-  var UI_SPR_MAP_PLAYER_OUTLINE = 134;
   var UI_ILLUSTRATION_SCALE = 4;
   var UI_TEXTURE_TILE_PX = 8;
   var UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR = 8;
@@ -1808,27 +2268,24 @@ ${dir}, ${chosen.d} leagues away.`;
   var UI_LEFT_PANEL_PADDING = 7;
   var UI_LEFT_PANEL_INNER_GAP = 6;
   var UI_STATUS_ICON_SIZE = 8;
-  var UI_STATUS_ICON_GAP = 3;
-  var UI_STATUS_LINE_GAP = 3;
-  var UI_STATUS_TEXT_OFFSET_Y = 1;
   var UI_HERO_RESOURCE_GAP_PX = 2;
   var UI_AFTER_RESOURCES_GAP_PX = 2;
   var UI_ARMY_ICON_W_PX = 16;
   var UI_ARMY_ICON_H_PX = 16;
   var UI_ARMY_VALUE_OFFSET_X = UI_ARMY_ICON_W_PX + 3;
   var UI_ARMY_VALUE_OFFSET_Y = 5;
-  var UI_ARMY_DELTA_OFFSET_X = 2;
-  var UI_ARMY_DELTA_OFFSET_Y = 2;
-  var UI_ARMY_DELTA_RISE_PX = 6;
-  var UI_ARMY_DELTA_GAP_PX = -4;
+  var UI_DELTA_OFFSET_X = 2;
+  var UI_DELTA_OFFSET_Y = 2;
+  var UI_DELTA_RISE_PX = 6;
+  var UI_DELTA_GAP_PX = -4;
   var UI_FOOD_ICON_W_PX = 16;
   var UI_FOOD_ICON_H_PX = 16;
   var UI_FOOD_VALUE_OFFSET_X = UI_FOOD_ICON_W_PX + 3;
   var UI_FOOD_VALUE_OFFSET_Y = 5;
-  var UI_FOOD_DELTA_OFFSET_X = 2;
-  var UI_FOOD_DELTA_OFFSET_Y = 2;
-  var UI_FOOD_DELTA_RISE_PX = 6;
-  var UI_FOOD_DELTA_GAP_PX = -4;
+  var UI_GOLD_ICON_W_PX = 16;
+  var UI_GOLD_ICON_H_PX = 16;
+  var UI_GOLD_VALUE_OFFSET_X = UI_GOLD_ICON_W_PX + 3;
+  var UI_GOLD_VALUE_OFFSET_Y = 5;
   var UI_SMALL_STATS_START_OFFSET_Y = UI_ARMY_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX + UI_FOOD_ICON_H_PX + UI_AFTER_RESOURCES_GAP_PX;
 
   // src/platform/tic80/nineSlice.ts
@@ -1888,22 +2345,6 @@ ${dir}, ${chosen.d} leagues away.`;
   }
 
   // src/platform/tic80/rightGridRenderPlan.ts
-  var RIGHT_GRID_SPRITE_ID = {
-    goal: SPR_BUTTON_GOAL,
-    minimap: SPR_BUTTON_MINIMAP,
-    map: SPR_BUTTON_MAP,
-    restart: SPR_BUTTON_RESTART,
-    fight: UI_SPR_FIGHT,
-    return: UI_SPR_RETURN,
-    enemy: UI_SPR_ENEMY,
-    campSearch: SPR_BUTTON_CAMP_SEARCH,
-    campHireScout: SPR_BUTTON_CAMP_HIRE_SCOUT,
-    campLeave: UI_SPR_RETURN,
-    campFireIcon: 140
-  };
-  function spriteIdForIconKey(iconKey) {
-    return RIGHT_GRID_SPRITE_ID[iconKey];
-  }
   function crossRevealIndex(row, col) {
     if (row === 0 && col === 1) return 0;
     if (row === 1 && col === 0) return 1;
@@ -1915,9 +2356,27 @@ ${dir}, ${chosen.d} leagues away.`;
   function spriteIdForModeCrossCell(s, mode, row, col) {
     if (mode === "blank") return null;
     if (mode === "combat") {
-      if (row === 1 && col === 0) return RIGHT_GRID_SPRITE_ID.fight;
-      if (row === 1 && col === 2) return RIGHT_GRID_SPRITE_ID.return;
-      if (row === 1 && col === 1) return RIGHT_GRID_SPRITE_ID.enemy;
+      if (row === 1 && col === 0) return SPRITES.buttons.fight;
+      if (row === 1 && col === 2) return SPRITES.buttons.return;
+      if (row === 1 && col === 1) return SPRITES.stats.enemy;
+      return null;
+    }
+    if (mode === "camp") {
+      if (row === 0 && col === 1) return null;
+      if (row === 1 && col === 0) return SPRITES.buttons.search;
+      if (row === 1 && col === 2) return SPRITES.buttons.return;
+      if (row === 1 && col === 1) return SPRITES.cosmetics.campfireIcon;
+      return null;
+    }
+    if (mode === "town") {
+      const p2 = s.player.position;
+      const here = s.world.cells[p2.y][p2.x];
+      if (here.kind !== "town") return null;
+      if (row === 0 && col === 1) return spriteIdForTownOffer(here.offers[0]);
+      if (row === 1 && col === 0) return spriteIdForTownOffer(here.offers[1]);
+      if (row === 2 && col === 1) return spriteIdForTownOffer(here.offers[2]);
+      if (row === 1 && col === 2) return SPRITES.buttons.return;
+      if (row === 1 && col === 1) return SPRITES.cosmetics.marketStall;
       return null;
     }
     const p = s.player.position;
@@ -1955,7 +2414,7 @@ ${dir}, ${chosen.d} leagues away.`;
       }
     }
     const def = getRightGridCellDef(s, row, col);
-    if (def.iconKey) return spriteIdForIconKey(def.iconKey) ?? null;
+    if (def.spriteId != null) return def.spriteId;
     if (def.tilePreview && def.tilePreview.kind === "relativeToPlayer") {
       const p = s.player.position;
       return getSpriteIdAt(s.world, p.x + def.tilePreview.dx, p.y + def.tilePreview.dy);
@@ -2114,10 +2573,10 @@ ${dir}, ${chosen.d} leagues away.`;
     }
     ops.push(...maskOutsideGridOps(), ...maskGridGapsOps());
     const corners = [
-      { row: 0, col: 0, spriteId: SPR_BUTTON_GOAL },
-      { row: 2, col: 0, spriteId: SPR_BUTTON_MINIMAP },
-      { row: 2, col: 2, spriteId: SPR_BUTTON_RESTART },
-      { row: 0, col: 2, spriteId: SPR_BUTTON_MAP }
+      { row: 0, col: 0, spriteId: SPRITES.buttons.goal },
+      { row: 2, col: 0, spriteId: SPRITES.buttons.minimap },
+      { row: 2, col: 2, spriteId: SPRITES.buttons.restart },
+      { row: 0, col: 2, spriteId: SPRITES.buttons.map }
     ];
     for (let i = 0; i < corners.length; i++) {
       const c = corners[i];
@@ -2139,41 +2598,10 @@ ${dir}, ${chosen.d} leagues away.`;
   }
 
   // src/platform/tic80/render.ts
-  var SPR_HUD_FRAME = {
-    tl: 146,
-    t: 147,
-    tr: 148,
-    l: 162,
-    c: 163,
-    r: 164,
-    bl: 178,
-    b: 179,
-    br: 180
-  };
-  var SPR_HUD_FRAME_BRONZE = {
-    tl: 149,
-    t: 150,
-    tr: 151,
-    l: 165,
-    c: 166,
-    r: 167,
-    bl: 181,
-    b: 182,
-    br: 183
-  };
   function renderFrame(s, hints) {
     cls(UI_COLOR_BG);
     drawRightPanel(s, hints);
     drawLeftPanel(s);
-    const iconY = 0;
-    if (s.resources.hasBronzeKey && s.resources.hasScout) {
-      spr(106, SCREEN_WIDTH - 16, iconY, 0, 1, 0, 0, 2, 2);
-      spr(SPR_ICON_SCOUT, SCREEN_WIDTH - 32, iconY, 0, 1, 0, 0, 2, 2);
-    } else if (s.resources.hasBronzeKey) {
-      spr(106, SCREEN_WIDTH - 16, iconY, 0, 1, 0, 0, 2, 2);
-    } else if (s.resources.hasScout) {
-      spr(SPR_ICON_SCOUT, SCREEN_WIDTH - 16, iconY, 0, 1, 0, 0, 2, 2);
-    }
   }
   function formatA1(position) {
     const col = String.fromCharCode("A".charCodeAt(0) + position.x);
@@ -2219,7 +2647,7 @@ ${dir}, ${chosen.d} leagues away.`;
     const illPx = 16 * UI_ILLUSTRATION_SCALE;
     for (let oy = 0; oy < illPx; oy += UI_TEXTURE_TILE_PX) {
       for (let ox = 0; ox < illPx; ox += UI_TEXTURE_TILE_PX) {
-        spr(UI_SPR_TEXTURE_OVERLAY, x + ox, y + oy, UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR, 1);
+        spr(SPRITES.ui8x8.previewGrain, x + ox, y + oy, UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR, 1);
       }
     }
   }
@@ -2238,7 +2666,7 @@ ${dir}, ${chosen.d} leagues away.`;
     const py = s.player.position.y;
     for (let vy = -radius; vy <= radius; vy++) {
       for (let vx = -radius; vx <= radius; vx++) {
-        spr(UI_SPR_MAP_TILE_BG, centerX + vx * pitch, centerY + vy * pitch, 0);
+        spr(SPRITES.ui8x8.mapBackground, centerX + vx * pitch, centerY + vy * pitch, 0);
       }
     }
     for (let i = 0; i < markers.length; i++) {
@@ -2248,11 +2676,11 @@ ${dir}, ${chosen.d} leagues away.`;
       if (Math.abs(dx) > radius || Math.abs(dy) > radius) continue;
       print(m.label, centerX + dx * pitch, centerY + dy * pitch, UI_COLOR_POI_DESC);
     }
-    spr(UI_SPR_MAP_PLAYER_OUTLINE, centerX - 1, centerY - 1, 0);
+    spr(SPRITES.ui8x8.mapHereMarker, centerX - 1, centerY - 1, 0);
   }
   function drawLeftPanel(s) {
     rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, UI_COLOR_BG);
-    const frame = s.resources.hasBronzeKey ? SPR_HUD_FRAME_BRONZE : SPR_HUD_FRAME;
+    const frame = s.resources.hasBronzeKey ? SPRITES.ui8x8.panelBorderBronze : SPRITES.ui8x8.panelBorder;
     drawNineSliceFrame(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, frame, {
       tilePx: 8,
       scale: 1,
@@ -2261,6 +2689,7 @@ ${dir}, ${chosen.d} leagues away.`;
     });
     const isCombat = !!(s.encounter && s.encounter.kind === "combat");
     const isCamp = !!(s.encounter && s.encounter.kind === "camp");
+    const isTown = !!(s.encounter && s.encounter.kind === "town");
     const pos = s.player.position;
     const spriteIdAtPos = getSpriteIdAt(s.world, pos.x, pos.y);
     const leftPanel = s.ui.leftPanel;
@@ -2274,9 +2703,9 @@ ${dir}, ${chosen.d} leagues away.`;
     } else if (leftPanel.kind === LEFT_PANEL_KIND_SPRITE) {
       drawIllustrationWithTextureOverlay(leftPanel.spriteId, illX, illY);
     } else if (s.run.isGameOver) {
-      drawIllustrationWithTextureOverlay(40, illX, illY);
+      drawIllustrationWithTextureOverlay(SPRITES.cosmetics.tombstoneIllustration, illX, illY);
     } else {
-      if (!isCombat && !isCamp) {
+      if (!isCombat && !isCamp && !isTown) {
         drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
       } else if (isCombat) {
         drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
@@ -2289,43 +2718,83 @@ ${dir}, ${chosen.d} leagues away.`;
         rectb(plateX, plateY, plateW, plateH, UI_COLOR_DIM);
         const enemyIconX = plateX + platePad;
         const enemyIconY = plateY + platePad;
-        spr(UI_SPR_ENEMY, enemyIconX, enemyIconY, 0, 1, 0, 0, 2, 2);
+        spr(SPRITES.stats.enemy, enemyIconX, enemyIconY, 0, 1, 0, 0, 2, 2);
         const enemyArmy = s.encounter && s.encounter.kind === "combat" ? s.encounter.enemyArmySize | 0 : 0;
         const enemyCountX = enemyIconX + UI_FOOD_VALUE_OFFSET_X;
         const enemyCountY = enemyIconY + UI_FOOD_VALUE_OFFSET_Y;
         print(`${enemyArmy}`, enemyCountX, enemyCountY, UI_COLOR_TEXT);
         if (ENABLE_ANIMATIONS) {
           const anims = s.ui.anim.active;
-          const frame2 = s.ui.clock.frame | 0;
-          let xCursor = enemyIconX + UI_FOOD_DELTA_OFFSET_X;
+          const frame2 = s.ui.clock.frame;
+          let xCursor = enemyIconX + UI_DELTA_OFFSET_X;
           for (let i = 0; i < anims.length; i++) {
             const a = anims[i];
-            if (a.kind !== "enemyArmyDelta") continue;
-            const ea = a;
-            const start = ea.startFrame | 0;
-            const dur = Math.max(1, ea.durationFrames | 0);
+            if (a.kind !== "delta") continue;
+            if (a.params.target !== "enemyArmy") continue;
+            const start = a.startFrame;
+            const dur = Math.max(1, a.durationFrames);
             const t = Math.max(0, Math.min(dur, frame2 - start));
             const p = t / dur;
-            const delta = ea.params.delta | 0;
+            const delta = a.params.delta;
             if (!delta) continue;
             const label = delta > 0 ? `+${delta}` : `${delta}`;
             const color = delta < 0 ? UI_COLOR_GOOD : UI_COLOR_BAD;
-            const dy = UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI_FOOD_DELTA_RISE_PX);
+            const dy = UI_DELTA_OFFSET_Y - Math.floor(p * UI_DELTA_RISE_PX);
             print(label, xCursor, enemyIconY + dy, color);
-            xCursor += label.length * 6 + UI_FOOD_DELTA_GAP_PX;
+            xCursor += label.length * 6 + UI_DELTA_GAP_PX;
           }
         }
-      } else {
+      } else if (isCamp) {
         drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
         const preview = computeCampPreviewModel(s);
         if (preview) {
           const lines = [];
           if (preview.foodGain > 0) {
-            lines.push({ spriteId: FOOD_SPRITE_ID, text: `+${preview.foodGain}`, color: UI_COLOR_TEXT });
-            lines.push({ spriteId: ARMY_SPRITE_ID, text: `+${preview.armyGain}`, color: UI_COLOR_TEXT });
+            lines.push({ spriteId: SPRITES.stats.food, text: `+${preview.foodGain}`, color: UI_COLOR_TEXT });
+            lines.push({ spriteId: SPRITES.stats.troop, text: `+${preview.armyGain}`, color: UI_COLOR_TEXT });
           }
           if (preview.scoutFoodCost != null) {
-            lines.push({ spriteId: SPR_ICON_SCOUT, text: `-${preview.scoutFoodCost}`, color: UI_COLOR_TEXT });
+            lines.push({ spriteId: SPRITES.stats.scout, text: `-${preview.scoutFoodCost}`, color: UI_COLOR_TEXT });
+          }
+          if (lines.length) {
+            const platePad = UI_COMBAT_PREVIEW_PLATE_PAD;
+            const plateW = UI_COMBAT_PREVIEW_PLATE_W;
+            const plateH = 16 * lines.length + platePad * 2;
+            const plateX = illX + illSize - plateW - UI_COMBAT_PREVIEW_PLATE_INSET;
+            const plateY = illY + UI_COMBAT_PREVIEW_PLATE_INSET;
+            rect(plateX, plateY, plateW, plateH, UI_COLOR_BG);
+            rectb(plateX, plateY, plateW, plateH, UI_COLOR_DIM);
+            for (let i = 0; i < lines.length; i++) {
+              const ln = lines[i];
+              const iconX = plateX + platePad;
+              const iconY = plateY + platePad + i * 16;
+              spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2);
+              const valueX = iconX + UI_FOOD_VALUE_OFFSET_X;
+              const valueY = iconY + UI_FOOD_VALUE_OFFSET_Y;
+              print(ln.text, valueX, valueY, ln.color);
+            }
+          }
+        }
+      } else {
+        drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
+        const here = s.world.cells[pos.y][pos.x];
+        if (here.kind === "town") {
+          const lines = [];
+          const offers = here.offers || [];
+          for (let i = 0; i < offers.length; i++) {
+            const o = offers[i];
+            if (o === "buyFood")
+              lines.push({ spriteId: SPRITES.stats.food, text: `-${here.prices.foodGold | 0}`, color: UI_COLOR_TEXT });
+            else if (o === "buyTroops")
+              lines.push({ spriteId: SPRITES.stats.troop, text: `-${here.prices.troopsGold | 0}`, color: UI_COLOR_TEXT });
+            else if (o === "hireScout")
+              lines.push({ spriteId: SPRITES.stats.scout, text: `-${here.prices.scoutGold | 0}`, color: UI_COLOR_TEXT });
+            else if (o === "buyRumors")
+              lines.push({
+                spriteId: SPRITES.cosmetics.rumorIllustration,
+                text: `-${here.prices.rumorGold | 0}`,
+                color: UI_COLOR_TEXT
+              });
           }
           if (lines.length) {
             const platePad = UI_COMBAT_PREVIEW_PLATE_PAD;
@@ -2350,80 +2819,62 @@ ${dir}, ${chosen.d} leagues away.`;
     }
     const statusX = illX + illSize + UI_LEFT_PANEL_INNER_GAP;
     const statusY = illY;
-    const statusIconSize = UI_STATUS_ICON_SIZE;
-    const statusIconGap = UI_STATUS_ICON_GAP;
     const fontH = 6;
-    const statusLineGap = UI_STATUS_LINE_GAP;
-    const statusLineH = fontH + statusLineGap;
     const messageLineH = fontH + 1;
-    const textOffsetY = UI_STATUS_TEXT_OFFSET_Y;
     const armyX = statusX;
     const armyY = statusY;
-    spr(ARMY_SPRITE_ID, armyX, armyY, -1, 1, 0, 0, 2, 2);
+    spr(SPRITES.stats.troop, armyX, armyY, -1, 1, 0, 0, 2, 2);
     const armyValueX = armyX + UI_ARMY_VALUE_OFFSET_X;
     const armyValueY = armyY + UI_ARMY_VALUE_OFFSET_Y;
     const armyColor = s.resources.armySize < 6 ? UI_COLOR_WARN : UI_COLOR_TEXT;
     print(`${s.resources.armySize}`, armyValueX, armyValueY, armyColor);
     const foodX = statusX;
     const foodY = armyY + UI_ARMY_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX;
-    spr(FOOD_SPRITE_ID, foodX, foodY, -1, 1, 0, 0, 2, 2);
+    spr(SPRITES.stats.food, foodX, foodY, -1, 1, 0, 0, 2, 2);
     const foodValueX = foodX + UI_FOOD_VALUE_OFFSET_X;
     const foodValueY = foodY + UI_FOOD_VALUE_OFFSET_Y;
     const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? UI_COLOR_WARN : UI_COLOR_TEXT;
     print(`${s.resources.food}`, foodValueX, foodValueY, foodColor);
-    const smallStartY = statusY + UI_SMALL_STATS_START_OFFSET_Y;
-    const seedY = smallStartY + 0 * statusLineH;
-    const posY = smallStartY + 1 * statusLineH;
-    const stepsY = smallStartY + 2 * statusLineH;
-    spr(UI_SPR_STATUS_SEED, statusX, seedY, -1);
-    print(`${s.world.seed}`, statusX + statusIconSize + statusIconGap, seedY + textOffsetY, UI_COLOR_TEXT);
-    spr(UI_SPR_STATUS_POS, statusX, posY, -1);
-    print(formatPositionLabel(s), statusX + statusIconSize + statusIconGap, posY + textOffsetY, UI_COLOR_TEXT);
-    spr(UI_SPR_STATUS_STEPS, statusX, stepsY, -1);
-    print(`${s.run.stepCount}`, statusX + statusIconSize + statusIconGap, stepsY + textOffsetY, UI_COLOR_TEXT);
+    const goldX = statusX;
+    const goldY = foodY + UI_FOOD_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX;
+    spr(SPRITES.stats.gold, goldX, goldY, -1, 1, 0, 0, 2, 2);
+    const goldValueX = goldX + UI_GOLD_VALUE_OFFSET_X;
+    const goldValueY = goldY + UI_GOLD_VALUE_OFFSET_Y;
+    print(`${s.resources.gold}`, goldValueX, goldValueY, UI_COLOR_TEXT);
     {
       const anims = s.ui.anim.active;
-      const frame2 = s.ui.clock.frame | 0;
-      let xCursor = armyX + UI_ARMY_DELTA_OFFSET_X;
-      for (let i = 0; i < anims.length; i++) {
-        const a = anims[i];
-        if (a.kind !== "armyDelta") continue;
-        const aa = a;
-        const start = aa.startFrame | 0;
-        const dur = Math.max(1, aa.durationFrames | 0);
-        const t = Math.max(0, Math.min(dur, frame2 - start));
+      const frame2 = s.ui.clock.frame;
+      const bases = {
+        army: { x: armyX, y: armyY },
+        food: { x: foodX, y: foodY },
+        gold: { x: goldX, y: goldY }
+      };
+      const cursorByTarget = {
+        army: bases.army.x + UI_DELTA_OFFSET_X,
+        food: bases.food.x + UI_DELTA_OFFSET_X,
+        gold: bases.gold.x + UI_DELTA_OFFSET_X
+      };
+      const draw = (target, delta, startFrame, durationFrames) => {
+        if (!delta) return;
+        const base = bases[target];
+        const dur = Math.max(1, durationFrames);
+        const t = Math.max(0, Math.min(dur, frame2 - startFrame));
         const p = t / dur;
-        const delta = aa.params.delta | 0;
-        if (!delta) continue;
         const label = delta > 0 ? `+${delta}` : `${delta}`;
         const color = delta > 0 ? UI_COLOR_GOOD : UI_COLOR_BAD;
-        const dy = UI_ARMY_DELTA_OFFSET_Y - Math.floor(p * UI_ARMY_DELTA_RISE_PX);
-        print(label, xCursor, armyY + dy, color);
-        xCursor += label.length * 6 + UI_ARMY_DELTA_GAP_PX;
-      }
-    }
-    {
-      const anims = s.ui.anim.active;
-      const frame2 = s.ui.clock.frame | 0;
-      let xCursor = foodX + UI_FOOD_DELTA_OFFSET_X;
+        const dy = UI_DELTA_OFFSET_Y - Math.floor(p * UI_DELTA_RISE_PX);
+        const xCursor = cursorByTarget[target];
+        print(label, xCursor, base.y + dy, color);
+        cursorByTarget[target] = xCursor + label.length * 6 + UI_DELTA_GAP_PX;
+      };
       for (let i = 0; i < anims.length; i++) {
         const a = anims[i];
-        if (a.kind !== "foodDelta") continue;
-        const fa = a;
-        const start = fa.startFrame | 0;
-        const dur = Math.max(1, fa.durationFrames | 0);
-        const t = Math.max(0, Math.min(dur, frame2 - start));
-        const p = t / dur;
-        const delta = fa.params.delta | 0;
-        if (!delta) continue;
-        const label = delta > 0 ? `+${delta}` : `${delta}`;
-        const color = delta > 0 ? UI_COLOR_GOOD : UI_COLOR_BAD;
-        const dy = UI_FOOD_DELTA_OFFSET_Y - Math.floor(p * UI_FOOD_DELTA_RISE_PX);
-        print(label, xCursor, foodY + dy, color);
-        xCursor += label.length * 6 + UI_FOOD_DELTA_GAP_PX;
+        if (a.kind !== "delta") continue;
+        if (a.params.target === "enemyArmy") continue;
+        draw(a.params.target, a.params.delta, a.startFrame, a.durationFrames);
       }
     }
-    const statusBottomY = stepsY + statusLineH;
+    const statusBottomY = goldY + UI_GOLD_ICON_H_PX + UI_AFTER_RESOURCES_GAP_PX;
     const headerBottomY = Math.max(illY + illSize, statusBottomY);
     const msgY = headerBottomY + 4;
     const headline = s.run.isGameOver ? { text: "GAME OVER", color: UI_COLOR_BAD } : s.run.hasWon ? { text: "YOU WIN", color: UI_COLOR_GOOD } : null;
@@ -2442,6 +2893,56 @@ ${dir}, ${chosen.d} leagues away.`;
   function drawRightPanel(s, hints) {
     const plan = buildRightGridRenderPlan(s, hints);
     drawRightGridOps(plan.ops);
+    drawRightTopBar(s);
+  }
+  function drawRightTopBar(s) {
+    const x0 = GRID_ORIGIN_X;
+    const y0 = 0;
+    const w = GRID_WIDTH_PX;
+    const h = RIGHT_PANEL_HEADER_H;
+    rect(x0, y0, w, h, UI_COLOR_BG);
+    rectb(x0, y0, w, h, UI_COLOR_DIM);
+    const padX = 2;
+    const iconY = y0 + 2;
+    const valueY = y0 + 11;
+    const iconGap = 2;
+    let rightInset = 0;
+    if (s.resources.hasBronzeKey) rightInset += 16 + iconGap;
+    if (s.resources.hasScout) rightInset += 16 + iconGap;
+    if (rightInset) rightInset -= iconGap;
+    const statsMaxX = x0 + w - padX - rightInset;
+    const itemW = 18;
+    const itemGap = 2;
+    const valueMaxChars = 3;
+    const formatValue = (raw) => {
+      const s2 = String(raw || "");
+      if (s2.length <= valueMaxChars) return s2;
+      return s2.slice(-valueMaxChars);
+    };
+    const drawStatItem = (idx, iconSpriteId, rawValue) => {
+      const xItem = x0 + padX + idx * (itemW + itemGap);
+      if (xItem + itemW > statsMaxX) return;
+      const value = formatValue(rawValue);
+      const valueW = value.length * 6;
+      const xRight = xItem + itemW;
+      const valueX = xRight - valueW;
+      const iconX = xRight - UI_STATUS_ICON_SIZE;
+      spr(iconSpriteId, iconX, iconY, -1);
+      print(value, valueX, valueY, UI_COLOR_TEXT);
+    };
+    drawStatItem(0, SPRITES.smallStats8x8.seed, `${s.world.seed}`);
+    drawStatItem(1, SPRITES.smallStats8x8.position, formatPositionLabel(s));
+    drawStatItem(2, SPRITES.smallStats8x8.steps, `${s.run.stepCount}`);
+    let xr = x0 + w - padX - 16;
+    const bigIconY = y0 + 1;
+    if (s.resources.hasBronzeKey) {
+      spr(SPRITES.stats.key, xr, bigIconY, 0, 1, 0, 0, 2, 2);
+      xr -= 16 + 2;
+    }
+    if (s.resources.hasScout) {
+      spr(SPRITES.stats.scout, xr, bigIconY, 0, 1, 0, 0, 2, 2);
+      xr -= 16 + 2;
+    }
   }
   function drawRightGridOps(ops) {
     for (let i = 0; i < ops.length; i++) {
@@ -2529,9 +3030,9 @@ ${dir}, ${chosen.d} leagues away.`;
   globalThis.TIC = TIC;
 })();
 
-// title:  The Unbound (prototype 0.2.0)
+// title:  The Unbound (prototype 0.3.0)
 // author: haulin
-// desc:   Prototype 0.2.0 toward the North Star
+// desc:   Prototype 0.3.0 toward the North Star
 // script: js
 // input:  mouse
 

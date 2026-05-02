@@ -13,7 +13,8 @@ export const GRID_WIDTH_PX = GRID_COLS * CELL_SIZE_PX + (GRID_COLS - 1) * CELL_G
 export const GRID_HEIGHT_PX = GRID_ROWS * CELL_SIZE_PX + (GRID_ROWS - 1) * CELL_GAP_PX
 
 export const GRID_ORIGIN_X = PANEL_LEFT_WIDTH + Math.floor((PANEL_RIGHT_WIDTH - GRID_WIDTH_PX) / 2)
-export const GRID_ORIGIN_Y = Math.floor((SCREEN_HEIGHT - GRID_HEIGHT_PX) / 2)
+export const RIGHT_PANEL_HEADER_H = 18
+export const GRID_ORIGIN_Y = RIGHT_PANEL_HEADER_H + 4
 
 export type GridCell = { row: number; col: number }
 

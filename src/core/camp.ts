@@ -1,6 +1,5 @@
 import { pickIntInRange } from './prng'
 import {
-  ACTION_CAMP_HIRE_SCOUT,
   ACTION_CAMP_LEAVE,
   ACTION_CAMP_SEARCH,
   CAMP_COOLDOWN_MOVES,
@@ -9,10 +8,7 @@ import {
   CAMP_RECRUIT_LINES,
   ENABLE_ANIMATIONS,
   FOOD_DELTA_FRAMES,
-  SCOUT_ALREADY_HAVE_LINES,
-  SCOUT_FOOD_COST,
-  SCOUT_HIRE_LINES,
-  SCOUT_NO_FOOD_LINES,
+  GRID_TRANSITION_STEP_FRAMES,
 } from './constants'
 import type { Action, CampCell, Resources, State, Ui } from './types'
 import { pickDeterministicLine } from './tiles/poiUtils'
@@ -43,13 +39,17 @@ export function computeCampPreviewModel(s: State): CampPreviewModel | null {
 
   const foodGain = isReady ? CAMP_FOOD_GAIN : 0
   const armyGain = isReady ? computeCampArmyGain({ seed: s.world.seed, campId: camp.id, stepCount }) : 0
-  const scoutFoodCost = s.resources.hasScout ? null : SCOUT_FOOD_COST
+  const scoutFoodCost = null
 
   return { campName, foodGain, armyGain, scoutFoodCost }
 }
 
+function gridTransitionDurationFrames(): number {
+  return Math.max(1, Math.trunc(GRID_TRANSITION_STEP_FRAMES)) * 5
+}
+
 export function reduceCampAction(prevState: State, action: Action): State | null {
-  if (action.type !== ACTION_CAMP_LEAVE && action.type !== ACTION_CAMP_SEARCH && action.type !== ACTION_CAMP_HIRE_SCOUT) return null
+  if (action.type !== ACTION_CAMP_LEAVE && action.type !== ACTION_CAMP_SEARCH) return null
 
   const enc = prevState.encounter
   if (!enc || enc.kind !== 'camp') return prevState
@@ -64,7 +64,17 @@ export function reduceCampAction(prevState: State, action: Action): State | null
 
   if (action.type === ACTION_CAMP_LEAVE) {
     const restore = enc.restoreMessage
-    return { ...prevState, encounter: null, ui: { ...prevState.ui, message: restore } }
+    const baseUi: Ui = { ...prevState.ui, message: restore }
+    if (!ENABLE_ANIMATIONS) return { ...prevState, encounter: null, ui: baseUi }
+    const startFrame = baseUi.clock.frame
+    const uiWith = enqueueAnim(baseUi, {
+      kind: 'gridTransition',
+      startFrame,
+      durationFrames: gridTransitionDurationFrames(),
+      blocksInput: true,
+      params: { from: 'camp', to: 'overworld' },
+    })
+    return { ...prevState, encounter: null, ui: uiWith }
   }
 
   if (action.type === ACTION_CAMP_SEARCH) {
@@ -86,44 +96,22 @@ export function reduceCampAction(prevState: State, action: Action): State | null
     const startFrame = baseUi.clock.frame
     let uiWith = baseUi
     uiWith = enqueueAnim(uiWith, {
-      kind: 'foodDelta',
+      kind: 'delta',
       startFrame,
       durationFrames: FOOD_DELTA_FRAMES,
       blocksInput: false,
-      params: { delta: CAMP_FOOD_GAIN },
+      params: { target: 'food', delta: CAMP_FOOD_GAIN },
     })
     uiWith = enqueueAnim(uiWith, {
-      kind: 'armyDelta',
+      kind: 'delta',
       startFrame,
       durationFrames: FOOD_DELTA_FRAMES,
       blocksInput: false,
-      params: { delta: armyGain },
+      params: { target: 'army', delta: armyGain },
     })
     return { ...prevState, world: nextWorld, resources: nextResources, ui: uiWith }
   }
 
-  if (prevRes.hasScout) {
-    const line = pickDeterministicLine(SCOUT_ALREADY_HAVE_LINES, prevState.world.seed, campCell.id, stepCount)
-    return { ...prevState, ui: { ...prevState.ui, message: `${campName} Camp\n${line}` } }
-  }
-  if (prevRes.food < SCOUT_FOOD_COST) {
-    const line = pickDeterministicLine(SCOUT_NO_FOOD_LINES, prevState.world.seed, campCell.id, stepCount)
-    return { ...prevState, ui: { ...prevState.ui, message: `${campName} Camp\n${line}` } }
-  }
-
-  const nextResources: Resources = { ...prevRes, hasScout: true, food: prevRes.food - SCOUT_FOOD_COST }
-  const line = pickDeterministicLine(SCOUT_HIRE_LINES, prevState.world.seed, campCell.id, stepCount)
-  const baseUi: Ui = { ...prevState.ui, message: `${campName} Camp\n${line}` }
-  if (!ENABLE_ANIMATIONS) return { ...prevState, resources: nextResources, ui: baseUi }
-
-  const startFrame = baseUi.clock.frame
-  const uiWith = enqueueAnim(baseUi, {
-    kind: 'foodDelta',
-    startFrame,
-    durationFrames: FOOD_DELTA_FRAMES,
-    blocksInput: false,
-    params: { delta: -SCOUT_FOOD_COST },
-  })
-  return { ...prevState, resources: nextResources, ui: uiWith }
+  return prevState
 }
 

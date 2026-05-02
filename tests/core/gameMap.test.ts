@@ -14,7 +14,19 @@ function makeWorld(): World {
     mapGenAlgorithm: 'TEST',
     cells: [
       [{ kind: 'farm', id: 1, name: 'F', nextReadyStep: 0 }, { kind: 'camp', id: 2, name: 'C', nextReadyStep: 0 }, { kind: 'henge', id: 3, name: 'H', nextReadyStep: 0 }, { kind: 'gate' }],
-      [{ kind: 'locksmith' }, grass(), grass(), grass()],
+      [
+        { kind: 'locksmith' },
+        {
+          kind: 'town',
+          id: 5,
+          name: 'Stonebridge',
+          offers: ['buyFood', 'buyTroops', 'hireScout'],
+          prices: { foodGold: 3, troopsGold: 5, scoutGold: 12, rumorGold: 3 },
+          bundles: { food: 3, troops: 2 },
+        },
+        grass(),
+        grass(),
+      ],
       [grass(), grass(), grass(), grass()],
       [grass(), grass(), grass(), grass()],
     ],
@@ -44,13 +56,17 @@ describe('computeGameMapView', () => {
   it('without scout, shows only mapped landmarks from run.path', () => {
     const s = makeState()
     s.run.knowsPosition = true
+    // Simulate the gate having been opened already.
+    s.world.cells[0]![3] = { kind: 'gateOpen' }
     s.run.path = [
       { pos: { x: 3, y: 0 }, isMapped: true }, // gate
       { pos: { x: 0, y: 1 }, isMapped: false }, // locksmith (unmapped -> hidden)
+      { pos: { x: 1, y: 1 }, isMapped: true }, // town
       { pos: { x: 0, y: 0 }, isMapped: true }, // farm
     ]
     expect(computeGameMapView(s).markers).toEqual([
       { pos: { x: 3, y: 0 }, label: 'G' },
+      { pos: { x: 1, y: 1 }, label: 'T' },
       { pos: { x: 0, y: 0 }, label: 'F' },
     ])
   })
@@ -61,11 +77,13 @@ describe('computeGameMapView', () => {
     s.run.path = [
       { pos: { x: 3, y: 0 }, isMapped: false }, // gate (pre-buffer -> hidden)
       { pos: { x: 0, y: 0 }, isMapped: false }, // farm (buffer -> visible)
+      { pos: { x: 1, y: 1 }, isMapped: false }, // town (buffer -> visible)
       { pos: { x: 0, y: 1 }, isMapped: false }, // locksmith (buffer -> visible)
     ]
     s.run.lostBufferStartIndex = 1
     expect(computeGameMapView(s).markers).toEqual([
       { pos: { x: 0, y: 0 }, label: 'F' },
+      { pos: { x: 1, y: 1 }, label: 'T' },
       { pos: { x: 0, y: 1 }, label: 'L' },
     ])
   })
@@ -86,6 +104,7 @@ describe('computeGameMapView', () => {
     s.resources.hasScout = true
     s.run.path = [
       { pos: { x: 0, y: 1 }, isMapped: true }, // locksmith (mapped -> visible)
+      { pos: { x: 1, y: 1 }, isMapped: true }, // town (mapped -> visible)
       { pos: { x: 3, y: 0 }, isMapped: false }, // gate (unmapped -> hidden)
     ]
 
@@ -94,6 +113,7 @@ describe('computeGameMapView', () => {
       { pos: { x: 1, y: 0 }, label: 'C' },
       { pos: { x: 2, y: 0 }, label: 'H' },
       { pos: { x: 0, y: 1 }, label: 'L' },
+      { pos: { x: 1, y: 1 }, label: 'T' },
     ])
   })
 })

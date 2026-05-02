@@ -11,7 +11,7 @@ import {
   ENABLE_ANIMATIONS,
   INITIAL_FOOD,
 } from '../../src/core/constants'
-import type { FoodDeltaAnim, State, World } from '../../src/core/types'
+import type { DeltaAnim, State, World } from '../../src/core/types'
 
 function makeWorld(): World {
   return {
@@ -133,7 +133,7 @@ describe('army + camps + game over', () => {
     expect(next.resources.food).toBe(CAMP_FOOD_GAIN)
 
     if (ENABLE_ANIMATIONS) {
-      const foodDeltas = next.ui.anim.active.filter((a): a is FoodDeltaAnim => a.kind === 'foodDelta')
+      const foodDeltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'food')
       expect(foodDeltas.some((a) => a.params.delta === CAMP_FOOD_GAIN)).toBe(true)
     }
   })

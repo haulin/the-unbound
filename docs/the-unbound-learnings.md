@@ -12,6 +12,7 @@ In practice: new features should usually be “add a new entry / new function”
 - **World updates are explicit + localized**: the world is a grid of cells (`world.cells`), and feature state (e.g. cooldowns) is updated immutably by cloning only the touched row + cell.
 - **Button-as-data (extension point)**: representing the 3×3 grid as a mapping of “cell → definition” (preview + onPress) reduces edit sites when buttons change.
 - **RNG boundary discipline**: keep bitwise/u32 concerns in `src/core/prng.ts`; call sites use `randInt` + plain math.
+- **Sprite single source of truth**: keep sprite numbers in one place (`src/core/spriteIds.ts` as `SPRITES`) and reference `SPRITES.*` directly in gameplay + renderer (avoid “alias layers” that just forward IDs).
 
 ## What surprised us (and what to do next time)
 
@@ -52,6 +53,7 @@ In practice: new features should usually be “add a new entry / new function”
 ## UI rendering learnings (TIC-80 specifics)
 
 - **Transparency is part of UI design**: if a hover highlight/tint is drawn behind an icon, the sprite often needs an explicit transparency key (colorkey) so its “background pixels” don’t erase the tint.
+- **Avoid sprite alias layers**: if a UI constant is just `FOO = SPRITES.bar.baz`, prefer using `SPRITES.*` at the call site and keep `uiConstants.ts` for tweakables (layout/spacing/colors).
 
 ## Refactor philosophy (boy scout rule)
 
@@ -101,4 +103,5 @@ In practice: new features should usually be “add a new entry / new function”
 - **Renderer consumes models, not mechanics**: for deterministic previews, compute a core “preview model” (e.g. camp preview values) in core and have platform renderers read it; the renderer should not replicate game calculations.
 - **Non-consuming deterministic picks**: for “random-looking but replay-stable” outcomes that must not perturb unrelated systems (flavor lines, event percentiles, deterministic previews), prefer keyed pickers (seed/stepCount/location + optional salt) over consuming `world.rngState`.
 - **Animation enqueueing can be shared**: keep animation state updates as pure data transforms and extract generic helpers (e.g. enqueue) so encounter modules can add animations without importing reducer internals.
+- **Deterministic shuffle without bitwise mixing**: use keyed pickers (`pickIntExclusive({ seed, stepCount:0, cellId, salt }, max)`) for per-location deterministic randomness; keep bitwise/hash arithmetic inside `prng.ts`.
 

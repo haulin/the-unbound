@@ -4,25 +4,30 @@ Mechanics index (keep this list current):
 - Core loop
   - Movement costs food (usually 1); mountains/swamps cost 2; hunger can reduce army and end run.
   - Winning: bronze key + gate interaction.
+  - Losing: army size hits 0
 
-- Lost / orientation
+- Resources
+  - Army: combat unit and HP; hits 0 = game over.
+  - Food: depletes 1/move, 2 on mountains/swamps; hits 0 reduces army;
+  - Scout
+    - Halves woods/swamp lost chance (floor).
+    - Map reveal: when oriented, Scout reveals farms/camps/henges globally; gate/locksmith remain gated by mapping.
+  - Bronze key - allows to open Gate, can be only obtained from Locksmith.
+
+- Navigation
+  - In‑game map
+    - Toggle map temporarily overrides lore text; closing restores previous text if unchanged.
+    - Rendering is platform-specific (see `src/platform/tic80/`); this file holds the player-facing strings.
   - Coords show "??" while lost; woods/swamp can teleport (lost); signpost/farm re-orient (knowsPosition).
   - run.path records steps; while lost we buffer mapping; on re-orient we backfill mappedness from lostBufferStartIndex.
 
 - Encounters / POIs
   - Combat: fight/flee; deterministic encounter flavor + exit lines.
   - Farms: harvest food when ready; cooldown revisit lines.
-  - Camps (v0.2): modal encounter; Search grants deterministic reinforcements when ready; Hire Scout costs food; Leave exits.
+  - Camps: modal encounter; Search grants deterministic reinforcements when ready; Hire Scout costs food; Leave exits.
   - Henges: combat encounter when ready; cooldown; henge-specific encounter line.
   - Gate / Locksmith: purchase key with food; gate opens only with key.
-
-- Scout (v0.2)
-  - Halves woods/swamp lost chance (floor).
-  - Map reveal: when oriented, Scout reveals farms/camps/henges globally; gate/locksmith remain gated by mapping.
-
-- In‑game map (v0.2)
-  - Toggle map temporarily overrides lore text; closing restores previous text if unchanged.
-  - Rendering is platform-specific (see `src/platform/tic80/`); this file holds the player-facing strings.
+  - Woods / Mountains: ambush chance
 
 Note: Not every mechanic must be taught by ambient lore. "Clear tips" can live in a future Tavern/Rumors module.
 */
@@ -38,28 +43,31 @@ export const GOAL_NARRATIVE =
 export const LOST_COORD_LABEL = "??";
 
 export const MAP_HINT_MESSAGE =
-  "Map\nThis is how the world looks from your point of view.";
+  "Map\nThe world, as best you can read it.";
 
 // ----------------------------
-// Tavern / barkeep tips (deferred UI; text can be refined later)
+// Tavern rumors / barkeep tips 
 // ----------------------------
 export const BARKEEP_TIPS = {
   movementAndHunger: [
     "Most steps cost 1 ration. Mountains and swamps cost 2.",
-    "If you can't pay the cost, you lose 1 soldier instead.",
+    "If you don't have rations, your soldiers will start to starve.",
   ],
   lostAndOrientation: [
     "Woods and swamps can pull you off course.",
-    "Find a signpost or a farm to get your bearings again.",
+    "When lost, find a signpost, farm, or town to get your bearings again.",
   ],
   map: [
     "The map shows landmarks, not terrain.",
-    "While lost, it only shows what you've found since you went off course.",
+    "While lost, map only shows what you've found since you went off course.",
   ],
   scout: [
     "A Scout halves your odds of getting lost in woods and swamps.",
     "When you're oriented, a Scout points out farms, camps, and henges.",
   ],
+  goal: [
+    "Someone saw the Locksmith three nights ago.",
+  ]
 } as const;
 
 // ----------------------------
@@ -158,6 +166,17 @@ export const HENGE_NAME_POOL = [
   "Weather Cross",
 ] as const;
 
+export const TOWN_NAME_POOL = [
+  "Stonebridge",
+  "Cinder Row",
+  "Ember Crossroads",
+  "The Long Return",
+  "Market of Ash",
+] as const;
+
+export const GATE_NAME = 'The Gate'
+export const LOCKSMITH_NAME = 'Locksmith of the Unbound'
+
 // ----------------------------
 // Farms / camps / henges
 // ----------------------------
@@ -205,19 +224,37 @@ export const HENGE_ENCOUNTER_LINE =
   "You walked into something that was already happening.";
 
 // ----------------------------
-// Scout
+// Towns
 // ----------------------------
-export const SCOUT_HIRE_LINES = [
+export const TOWN_ENTER_LINES = [
+  "A market that learned to survive the loop.",
+  "You smell bread, smoke, and old arguments.",
+  "A place that pretends the road is straight.",
+] as const;
+
+export const TOWN_BUY_LINES = [
+  "Coins change hands. You keep moving.",
+  "No ceremony. Just trade.",
+] as const;
+
+export const TOWN_NO_GOLD_LINES = [
+  "Not enough to pay.",
+  "Your purse is light.",
+] as const;
+
+export const TOWN_SCOUT_HIRE_LINES = [
+  "You pay. They fall in beside you.",
   "You pay in food. They lead the way.",
-  "\"When you have your bearings, I'll mark fires, fields, and stone-rings on your map.\"",
+  "\"When you have your bearings, I'll mark what matters.\"",
   "\"Woods and bog won't steal you as often with me ahead.\"",
 ] as const;
 
-export const SCOUT_ALREADY_HAVE_LINES = [
+export const TOWN_SCOUT_ALREADY_HAVE_LINES = [
   "\"I'm already watching the road.\"",
   "\"You kept me for a reason. Let me do it.\"",
 ] as const;
-export const SCOUT_NO_FOOD_LINES = ["Not enough to pay them.", "No food, no footsteps.", "Come back with 5 food."] as const;
+
+// Town rumors are built in `town.ts` from `BARKEEP_TIPS` (plus extra hints).
 
 // ----------------------------
 // Lost + combat + game over

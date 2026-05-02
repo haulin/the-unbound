@@ -1,24 +1,62 @@
 # Tentative roadmap (The Unbound)
 
-v0.3 — Towns
 
-Town PoI (named, combined farm+camp+one action)
-Up to 4 contextual buttons (3 actions + leave)
-Town flavor text pool
-Structurally ready for gold transactions without implementing them yet
+**v0.4 — PoI Rework & Terrain Payoff**
+- Farms become modal encounters: Buy Food (cheap, gold) / Buy Beast (one per run, gold) / Leave
+- Food carry limit, 2 per troop, tame beast possession adds +50
+- Farms sell food cheaper than towns, guaranteed stock, no cooldown on purchase, sells tame beast
+- Camps reworked: Search (food + troops, cooldown) / Local Map (fixed price, fixed radius, buyer beware) / Leave
+- Locksmith becomes modal: Pay Gold / Give food / Leave (Offer Troops deferred)
+- Lake: fishing gives 2-3 food on visit, cooldown, re-orients position
+- Rainbow's end: gives gold on visit (both ends), one-time per run or cooldown
+- Henge fights scale harder (enemy = player×2..player×3 (min 10)), reward 10..25 gold+food
+- Swamp upside: small chance of rare herb (food bonus or combat buff) or gold from a corpse
+- Mountains upside: small chance of cave loot (gold or food cache)
 
-v0.4 — Gold (mini-epic)
+**v0.5 — Random Encounters & World Texture**
+- Random encounter pool on any tile (5-6 types): loot find / lone soldier joins / cursed tile / abandoned supplies / fellow traveller with rumor / something negative TBD
+- Camps re-orient position (consistent with farms/signposts/towns)
+- Multiple flavor text variations per tile type (deterministic rotation by seed+step)
+- Contextual first-visit lore for every mechanic introduced so far
 
-Gold resource (display, earn from combat, carry limit TBD)
-Town sells food and troops for gold
-Keyholder price becomes gold instead of food
-Scout hired in town for gold
+**v0.6 — Taverns**
+- Tavern PoI (named, standalone, one or two per map)
+- Buy rumors: reveals one named PoI location for gold (locksmith, gate, random landmark)
+- Gambling mini-game (bet gold, contextual buttons, slight house edge)
+- Tavern flavor text pool (warmer, unreliable narrator register)
 
-v0.5 — Second Gate
+**v0.7 — Sanctuary & Special Items**
+- Sanctuary PoI (named, rare — one per map)
+- Pegasus: buy for gold, one-use fast travel to any visited tile
+- Tame Beast moves here from farms if beast-on-farm feels narratively weak in playtests
+- Sanctuary flavor text pool (strange, feral register)
 
-Silver keyholder, silver gate, silver border
-Map size step up (10×10)
-Balance pass across full run
+**v0.8 — Second Gate (Silver)**
+- Silver keyholder, silver gate, silver border
+- Map size increases (10×10)
+- Scout / beast / pegasus carry over between gates
+- Balance pass across full run arc: food, gold, army, run length
+
+**v0.9 — Polish & Teaching**
+- Game over messages per cause (starvation, combat, fleeing with 1 troop)
+- Win messages per gate tier
+- Full flavor text audit — tone consistency, missing tile types, first-visit teaching lines
+- Sprite audit and bank reshuffle if needed
+
+**v1.0 — Third Gate & Release Candidate**
+- Gold gate, gold border
+- Epic map size (15×15)
+- Full balance pass
+- Paid content gate (one gate free, two gates paid — Hoplite model)
+- Itch.io + web release, Android via Capacitor if viable
+
+## Issues
+- Fleeing a fight from henge starts cooldown.
+- Leaving a camp shows no message.
+- Arriving in a farm with 1 food gives food, but game over as well.
+- When I accidentally leave a town I cannot return, have to step out and back.
+- It's a bit rough when neither town sells food.
+- The fight algo is a bit weird. Long streaks of hit or miss.
 
 # Deferred backlog
 
@@ -44,18 +82,22 @@ This file captures ideas discussed during design, kept out of the current phase'
 
 ## Visibility / navigation
 
-- Minimap with visited/revealed tiles (fog-of-war).
 - Replay of the steps at game end.
 
 ## Economy / combat / encounters
 
-- Resources: gold.
-- Towns sell food and troops.
 - Richer encounter types beyond current combat (traps, loot beats, etc.).
 - Mountains/swamps can cluster: if we increase their food cost, they should also carry “opportunity” (bonus events/loot/higher encounter odds) so they feel like risk/reward.
 - Event spawn probabilities influenced by player stats and time-since-visit (e.g., when poor, more likely to find a chest).
 - Consider making roads cost food only ~50% of the time (mechanics/balance change; would require tests + tuning).
+- Buy map features - add Cs, Fs, Ts for gold.
 - Collectibles to find.
+
+## shop clarity (deferred)
+
+- Balance pass: town prices, scout cost, combat gold drops.
+- Town offer UI: decide whether to show quantity, price, or both (e.g. `3/5`), and whether bundle sizes should vary per offer/town.
+- Farms selling food (cheaper than towns).
 
 ## Tavern / rumors (deferred)
 
