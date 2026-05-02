@@ -7,11 +7,12 @@
 - Farms sell food cheaper than towns, guaranteed stock, no cooldown on purchase, sells tame beast
 - Camps reworked: Search (food + troops, cooldown) / Local Map (fixed price, fixed radius, buyer beware) / Leave
 - Locksmith becomes modal: Pay Gold / Give food / Leave (Offer Troops deferred)
-- Lake: fishing gives 2-3 food on visit, cooldown, re-orients position
+- Lake: fishing gives 2-3 food on visit, cooldown
 - Rainbow's end: gives gold on visit (both ends), one-time per run or cooldown
 - Henge fights scale harder (enemy = player×2..player×3 (min 10)), reward 10..25 gold+food
 - Swamp upside: small chance of rare herb (food bonus or combat buff) or gold from a corpse
 - Mountains upside: small chance of cave loot (gold or food cache)
+- for everything we should audit lore.ts and make sure to update lines to reflect new mechanics.
 
 **v0.5 — Random Encounters & World Texture**
 - Random encounter pool on any tile (5-6 types): loot find / lone soldier joins / cursed tile / abandoned supplies / fellow traveller with rumor / something negative TBD

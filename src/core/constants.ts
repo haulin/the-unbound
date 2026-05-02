@@ -7,6 +7,20 @@ import { SPRITES } from './spriteIds'
 // Re-export lore/name pools (defined in `src/core/lore.ts`).
 export * from './lore'
 
+export type GameMapLabel = 'F' | 'C' | 'H' | 'T' | 'G' | 'L'
+
+export const SCOUT_GLOBAL_REVEAL_KINDS = ['farm', 'camp', 'henge', 'town'] as const satisfies readonly FeatureKind[]
+
+export const GAME_MAP_LABEL_BY_KIND = {
+  farm: 'F',
+  camp: 'C',
+  henge: 'H',
+  town: 'T',
+  gate: 'G',
+  gateOpen: 'G',
+  locksmith: 'L',
+} as const satisfies Partial<Record<CellKind, GameMapLabel>>
+
 export const WORLD_WIDTH = 10
 export const WORLD_HEIGHT = 10
 export const INITIAL_SEED = 47

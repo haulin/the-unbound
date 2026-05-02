@@ -39,13 +39,17 @@ function makeState(): State {
     world: makeWorld(),
     player: { position: { x: 0, y: 0 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: 10, armySize: 5, hasBronzeKey: false, hasScout: false },
+    resources: { food: 10, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false },
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
 }
 
 describe('computeGameMapView', () => {
+  function keys(markers: Array<{ pos: { x: number; y: number }; label: string; isMapped: boolean }>) {
+    return markers.map((m) => `${m.label}@${m.pos.x},${m.pos.y}:${m.isMapped ? '1' : '0'}`).sort()
+  }
+
   it('showPlayer is true only when oriented', () => {
     const s = makeState()
     expect(computeGameMapView(s).showPlayer).toBe(false)
@@ -64,11 +68,7 @@ describe('computeGameMapView', () => {
       { pos: { x: 1, y: 1 }, isMapped: true }, // town
       { pos: { x: 0, y: 0 }, isMapped: true }, // farm
     ]
-    expect(computeGameMapView(s).markers).toEqual([
-      { pos: { x: 3, y: 0 }, label: 'G' },
-      { pos: { x: 1, y: 1 }, label: 'T' },
-      { pos: { x: 0, y: 0 }, label: 'F' },
-    ])
+    expect(keys(computeGameMapView(s).markers)).toEqual(['F@0,0:1', 'G@3,0:1', 'T@1,1:1'])
   })
 
   it('while lost, shows landmarks encountered since lostBufferStartIndex even if unmapped', () => {
@@ -81,11 +81,7 @@ describe('computeGameMapView', () => {
       { pos: { x: 0, y: 1 }, isMapped: false }, // locksmith (buffer -> visible)
     ]
     s.run.lostBufferStartIndex = 1
-    expect(computeGameMapView(s).markers).toEqual([
-      { pos: { x: 0, y: 0 }, label: 'F' },
-      { pos: { x: 1, y: 1 }, label: 'T' },
-      { pos: { x: 0, y: 1 }, label: 'L' },
-    ])
+    expect(keys(computeGameMapView(s).markers)).toEqual(['F@0,0:0', 'L@0,1:0', 'T@1,1:0'])
   })
 
   it('while lost, scout does not globally reveal farms/camps/henges until oriented', () => {
@@ -95,10 +91,10 @@ describe('computeGameMapView', () => {
     s.run.path = [{ pos: { x: 0, y: 1 }, isMapped: false }] // locksmith only
     s.run.lostBufferStartIndex = 0
 
-    expect(computeGameMapView(s).markers).toEqual([{ pos: { x: 0, y: 1 }, label: 'L' }])
+    expect(keys(computeGameMapView(s).markers)).toEqual(['L@0,1:0'])
   })
 
-  it('with scout, reveals farms/camps/henges globally but not gate/locksmith', () => {
+  it('with scout, reveals farms/camps/henges/towns globally but not gate/locksmith', () => {
     const s = makeState()
     s.run.knowsPosition = true
     s.resources.hasScout = true
@@ -108,12 +104,12 @@ describe('computeGameMapView', () => {
       { pos: { x: 3, y: 0 }, isMapped: false }, // gate (unmapped -> hidden)
     ]
 
-    expect(computeGameMapView(s).markers).toEqual([
-      { pos: { x: 0, y: 0 }, label: 'F' },
-      { pos: { x: 1, y: 0 }, label: 'C' },
-      { pos: { x: 2, y: 0 }, label: 'H' },
-      { pos: { x: 0, y: 1 }, label: 'L' },
-      { pos: { x: 1, y: 1 }, label: 'T' },
+    expect(keys(computeGameMapView(s).markers)).toEqual([
+      'C@1,0:1',
+      'F@0,0:1',
+      'H@2,0:1',
+      'L@0,1:1',
+      'T@1,1:1',
     ])
   })
 })

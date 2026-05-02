@@ -25,6 +25,9 @@ export const UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR = 8
 // In-game map: fixed viewport centered on player, torus-wrapped.
 export const UI_MAP_VIEWPORT_CELLS = 9 // odd so player sits at exact center
 export const UI_MAP_CELL_PITCH_PX = 6
+export const UI_MAP_POI_TEXT_COLOR = 13
+export const UI_MAP_POI_UNCOMMITTED_TEXT_COLOR = UI_COLOR_BG
+export const UI_MAP_POI_TEXT_OFFSET_X_PX = 1
 
 // Combat preview plate layout inside illustration block.
 export const UI_COMBAT_PREVIEW_PLATE_PAD = 2

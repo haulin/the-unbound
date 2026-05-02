@@ -132,7 +132,8 @@ function drawMap(s: State, x: number, y: number, sizePx: number) {
     const dx = torusDelta(px, m.pos.x, w)
     const dy = torusDelta(py, m.pos.y, h)
     if (Math.abs(dx) > radius || Math.abs(dy) > radius) continue
-    print(m.label, centerX + dx * pitch, centerY + dy * pitch, UI.UI_COLOR_POI_DESC)
+    const color = m.isMapped ? UI.UI_MAP_POI_TEXT_COLOR : UI.UI_MAP_POI_UNCOMMITTED_TEXT_COLOR
+    print(m.label, centerX + dx * pitch + UI.UI_MAP_POI_TEXT_OFFSET_X_PX, centerY + dy * pitch, color)
   }
 
   // Player marker never disappears on the rolling map.

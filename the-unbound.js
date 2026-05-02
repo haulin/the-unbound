@@ -295,6 +295,16 @@
   };
 
   // src/core/constants.ts
+  var SCOUT_GLOBAL_REVEAL_KINDS = ["farm", "camp", "henge", "town"];
+  var GAME_MAP_LABEL_BY_KIND = {
+    farm: "F",
+    camp: "C",
+    henge: "H",
+    town: "T",
+    gate: "G",
+    gateOpen: "G",
+    locksmith: "L"
+  };
   var WORLD_WIDTH = 10;
   var WORLD_HEIGHT = 10;
   var INITIAL_SEED = 47;
@@ -2267,23 +2277,17 @@ ${line}`, knowsPosition: true };
 
   // src/core/gameMap.ts
   function labelForKind(kind) {
-    if (kind === "farm") return "F";
-    if (kind === "camp") return "C";
-    if (kind === "henge") return "H";
-    if (kind === "town") return "T";
-    if (kind === "gate" || kind === "gateOpen") return "G";
-    if (kind === "locksmith") return "L";
-    return null;
+    return GAME_MAP_LABEL_BY_KIND[kind] ?? null;
   }
   function computeGameMapView(s) {
     const showPlayer = !!s.run.knowsPosition;
     const markers = [];
     const seen = /* @__PURE__ */ new Set();
-    function push(pos, label) {
+    function push(pos, label, isMapped) {
       const k = `${label}@${pos.x},${pos.y}`;
       if (seen.has(k)) return;
       seen.add(k);
-      markers.push({ pos, label });
+      markers.push({ pos, label, isMapped });
     }
     const path = s.run.path ?? [];
     if (s.run.knowsPosition) {
@@ -2291,8 +2295,9 @@ ${line}`, knowsPosition: true };
         for (let y = 0; y < s.world.height; y++) {
           for (let x = 0; x < s.world.width; x++) {
             const kind = s.world.cells[y][x].kind;
-            const label = kind === "farm" ? "F" : kind === "camp" ? "C" : kind === "henge" ? "H" : null;
-            if (label) push({ x, y }, label);
+            if (!SCOUT_GLOBAL_REVEAL_KINDS.includes(kind)) continue;
+            const label = labelForKind(kind);
+            if (label) push({ x, y }, label, true);
           }
         }
       }
@@ -2303,10 +2308,10 @@ ${line}`, knowsPosition: true };
         const kind = s.world.cells[p.y][p.x].kind;
         const label = labelForKind(kind);
         if (!label) continue;
-        if (s.resources.hasScout && (label === "G" || label === "L")) push(p, label);
-        else if (!s.resources.hasScout) push(p, label);
-        else if (label === "F" || label === "C" || label === "H") push(p, label);
-        else if (label === "T") push(p, label);
+        if (s.resources.hasScout && (label === "G" || label === "L")) push(p, label, true);
+        else if (!s.resources.hasScout) push(p, label, true);
+        else if (label === "F" || label === "C" || label === "H") push(p, label, true);
+        else if (label === "T") push(p, label, true);
       }
     } else {
       const start = s.run.lostBufferStartIndex ?? path.length;
@@ -2316,7 +2321,7 @@ ${line}`, knowsPosition: true };
         const kind = s.world.cells[p.y][p.x].kind;
         const label = labelForKind(kind);
         if (!label) continue;
-        push(p, label);
+        push(p, label, step.isMapped);
       }
     }
     return { markers, showPlayer };
@@ -2337,6 +2342,9 @@ ${line}`, knowsPosition: true };
   var UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR = 8;
   var UI_MAP_VIEWPORT_CELLS = 9;
   var UI_MAP_CELL_PITCH_PX = 6;
+  var UI_MAP_POI_TEXT_COLOR = 13;
+  var UI_MAP_POI_UNCOMMITTED_TEXT_COLOR = UI_COLOR_BG;
+  var UI_MAP_POI_TEXT_OFFSET_X_PX = 1;
   var UI_COMBAT_PREVIEW_PLATE_PAD = 2;
   var UI_COMBAT_PREVIEW_PLATE_W = 42;
   var UI_COMBAT_PREVIEW_PLATE_INSET = 2;
@@ -2753,7 +2761,8 @@ ${line}`, knowsPosition: true };
       const dx = torusDelta(px, m.pos.x, w);
       const dy = torusDelta(py, m.pos.y, h);
       if (Math.abs(dx) > radius || Math.abs(dy) > radius) continue;
-      print(m.label, centerX + dx * pitch, centerY + dy * pitch, UI_COLOR_POI_DESC);
+      const color = m.isMapped ? UI_MAP_POI_TEXT_COLOR : UI_MAP_POI_UNCOMMITTED_TEXT_COLOR;
+      print(m.label, centerX + dx * pitch + UI_MAP_POI_TEXT_OFFSET_X_PX, centerY + dy * pitch, color);
     }
     spr(SPRITES.ui8x8.mapHereMarker, centerX - 1, centerY - 1, 0);
   }

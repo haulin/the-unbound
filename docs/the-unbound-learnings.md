@@ -78,6 +78,7 @@ In practice: new features should usually be “add a new entry / new function”
 
 - **Prototype-as-foundation**: optimize for learning speed *and* long-term maintainability. Treat the codebase as something we’ll grow, refactor, and keep readable.
 - **“Don’t assume; ask” norm**: when UI/feel looks wrong, gather the user’s observations before attributing a cause (especially with TIC-80 sprite/rendering quirks).
+- **Choice prompts (ordering)**: when you need a user decision, **state your recommendation first** (with 1–2 reasons), then present the options for selection. Avoid “pick first, pros/cons later” — it feels backwards and wastes the choice UI.
 - **Doc-as-contract during iteration**: once a tweak becomes stable (layout constants, button semantics, signpost count), capture it in the design doc so future diffs have an explicit baseline.
 
 ## v0.0.9 — The Key (process + architecture notes)

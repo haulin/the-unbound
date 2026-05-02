@@ -55,19 +55,19 @@ describe('world', () => {
     expect(new Set(farms.map((f) => (f.cell.kind === 'farm' ? f.cell.name : ''))).size).toBe(FARM_COUNT)
     expect(new Set(farms.map((f) => `${f.x},${f.y}`)).size).toBe(FARM_COUNT)
     for (const f of farms) {
-      expect(f.cell.kind).toBe('farm')
+      if (f.cell.kind !== 'farm') throw new Error('expected farm cell')
       expect(f.cell.id).toBe(f.y * WORLD_WIDTH + f.x)
     }
 
     expect(new Set(camps.map((c) => (c.cell.kind === 'camp' ? c.cell.name : ''))).size).toBe(CAMP_COUNT)
     expect(new Set(camps.map((c) => `${c.x},${c.y}`)).size).toBe(CAMP_COUNT)
     for (const c of camps) {
-      expect(c.cell.kind).toBe('camp')
+      if (c.cell.kind !== 'camp') throw new Error('expected camp cell')
       expect(c.cell.id).toBe(c.y * WORLD_WIDTH + c.x)
     }
 
     for (const h of henges) {
-      expect(h.cell.kind).toBe('henge')
+      if (h.cell.kind !== 'henge') throw new Error('expected henge cell')
       expect(h.cell.id).toBe(h.y * WORLD_WIDTH + h.x)
     }
   })

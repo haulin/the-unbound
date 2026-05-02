@@ -83,8 +83,8 @@ describe('town reducer', () => {
 
     const body1 = s1.ui.message.split('\n').slice(1).join('\n')
     const body2 = s2.ui.message.split('\n').slice(1).join('\n')
-    expect(TOWN_BUY_LINES.includes(body1)).toBe(true)
-    expect(TOWN_BUY_LINES.includes(body2)).toBe(true)
+    expect((TOWN_BUY_LINES as readonly string[]).includes(body1)).toBe(true)
+    expect((TOWN_BUY_LINES as readonly string[]).includes(body2)).toBe(true)
     expect(body1).not.toBe(body2)
   })
 
@@ -131,10 +131,7 @@ describe('town reducer', () => {
     // Rumors cycle through the pool per-purchase (deterministic base + cursor).
     expect(next.ui.message.startsWith('Stonebridge Town\n')).toBe(true)
     const body = next.ui.message.split('\n').slice(1).join('\n')
-    const pool = ([] as string[]).concat(
-      ...Object.values(BARKEEP_TIPS).map((v) => Array.from(v as any)),
-      ['Someone saw the Locksmith three nights ago.'],
-    )
+    const pool: string[] = [...Object.values(BARKEEP_TIPS).flatMap((v) => [...v]), 'Someone saw the Locksmith three nights ago.']
     expect(pool.includes(body)).toBe(true)
   })
 
@@ -173,7 +170,7 @@ describe('town reducer', () => {
     expect(deltas.some((d) => d.params.delta === -3)).toBe(true)
 
     const body = next.ui.message.split('\n').slice(1).join('\n')
-    expect(TOWN_BUY_LINES.includes(body)).toBe(true)
+    expect((TOWN_BUY_LINES as readonly string[]).includes(body)).toBe(true)
   })
 })
 

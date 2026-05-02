@@ -47,7 +47,7 @@ function makeState(world: World): State {
     world,
     player: { position: { x: 2, y: 1 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: INITIAL_FOOD, armySize: 5, hasBronzeKey: false, hasScout: false },
+    resources: { food: INITIAL_FOOD, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false },
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -162,7 +162,6 @@ describe('v0.1 lost acceptance', () => {
   it('combat and lost are mutually exclusive on a single move', () => {
     // Sample many seeds entering woods; for each, assert that teleport and combat
     // never co-occur.
-    const cellId = 2 * 5 + 2
     let combats = 0
     let teleports = 0
     for (let seed = 1; seed <= 200; seed++) {

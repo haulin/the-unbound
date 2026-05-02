@@ -1,16 +1,10 @@
+import { GAME_MAP_LABEL_BY_KIND, type GameMapLabel, SCOUT_GLOBAL_REVEAL_KINDS } from './constants'
 import type { CellKind, State, Vec2 } from './types'
 
-export type GameMapLabel = 'F' | 'C' | 'H' | 'T' | 'G' | 'L'
-export type GameMapMarker = { pos: Vec2; label: GameMapLabel }
+export type GameMapMarker = { pos: Vec2; label: GameMapLabel; isMapped: boolean }
 
 function labelForKind(kind: CellKind): GameMapLabel | null {
-  if (kind === 'farm') return 'F'
-  if (kind === 'camp') return 'C'
-  if (kind === 'henge') return 'H'
-  if (kind === 'town') return 'T'
-  if (kind === 'gate' || kind === 'gateOpen') return 'G'
-  if (kind === 'locksmith') return 'L'
-  return null
+  return (GAME_MAP_LABEL_BY_KIND as Partial<Record<CellKind, GameMapLabel>>)[kind] ?? null
 }
 
 export function computeGameMapView(s: State): { markers: GameMapMarker[]; showPlayer: boolean } {
@@ -18,24 +12,25 @@ export function computeGameMapView(s: State): { markers: GameMapMarker[]; showPl
   const markers: GameMapMarker[] = []
   const seen = new Set<string>()
 
-  function push(pos: Vec2, label: GameMapLabel) {
+  function push(pos: Vec2, label: GameMapLabel, isMapped: boolean) {
     const k = `${label}@${pos.x},${pos.y}`
     if (seen.has(k)) return
     seen.add(k)
-    markers.push({ pos, label })
+    markers.push({ pos, label, isMapped })
   }
 
   const path = s.run.path ?? []
 
   // Oriented: show mapped run.path positions.
   if (s.run.knowsPosition) {
-    // With scout: global reveal for farms/camps/henges (only when oriented).
+    // With scout: global reveal for selected POIs (only when oriented).
     if (s.resources.hasScout) {
       for (let y = 0; y < s.world.height; y++) {
         for (let x = 0; x < s.world.width; x++) {
           const kind = s.world.cells[y]![x]!.kind
-          const label = kind === 'farm' ? 'F' : kind === 'camp' ? 'C' : kind === 'henge' ? 'H' : null
-          if (label) push({ x, y }, label)
+          if (!(SCOUT_GLOBAL_REVEAL_KINDS as readonly string[]).includes(kind)) continue
+          const label = labelForKind(kind)
+          if (label) push({ x, y }, label, true)
         }
       }
     }
@@ -49,10 +44,10 @@ export function computeGameMapView(s: State): { markers: GameMapMarker[]; showPl
       if (!label) continue
 
       // With scout: keep G/L gated by mappedness, but allow F/C/H to show as well.
-      if (s.resources.hasScout && (label === 'G' || label === 'L')) push(p, label)
-      else if (!s.resources.hasScout) push(p, label)
-      else if (label === 'F' || label === 'C' || label === 'H') push(p, label)
-      else if (label === 'T') push(p, label)
+      if (s.resources.hasScout && (label === 'G' || label === 'L')) push(p, label, true)
+      else if (!s.resources.hasScout) push(p, label, true)
+      else if (label === 'F' || label === 'C' || label === 'H') push(p, label, true)
+      else if (label === 'T') push(p, label, true)
     }
   } else {
     // Lost: build a local fragment from the lost-buffer segment (even though it's not mapped yet).
@@ -63,7 +58,7 @@ export function computeGameMapView(s: State): { markers: GameMapMarker[]; showPl
       const kind = s.world.cells[p.y]![p.x]!.kind
       const label = labelForKind(kind)
       if (!label) continue
-      push(p, label)
+      push(p, label, step.isMapped)
     }
   }
 

@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json --noEmit && node scripts/build-cart.mjs",
     "dev": "node scripts/dev.mjs",
     "test": "vitest run",
-    "verify": "npm run build && npm run test"
+    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
+    "verify": "npm run build && npm run typecheck:test && npm run test"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",

@@ -36,6 +36,7 @@ function makeState(): State {
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
     resources: {
       food: INITIAL_FOOD,
+      gold: 0,
       armySize: 1,
       hasBronzeKey: false,
       hasScout: false,
@@ -71,7 +72,7 @@ describe('army + camps + game over', () => {
       world: w,
       player: { position: { x: 0, y: 0 } },
       run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-      resources: { food: 2, armySize: 5, hasBronzeKey: false, hasScout: false },
+      resources: { food: 2, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false },
       encounter: null,
       ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
     }
@@ -99,7 +100,7 @@ describe('army + camps + game over', () => {
       world: w,
       player: { position: { x: 0, y: 0 } },
       run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-      resources: { food: 1, armySize: 5, hasBronzeKey: false, hasScout: false },
+      resources: { food: 1, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false },
       encounter: null,
       ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
     }

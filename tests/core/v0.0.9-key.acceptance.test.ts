@@ -29,8 +29,8 @@ function makeState(): State {
   return {
     world: makeWorld(),
     player: { position: { x: 1, y: 0 } },
-    run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false },
-    resources: { food: INITIAL_FOOD, armySize: 5, hasBronzeKey: false },
+    run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
+    resources: { food: INITIAL_FOOD, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false },
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
