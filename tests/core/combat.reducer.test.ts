@@ -14,7 +14,7 @@ import {
   INITIAL_GOLD,
   WOODS_AMBUSH_PERCENT,
 } from '../../src/core/constants'
-import { randInt, seedToRngState, xorshift32 } from '../../src/core/prng'
+import { RNG } from '../../src/core/rng'
 import type { DeltaAnim, State, World } from '../../src/core/types'
 
 function makeWorld(opts: { seed: number; dstKind: 'henge' | 'woods'; rngState: number }): World {
@@ -47,16 +47,10 @@ function makeState(w: World): State {
   }
 }
 
-function ambushHash(seed: number, stepCount: number, cellId: number) {
-  const base = seedToRngState(seed)
-  const mix = (base ^ ((stepCount * 2654435761) >>> 0) ^ (cellId >>> 0)) >>> 0
-  return xorshift32(mix) >>> 0
-}
-
 function findSeedForAmbush(cellId: number): number {
   for (let seed = 1; seed < 10000; seed++) {
-    const h = ambushHash(seed, 1, cellId)
-    if ((h % 100) < WOODS_AMBUSH_PERCENT) return seed
+    const p = RNG._keyedIntExclusive({ seed, stepCount: 1, cellId }, 100)
+    if (p < WOODS_AMBUSH_PERCENT) return seed
   }
   throw new Error('could not find ambush seed')
 }
@@ -64,11 +58,11 @@ function findSeedForAmbush(cellId: number): number {
 function findRngStateForFightOutcome(opts: { playerArmy: number; enemyArmy: number; want: 'win' | 'loss' }): number {
   let rng = 1
   for (let i = 0; i < 10000; i++) {
-    const w = randInt(rng, opts.playerArmy + 5)
-    const b = randInt(w.rngState, opts.enemyArmy + 5)
+    const w = RNG._int(rng, opts.playerArmy + 5)
+    const b = RNG._int(w.rngState, opts.enemyArmy + 5)
     const isWin = (w.value | 0) >= (b.value | 0)
     if ((opts.want === 'win' && isWin) || (opts.want === 'loss' && !isWin)) return rng
-    rng = xorshift32(rng)
+    rng = RNG._int(rng, 1).rngState
   }
   throw new Error(`could not find rngState for ${opts.want}`)
 }
@@ -78,7 +72,7 @@ describe('combat reducer (v0.0.7)', () => {
     const w = makeWorld({ seed: 1, dstKind: 'henge', rngState: 123 })
     const s = makeState(w)
 
-    const spawnRoll = randInt(w.rngState, (s.resources.armySize | 0) + 1)
+    const spawnRoll = RNG._int(w.rngState, (s.resources.armySize | 0) + 1)
     const expectedEnemy = (s.resources.armySize | 0) + (spawnRoll.value | 0)
     const expectedRng = spawnRoll.rngState >>> 0
 
@@ -98,8 +92,8 @@ describe('combat reducer (v0.0.7)', () => {
     let seed = 1
     // Find a seed where ambush does not trigger for stepCount=1 on this cellId.
     for (; seed < 10000; seed++) {
-      const h = ambushHash(seed, 1, cellId)
-      if ((h % 100) >= WOODS_AMBUSH_PERCENT) break
+      const p = RNG._keyedIntExclusive({ seed, stepCount: 1, cellId }, 100)
+      if (p >= WOODS_AMBUSH_PERCENT) break
     }
     const w = makeWorld({ seed, dstKind: 'woods', rngState: 777 })
     const s = makeState(w)
@@ -117,7 +111,7 @@ describe('combat reducer (v0.0.7)', () => {
     const w = makeWorld({ seed, dstKind: 'woods', rngState: 999 })
     const s = makeState(w)
 
-    const spawnRoll = randInt(w.rngState, (s.resources.armySize | 0) + 1)
+    const spawnRoll = RNG._int(w.rngState, (s.resources.armySize | 0) + 1)
     const expectedEnemy = (s.resources.armySize | 0) + (spawnRoll.value | 0)
     const expectedRng = spawnRoll.rngState >>> 0
 
@@ -141,11 +135,11 @@ describe('combat reducer (v0.0.7)', () => {
     const startRng = findRngStateForFightOutcome({ playerArmy: 5, enemyArmy: 1, want: 'win' })
     s.world.rngState = startRng
 
-    const wRoll = randInt(startRng, 5 + 5)
-    const bRoll = randInt(wRoll.rngState, 1 + 5)
-    const goldRoll = randInt(bRoll.rngState, (COMBAT_GOLD_REWARD_MAX - COMBAT_GOLD_REWARD_MIN + 1) | 0)
+    const wRoll = RNG._int(startRng, 5 + 5)
+    const bRoll = RNG._int(wRoll.rngState, 1 + 5)
+    const goldRoll = RNG._int(bRoll.rngState, (COMBAT_GOLD_REWARD_MAX - COMBAT_GOLD_REWARD_MIN + 1) | 0)
     const expectedGold = (COMBAT_GOLD_REWARD_MIN | 0) + (goldRoll.value | 0)
-    const foodBonusRoll = randInt(goldRoll.rngState, (COMBAT_FOOD_BONUS_MAX + 1) | 0)
+    const foodBonusRoll = RNG._int(goldRoll.rngState, (COMBAT_FOOD_BONUS_MAX + 1) | 0)
     const expectedFoodBonus = foodBonusRoll.value | 0
 
     const next = processAction(s, { type: ACTION_FIGHT })!

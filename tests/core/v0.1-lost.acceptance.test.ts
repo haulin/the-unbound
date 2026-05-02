@@ -12,7 +12,7 @@ import {
   WOODS_LOST_PERCENT,
 } from '../../src/core/constants'
 import { manhattan, torusDelta } from '../../src/core/math'
-import { pickIntExclusive } from '../../src/core/prng'
+import { RNG } from '../../src/core/rng'
 import type { Cell, State, World } from '../../src/core/types'
 
 function newRun(seed = 1): State {
@@ -56,7 +56,7 @@ function makeState(world: World): State {
 // Find a {seed, stepCount, cellId} where the percentile lands in [lo, hi).
 function findEventSeed(opts: { stepCount: number; cellId: number; lo: number; hi: number }): number {
   for (let seed = 1; seed < 200000; seed++) {
-    const p = pickIntExclusive({ seed, stepCount: opts.stepCount, cellId: opts.cellId }, 100)
+    const p = RNG._keyedIntExclusive({ seed, stepCount: opts.stepCount, cellId: opts.cellId }, 100)
     if (p >= opts.lo && p < opts.hi) return seed
   }
   throw new Error('no seed found in range')

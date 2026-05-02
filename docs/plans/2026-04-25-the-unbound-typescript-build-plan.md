@@ -652,10 +652,10 @@ Verification:
 
 **Files:**
 - Create: `src/core/math.ts`
-- Create: `src/core/prng.ts`
+- Create: `src/core/rng.ts`
 - Create: `src/core/signpost.ts`
 - Create: `tests/core/math.test.ts`
-- Create: `tests/core/prng.test.ts`
+- Create: `tests/core/rng.test.ts`
 - Create: `tests/core/signpost.test.ts`
 
 - [ ] **Step 1: Write tests for math helpers (copy expected values from old in-cart harness)**
@@ -730,7 +730,7 @@ Tests:
 
 ```ts
 import { describe, expect, it } from 'vitest'
-import { randInt, seedToRngState, xorshift32 } from '../../src/core/prng'
+import { randInt, seedToRngState, xorshift32 } from '../../src/core/rng'
 
 describe('prng', () => {
   it('xorshift32', () => {

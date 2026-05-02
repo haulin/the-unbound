@@ -16,8 +16,7 @@ import {
   SWAMP_LOST_PERCENT,
 } from '../../src/core/constants'
 import { computeCampArmyGain } from '../../src/core/camp'
-import { pickIntExclusive } from '../../src/core/prng'
-import { pickDeterministicLine } from '../../src/core/tiles/poiUtils'
+import { RNG } from '../../src/core/rng'
 import type { Cell, State, World } from '../../src/core/types'
 
 function grass(): Cell {
@@ -52,7 +51,7 @@ function makeState(world: World): State {
 
 function findSeedForSwampLost(stepCount: number, cellId: number): number {
   for (let seed = 1; seed < 200000; seed++) {
-    const p = pickIntExclusive({ seed, stepCount, cellId }, 100)
+    const p = RNG._keyedIntExclusive({ seed, stepCount, cellId }, 100)
     if (p < SWAMP_LOST_PERCENT) return seed
   }
   throw new Error('seed not found')
@@ -117,12 +116,16 @@ describe('v0.2 map+scout acceptance', () => {
     const after = processAction(onto, { type: ACTION_CAMP_SEARCH })!
     expect(after.resources.food).toBe(onto.resources.food + CAMP_FOOD_GAIN)
     expect(after.resources.armySize).toBe(onto.resources.armySize + armyGain)
-    expect(after.ui.message).toBe(`Ember Cross Camp\n${pickDeterministicLine(CAMP_RECRUIT_LINES, onto.world.seed, 4, stepCount)}`)
+    expect(after.ui.message).toBe(
+      `Ember Cross Camp\n${RNG.createTileRandom({ world: onto.world, stepCount, pos: { x: 1, y: 1 } }).perMoveLine(CAMP_RECRUIT_LINES, { cellId: 4 })}`,
+    )
 
     const second = processAction(after, { type: ACTION_CAMP_SEARCH })!
     expect(second.resources.food).toBe(after.resources.food)
     expect(second.resources.armySize).toBe(after.resources.armySize)
-    expect(second.ui.message).toBe(`Ember Cross Camp\n${pickDeterministicLine(CAMP_EMPTY_LINES, onto.world.seed, 4, stepCount)}`)
+    expect(second.ui.message).toBe(
+      `Ember Cross Camp\n${RNG.createTileRandom({ world: onto.world, stepCount, pos: { x: 1, y: 1 } }).perMoveLine(CAMP_EMPTY_LINES, { cellId: 4 })}`,
+    )
 
     const campCell = second.world.cells[1]![1]!
     expect(campCell.kind).toBe('camp')

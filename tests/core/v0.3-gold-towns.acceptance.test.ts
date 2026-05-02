@@ -58,6 +58,21 @@ describe('v0.3 gold+towns acceptance', () => {
     expect(left.encounter).toBe(null)
   })
 
+  it('town entry description is stable across visits (not keyed to stepCount)', () => {
+    const s0 = makeState(makeWorld(7))
+
+    const first = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!
+    expect(first.encounter?.kind).toBe('town')
+    const firstMsg = first.ui.message
+
+    const left = processAction(first, { type: ACTION_TOWN_LEAVE })!
+    const back = processAction(left, { type: ACTION_MOVE, dx: 0, dy: -1 })!
+    const second = processAction(back, { type: ACTION_MOVE, dx: 0, dy: 1 })!
+
+    expect(second.encounter?.kind).toBe('town')
+    expect(second.ui.message).toBe(firstMsg)
+  })
+
   it('entering a town orients the player (knowsPosition = true)', () => {
     const s0 = makeState(makeWorld(7))
     const onto = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!

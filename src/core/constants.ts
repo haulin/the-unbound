@@ -9,7 +9,7 @@ export * from './lore'
 
 export const WORLD_WIDTH = 10
 export const WORLD_HEIGHT = 10
-export const INITIAL_SEED = 34
+export const INITIAL_SEED = 47
 export const ENABLE_ANIMATIONS = true
 
 export const SIGNPOST_COUNT = 6

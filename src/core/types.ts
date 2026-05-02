@@ -116,6 +116,7 @@ export type Run = {
   knowsPosition: boolean
   path: RunPathStep[]
   lostBufferStartIndex: number | null
+  copyCursors?: Record<string, number>
 }
 
 export type Resources = {
@@ -146,7 +147,6 @@ export type TownEncounter = {
   sourceKind: 'town'
   sourceCellId: number
   restoreMessage: string
-  rumorCursor: number
 }
 
 export type Encounter = CombatEncounter | CampEncounter | TownEncounter

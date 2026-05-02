@@ -297,7 +297,7 @@
   // src/core/constants.ts
   var WORLD_WIDTH = 10;
   var WORLD_HEIGHT = 10;
-  var INITIAL_SEED = 34;
+  var INITIAL_SEED = 47;
   var ENABLE_ANIMATIONS = true;
   var SIGNPOST_COUNT = 6;
   var GATE_LOCKSMITH_MIN_DISTANCE = 7;
@@ -450,7 +450,7 @@
   var MOVE_SLIDE_FRAMES = 15;
   var LORE_MAX_CHARS_PER_LINE = 19;
 
-  // src/core/prng.ts
+  // src/core/rng.ts
   function xorshift32(x) {
     x = x >>> 0;
     x ^= x << 13 >>> 0;
@@ -476,7 +476,7 @@
     const m = normalizeMaxExclusive(maxExclusive);
     return { rngState: next, value: next % m };
   }
-  function hashSeedStepCell(opts) {
+  function hashSeedStepCellInternal(opts) {
     const base = seedToRngState(opts.seed | 0);
     const stepMix = u32(Math.imul(opts.stepCount | 0, 2654435761));
     const cellId2 = u32(opts.cellId | 0);
@@ -486,12 +486,12 @@
   function pickIndex(state2, length) {
     const m = length | 0;
     if (m <= 0) return 0;
-    const h = hashSeedStepCell(state2);
+    const h = hashSeedStepCellInternal(state2);
     return u32(h) % m;
   }
   function pickIntExclusive(state2, maxExclusive) {
     const m = normalizeMaxExclusive(maxExclusive);
-    const h = hashSeedStepCell(state2);
+    const h = hashSeedStepCellInternal(state2);
     return u32(h) % m;
   }
   function pickIntInRange(state2, minInclusive, maxInclusive) {
@@ -507,12 +507,106 @@
     if (!pool.length) return void 0;
     return pool[pickIndex(state2, pool.length)];
   }
-
-  // src/core/tiles/poiUtils.ts
-  function pickDeterministicLine(lines, seed, poiIndex, stepCount) {
-    if (!lines.length) return "";
-    return pickFromPool({ seed, stepCount, cellId: poiIndex }, lines) || lines[0] || "";
+  function shuffledIndices(args) {
+    const n = Number.isFinite(args.length) ? Math.trunc(args.length) : 0;
+    if (n <= 0) return [];
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(i);
+    if (n <= 1) return out;
+    const baseSalt = args.salt == null ? 0 : args.salt | 0;
+    const cellId2 = n | 0;
+    for (let i = n - 1; i > 0; i--) {
+      const j = pickIntExclusive({ seed: args.seed, stepCount: 0, cellId: cellId2, salt: baseSalt ^ i }, i + 1);
+      const tmp = out[i];
+      out[i] = out[j];
+      out[j] = tmp;
+    }
+    return out;
   }
+  function stable(args) {
+    const { seed, placeId, pool, salt } = args;
+    if (!pool.length) return "";
+    const state2 = salt == null ? { seed, stepCount: 0, cellId: placeId } : { seed, stepCount: 0, cellId: placeId, salt };
+    return pickFromPool(state2, pool) || pool[0] || "";
+  }
+  function perMove(args) {
+    const { seed, stepCount, cellId: cellId2, pool, salt } = args;
+    if (!pool.length) return "";
+    const state2 = salt == null ? { seed, stepCount, cellId: cellId2 } : { seed, stepCount, cellId: cellId2, salt };
+    return pickFromPool(state2, pool) || pool[0] || "";
+  }
+  function cursorAdvance(args) {
+    const { seed, pool } = args;
+    const n = pool.length;
+    if (n <= 0) return { line: "", nextCursor: args.cursor };
+    const indices = args.salt == null ? shuffledIndices({ seed, length: n }) : shuffledIndices({ seed, length: n, salt: args.salt });
+    const idx = indices[args.cursor % n] ?? 0;
+    const line = pool[idx] || pool[0] || "";
+    return { line, nextCursor: args.cursor + 1 };
+  }
+  function cellIdForPos(world, pos) {
+    return pos.y * world.width + pos.x;
+  }
+  function getCopyCursors(run) {
+    return run.copyCursors ?? {};
+  }
+  function advanceRunCursor(args) {
+    const cursors = getCopyCursors(args.run);
+    const cursor = cursors[args.tag] ?? 0;
+    const pick = args.salt == null ? cursorAdvance({ seed: args.seed, cursor, pool: args.pool }) : cursorAdvance({ seed: args.seed, cursor, pool: args.pool, salt: args.salt });
+    const nextCursors = { ...cursors, [args.tag]: pick.nextCursor };
+    return { line: pick.line, run: { ...args.run, copyCursors: nextCursors } };
+  }
+  function createTileRandom(args) {
+    const seed = args.world.seed;
+    const cellId2 = cellIdForPos(args.world, args.pos);
+    const stepCount = args.stepCount;
+    return {
+      stableLine: (pool, opts) => opts?.salt == null ? stable({ seed, placeId: opts?.placeId ?? cellId2, pool }) : stable({ seed, placeId: opts?.placeId ?? cellId2, pool, salt: opts.salt }),
+      perMoveLine: (pool, opts) => opts?.salt == null ? perMove({ seed, stepCount, cellId: opts?.cellId ?? cellId2, pool }) : perMove({ seed, stepCount, cellId: opts?.cellId ?? cellId2, pool, salt: opts.salt })
+    };
+  }
+  function createRunCopyRandom(state2) {
+    const seed = state2.world.seed;
+    const stepCount = state2.run.stepCount;
+    const cellId2 = cellIdForPos(state2.world, state2.player.position);
+    return {
+      stableLine: (pool, opts) => opts?.salt == null ? stable({ seed, placeId: opts?.placeId ?? cellId2, pool }) : stable({ seed, placeId: opts?.placeId ?? cellId2, pool, salt: opts.salt }),
+      perMoveLine: (pool, opts) => opts?.salt == null ? perMove({ seed, stepCount: opts?.stepCount ?? stepCount, cellId: opts?.cellId ?? cellId2, pool }) : perMove({ seed, stepCount: opts?.stepCount ?? stepCount, cellId: opts?.cellId ?? cellId2, pool, salt: opts.salt }),
+      advanceCursor: (tag, pool, opts) => {
+        const next = opts?.salt == null ? advanceRunCursor({ run: state2.run, seed, tag, pool }) : advanceRunCursor({ run: state2.run, seed, tag, pool, salt: opts.salt });
+        return { line: next.line, nextState: { ...state2, run: next.run } };
+      }
+    };
+  }
+  function createStreamRandom(rngState) {
+    let rng = rngState;
+    return {
+      intExclusive: (maxExclusive) => {
+        const r = randInt(rng, maxExclusive);
+        rng = r.rngState;
+        return r.value;
+      },
+      get rngState() {
+        return rng;
+      }
+    };
+  }
+  function createStreamRandomFromSeed(seed) {
+    return createStreamRandom(seedToRngState(seed));
+  }
+  var RNG = {
+    // Facades (preferred)
+    createTileRandom,
+    createRunCopyRandom,
+    createStreamRandom,
+    createStreamRandomFromSeed,
+    // Minimal primitives for mechanics/tests that need explicit keyed/stream draws.
+    _seedToRngState: seedToRngState,
+    _int: randInt,
+    _keyedIntExclusive: pickIntExclusive,
+    _keyedIntInRange: pickIntInRange
+  };
 
   // src/core/cells.ts
   function getCellAt(world, pos) {
@@ -543,7 +637,7 @@
 
   // src/core/camp.ts
   function computeCampArmyGain(args) {
-    return pickIntInRange({ seed: args.seed, stepCount: args.stepCount, cellId: args.campId }, 1, 2);
+    return RNG._keyedIntInRange({ seed: args.seed, stepCount: args.stepCount, cellId: args.campId }, 1, 2);
   }
   function computeCampPreviewModel(s) {
     const pos = s.player.position;
@@ -589,7 +683,8 @@
     if (action.type === ACTION_CAMP_SEARCH) {
       const readyAt = campCell.nextReadyStep ?? 0;
       if (stepCount < readyAt) {
-        const line2 = pickDeterministicLine(CAMP_EMPTY_LINES, prevState.world.seed, campCell.id, stepCount);
+        const rnd2 = RNG.createRunCopyRandom(prevState);
+        const line2 = rnd2.perMoveLine(CAMP_EMPTY_LINES, { cellId: campCell.id });
         return { ...prevState, ui: { ...prevState.ui, message: `${campName} Camp
 ${line2}` } };
       }
@@ -597,7 +692,8 @@ ${line2}` } };
       const nextCampCell = { ...campCell, nextReadyStep: stepCount + CAMP_COOLDOWN_MOVES };
       const nextWorld = setCellAt(prevState.world, pos, nextCampCell);
       const nextResources = { ...prevRes, food: prevRes.food + CAMP_FOOD_GAIN, armySize: prevRes.armySize + armyGain };
-      const line = pickDeterministicLine(CAMP_RECRUIT_LINES, prevState.world.seed, campCell.id, stepCount);
+      const rnd = RNG.createRunCopyRandom(prevState);
+      const line = rnd.perMoveLine(CAMP_RECRUIT_LINES, { cellId: campCell.id });
       const baseUi = { ...prevState.ui, message: `${campName} Camp
 ${line}` };
       if (!ENABLE_ANIMATIONS) return { ...prevState, world: nextWorld, resources: nextResources, ui: baseUi };
@@ -623,37 +719,27 @@ ${line}` };
   }
 
   // src/core/combat.ts
-  function cellIdForPos(world, pos) {
+  function cellIdForPos2(world, pos) {
     return pos.y * world.width + pos.x;
-  }
-  function encounterFlavorIndex(opts) {
-    return pickIndex({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId }, COMBAT_ENCOUNTER_LINES.length);
-  }
-  function pickCombatEncounterLine(opts) {
-    const idx = encounterFlavorIndex(opts);
-    return COMBAT_ENCOUNTER_LINES[idx] || COMBAT_ENCOUNTER_LINES[0] || "";
-  }
-  function pickCombatExitLine(opts) {
-    const pool = opts.outcome === "victory" ? COMBAT_VICTORY_EXIT_LINES : COMBAT_FLEE_EXIT_LINES;
-    const salt = opts.outcome === "victory" ? 2654435769 : 2246822507;
-    return pickFromPool({ seed: opts.seed, stepCount: opts.stepCount, cellId: opts.cellId, salt }, pool) || pool[0] || "";
   }
   function spawnEnemyArmy(opts) {
     const playerArmy = Math.max(0, Math.trunc(opts.playerArmy));
     const maxExclusive = playerArmy + 1;
-    const r = randInt(opts.rngState, maxExclusive);
-    return { rngState: r.rngState, enemyArmy: playerArmy + r.value };
+    const r = RNG.createStreamRandom(opts.rngState);
+    const delta = r.intExclusive(maxExclusive);
+    return { rngState: r.rngState, enemyArmy: playerArmy + delta };
   }
   function resolveFightRound(opts) {
     const playerArmy = Math.max(0, Math.trunc(opts.playerArmy));
     const enemyArmy = Math.max(0, Math.trunc(opts.enemyArmy));
-    const w = randInt(opts.rngState, playerArmy + 5);
-    const b = randInt(w.rngState, enemyArmy + 5);
-    if (w.value >= b.value) {
+    const r = RNG.createStreamRandom(opts.rngState);
+    const w = r.intExclusive(playerArmy + 5);
+    const b = r.intExclusive(enemyArmy + 5);
+    if (w >= b) {
       const nextEnemyArmy = Math.floor(enemyArmy / 2);
       const killed = enemyArmy - nextEnemyArmy;
       return {
-        rngState: b.rngState,
+        rngState: r.rngState,
         outcome: "playerHit",
         nextEnemyArmy,
         enemyDelta: nextEnemyArmy - enemyArmy,
@@ -661,7 +747,7 @@ ${line}` };
       };
     }
     return {
-      rngState: b.rngState,
+      rngState: r.rngState,
       outcome: "enemyHit",
       nextEnemyArmy: enemyArmy,
       enemyDelta: 0,
@@ -682,19 +768,12 @@ ${line}` };
     const name = town.name || "A Town";
     return `${name} Town`;
   }
-  function shuffledRumors(seed, townId) {
+  function rumorPool() {
     const pool = [];
     const groups = Object.values(BARKEEP_TIPS);
     for (let i = 0; i < groups.length; i++) {
       const lines = groups[i];
       for (let j = 0; j < lines.length; j++) pool.push(lines[j]);
-    }
-    if (pool.length <= 1) return pool;
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = pickIntExclusive({ seed, stepCount: 0, cellId: townId, salt: i }, i + 1);
-      const tmp = pool[i];
-      pool[i] = pool[j];
-      pool[j] = tmp;
     }
     return pool;
   }
@@ -706,14 +785,13 @@ ${line}` };
     if (!enc || enc.kind !== "town") return prevState;
     const town = getTownAtPlayer(prevState);
     if (!town) return prevState;
-    const seed = prevState.world.seed;
-    const stepCount = prevState.run.stepCount;
     const townId = town.id;
     const prefix = townPrefix(town);
+    const rnd = RNG.createRunCopyRandom(prevState);
     const prevRes = prevState.resources;
     const setMessage = (line2) => ({ ...prevState, ui: { ...prevState.ui, message: `${prefix}
 ${line2}` } });
-    const noGold = () => setMessage(pickDeterministicLine(TOWN_NO_GOLD_LINES, seed, townId, stepCount));
+    const noGold = () => setMessage(rnd.perMoveLine(TOWN_NO_GOLD_LINES, { cellId: townId }));
     if (action.type === ACTION_TOWN_LEAVE) {
       const restore = enc.restoreMessage;
       const baseUi2 = { ...prevState.ui, message: restore };
@@ -736,10 +814,12 @@ ${line2}` } });
         gold: prevRes.gold - cost2,
         food: prevRes.food + town.bundles.food
       };
-      const line2 = pickDeterministicLine(TOWN_BUY_LINES, seed, townId, stepCount);
+      const pick2 = rnd.advanceCursor("town.buyFeedback", TOWN_BUY_LINES);
+      const nextRun2 = pick2.nextState.run;
+      const line2 = pick2.line;
       const baseUi2 = { ...prevState.ui, message: `${prefix}
 ${line2}` };
-      if (!ENABLE_ANIMATIONS) return { ...prevState, resources: nextResources2, ui: baseUi2 };
+      if (!ENABLE_ANIMATIONS) return { ...prevState, run: nextRun2, resources: nextResources2, ui: baseUi2 };
       const startFrame2 = baseUi2.clock.frame;
       let uiWith2 = baseUi2;
       uiWith2 = enqueueAnim(uiWith2, {
@@ -756,7 +836,7 @@ ${line2}` };
         blocksInput: false,
         params: { target: "food", delta: town.bundles.food }
       });
-      return { ...prevState, resources: nextResources2, ui: uiWith2 };
+      return { ...prevState, run: nextRun2, resources: nextResources2, ui: uiWith2 };
     }
     if (action.type === ACTION_TOWN_BUY_TROOPS) {
       const cost2 = town.prices.troopsGold;
@@ -766,10 +846,12 @@ ${line2}` };
         gold: prevRes.gold - cost2,
         armySize: prevRes.armySize + town.bundles.troops
       };
-      const line2 = pickDeterministicLine(TOWN_BUY_LINES, seed, townId, stepCount);
+      const pick2 = rnd.advanceCursor("town.buyFeedback", TOWN_BUY_LINES);
+      const nextRun2 = pick2.nextState.run;
+      const line2 = pick2.line;
       const baseUi2 = { ...prevState.ui, message: `${prefix}
 ${line2}` };
-      if (!ENABLE_ANIMATIONS) return { ...prevState, resources: nextResources2, ui: baseUi2 };
+      if (!ENABLE_ANIMATIONS) return { ...prevState, run: nextRun2, resources: nextResources2, ui: baseUi2 };
       const startFrame2 = baseUi2.clock.frame;
       let uiWith2 = baseUi2;
       uiWith2 = enqueueAnim(uiWith2, {
@@ -786,16 +868,16 @@ ${line2}` };
         blocksInput: false,
         params: { target: "army", delta: town.bundles.troops }
       });
-      return { ...prevState, resources: nextResources2, ui: uiWith2 };
+      return { ...prevState, run: nextRun2, resources: nextResources2, ui: uiWith2 };
     }
     if (action.type === ACTION_TOWN_HIRE_SCOUT) {
       if (prevRes.hasScout) {
-        return setMessage(pickDeterministicLine(TOWN_SCOUT_ALREADY_HAVE_LINES, seed, townId, stepCount));
+        return setMessage(rnd.perMoveLine(TOWN_SCOUT_ALREADY_HAVE_LINES, { cellId: townId }));
       }
       const cost2 = town.prices.scoutGold;
       if (prevRes.gold < cost2) return noGold();
       const nextResources2 = { ...prevRes, hasScout: true, gold: prevRes.gold - cost2 };
-      const line2 = pickDeterministicLine(TOWN_SCOUT_HIRE_LINES, seed, townId, stepCount);
+      const line2 = rnd.perMoveLine(TOWN_SCOUT_HIRE_LINES, { cellId: townId });
       const baseUi2 = { ...prevState.ui, message: `${prefix}
 ${line2}` };
       if (!ENABLE_ANIMATIONS) return { ...prevState, resources: nextResources2, ui: baseUi2 };
@@ -812,14 +894,13 @@ ${line2}` };
     const cost = town.prices.rumorGold;
     if (prevRes.gold < cost) return noGold();
     const nextResources = { ...prevRes, gold: prevRes.gold - cost };
-    const cursor = enc.rumorCursor;
-    const pool = shuffledRumors(seed, townId);
-    const idx = pool.length > 0 ? cursor % pool.length : 0;
-    const line = pool[idx] || pool[0] || "";
-    const nextEncounter = { ...enc, rumorCursor: cursor + 1 };
+    const pool = rumorPool();
+    const pick = rnd.advanceCursor(`town.rumor.${townId}`, pool, { salt: townId });
+    const line = pick.line;
+    const nextRun = pick.nextState.run;
     const baseUi = { ...prevState.ui, message: `${prefix}
 ${line}` };
-    if (!ENABLE_ANIMATIONS) return { ...prevState, resources: nextResources, ui: baseUi };
+    if (!ENABLE_ANIMATIONS) return { ...prevState, run: nextRun, resources: nextResources, ui: baseUi };
     const startFrame = baseUi.clock.frame;
     const uiWith = enqueueAnim(baseUi, {
       kind: "delta",
@@ -828,7 +909,7 @@ ${line}` };
       blocksInput: false,
       params: { target: "gold", delta: -cost }
     });
-    return { ...prevState, resources: nextResources, encounter: nextEncounter, ui: uiWith };
+    return { ...prevState, run: nextRun, resources: nextResources, ui: uiWith };
   }
 
   // src/core/tileEvents.ts
@@ -855,7 +936,7 @@ ${line}` };
       lostPct = Math.floor(lostPct / 2);
     }
     if (ambushPct + lostPct === 0) return null;
-    const p = pickIntExclusive({ seed, stepCount, cellId: cellId2 }, 100);
+    const p = RNG._keyedIntExclusive({ seed, stepCount, cellId: cellId2 }, 100);
     if (p < ambushPct) return { kind: "fight", source: kind };
     if (p < ambushPct + lostPct) return { kind: "lost", source: kind };
     return null;
@@ -897,7 +978,7 @@ ${line}` };
   }
   function pickTeleportDestination(args) {
     const { world, origin } = args;
-    let rngState = args.rngState;
+    const r = RNG.createStreamRandom(args.rngState);
     const candidates = [];
     let maxD = 0;
     for (let y = 0; y < world.height; y++) {
@@ -917,12 +998,10 @@ ${line}` };
     const eligible = candidates.filter((c) => c.d >= target);
     const pool = eligible.length > 0 ? eligible : candidates;
     if (pool.length === 0) {
-      return { destination: origin, rngState };
+      return { destination: origin, rngState: r.rngState };
     }
-    const r = randInt(rngState, pool.length);
-    rngState = r.rngState;
-    const pick = pool[r.value];
-    return { destination: { x: pick.x, y: pick.y }, rngState };
+    const pick = pool[r.intExclusive(pool.length)];
+    return { destination: { x: pick.x, y: pick.y }, rngState: r.rngState };
   }
 
   // src/core/world.ts
@@ -941,7 +1020,7 @@ ${line}` };
   function placeFeature(cells, rngState, opts) {
     const placed = [];
     while (placed.length < opts.count) {
-      const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
+      const r = RNG._int(rngState, WORLD_WIDTH * WORLD_HEIGHT);
       rngState = r.rngState;
       const x = r.value % WORLD_WIDTH;
       const y = Math.floor(r.value / WORLD_WIDTH);
@@ -978,7 +1057,7 @@ ${line}` };
     for (let y = 0; y < WORLD_HEIGHT; y++) {
       const row = [];
       for (let x = 0; x < WORLD_WIDTH; x++) {
-        const r = randInt(rngState, NOISE_VALUE_MAX);
+        const r = RNG._int(rngState, NOISE_VALUE_MAX);
         rngState = r.rngState;
         row.push(r.value);
       }
@@ -1039,7 +1118,7 @@ ${line}` };
       buildCell: (x, y, nextRng) => {
         let name = opts.fallbackName;
         if (remainingNames.length > 0) {
-          const pick = randInt(nextRng, remainingNames.length);
+          const pick = RNG._int(nextRng, remainingNames.length);
           nextRng = pick.rngState;
           name = remainingNames.splice(pick.value, 1)[0] || opts.fallbackName;
         }
@@ -1056,7 +1135,7 @@ ${line}` };
       buildCell: (x, y, nextRng) => {
         let name = opts.fallbackName;
         if (remainingNames.length > 0) {
-          const pick = randInt(nextRng, remainingNames.length);
+          const pick = RNG._int(nextRng, remainingNames.length);
           nextRng = pick.rngState;
           name = remainingNames.splice(pick.value, 1)[0] || opts.fallbackName;
         }
@@ -1096,33 +1175,33 @@ ${line}` };
       buildCell: (x, y, name, nextRng) => {
         let omitIdx;
         if (townIndex === 0) {
-          const pick = randInt(nextRng, omitNoScoutIndices.length);
+          const pick = RNG._int(nextRng, omitNoScoutIndices.length);
           nextRng = pick.rngState;
           omitIdx = omitNoScoutIndices[pick.value];
         } else {
-          const pick = randInt(nextRng, baseOffers.length);
+          const pick = RNG._int(nextRng, baseOffers.length);
           nextRng = pick.rngState;
           omitIdx = pick.value;
         }
         const offers = baseOffers.filter((_k, idx) => idx !== omitIdx);
         const loFood = Math.min(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX);
         const hiFood = Math.max(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX);
-        const rf = randInt(nextRng, hiFood - loFood + 1);
+        const rf = RNG._int(nextRng, hiFood - loFood + 1);
         nextRng = rf.rngState;
         const foodGold = loFood + rf.value;
         const loTroops = Math.min(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX);
         const hiTroops = Math.max(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX);
-        const rt = randInt(nextRng, hiTroops - loTroops + 1);
+        const rt = RNG._int(nextRng, hiTroops - loTroops + 1);
         nextRng = rt.rngState;
         const troopsGold = loTroops + rt.value;
         const loScout = Math.min(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX);
         const hiScout = Math.max(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX);
-        const rs = randInt(nextRng, hiScout - loScout + 1);
+        const rs = RNG._int(nextRng, hiScout - loScout + 1);
         nextRng = rs.rngState;
         const scoutGold = loScout + rs.value;
         const loRumor = Math.min(TOWN_PRICE_RUMOR_MIN, TOWN_PRICE_RUMOR_MAX);
         const hiRumor = Math.max(TOWN_PRICE_RUMOR_MIN, TOWN_PRICE_RUMOR_MAX);
-        const rr = randInt(nextRng, hiRumor - loRumor + 1);
+        const rr = RNG._int(nextRng, hiRumor - loRumor + 1);
         nextRng = rr.rngState;
         const rumorGold = loRumor + rr.value;
         const cell = {
@@ -1156,7 +1235,7 @@ ${line}` };
     return res.rngState;
   }
   function pickStart({ rngState }) {
-    const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT);
+    const r = RNG._int(rngState, WORLD_WIDTH * WORLD_HEIGHT);
     rngState = r.rngState;
     const x = r.value % WORLD_WIDTH;
     const y = Math.floor(r.value / WORLD_WIDTH);
@@ -1169,7 +1248,7 @@ ${line}` };
     return spriteIdForKind(cell.kind);
   }
   function generateWorld(seed) {
-    let rngState = seedToRngState(seed);
+    let rngState = RNG.createStreamRandomFromSeed(seed).rngState;
     const base = generateBaseTerrainCells(rngState);
     rngState = base.rngState;
     const cells = base.cells;
@@ -1205,9 +1284,10 @@ ${line}` };
   };
 
   // src/core/tiles/onEnterDefaultTerrain.ts
-  var onEnterDefaultTerrain = ({ cell, world, pos, stepCount }) => ({
-    message: pickDeterministicLine(terrainLoreLinesForKind(cell.kind), world.seed, cellIdForPos(world, pos), stepCount)
-  });
+  var onEnterDefaultTerrain = ({ cell, world, pos, stepCount }) => {
+    const r = RNG.createTileRandom({ world, stepCount, pos });
+    return { message: r.perMoveLine(terrainLoreLinesForKind(cell.kind)) };
+  };
 
   // src/core/tiles/onEnterFarm.ts
   var onEnterFarm = ({ cell, world, pos, stepCount, resources }) => {
@@ -1217,21 +1297,19 @@ ${line}` };
     const farmName = farmCell.name || "A Farm";
     const readyAt = farmCell.nextReadyStep ?? 0;
     if (stepCount < readyAt) {
+      const r2 = RNG.createTileRandom({ world, stepCount, pos });
       return {
         message: `${farmName} Farm
-${pickDeterministicLine(FARM_REVISIT_LINES, world.seed, farmCell.id, stepCount)}`,
+${r2.perMoveLine(FARM_REVISIT_LINES, { cellId: farmCell.id })}`,
         knowsPosition: true
       };
     }
-    let rngState = world.rngState;
-    const rGain = randInt(rngState, 8);
-    rngState = rGain.rngState;
-    const gain = rGain.value + 3;
-    const rLine = randInt(rngState, FARM_HARVEST_LINES.length);
-    rngState = rLine.rngState;
-    const harvestLine = FARM_HARVEST_LINES[rLine.value] || FARM_HARVEST_LINES[0] || "";
+    const sr = RNG.createStreamRandom(world.rngState);
+    const gain = sr.intExclusive(8) + 3;
+    const r = RNG.createTileRandom({ world, stepCount, pos });
+    const harvestLine = r.stableLine(FARM_HARVEST_LINES, { placeId: farmCell.id });
     const nextFarmCell = { ...farmCell, nextReadyStep: stepCount + FARM_COOLDOWN_MOVES };
-    const nextWorld = setCellAt({ ...world, rngState }, pos, nextFarmCell);
+    const nextWorld = setCellAt({ ...world, rngState: sr.rngState }, pos, nextFarmCell);
     return {
       world: nextWorld,
       resources: {
@@ -1248,14 +1326,14 @@ ${harvestLine}`,
   // src/core/tiles/onEnterGate.ts
   var onEnterGate = ({ cell, world, pos, stepCount, resources }) => {
     if (cell.kind !== "gate" && cell.kind !== "gateOpen") return { message: "" };
-    const cellId2 = pos.y * world.width + pos.x;
+    const r = RNG.createTileRandom({ world, stepCount, pos });
     if (!resources.hasBronzeKey) {
-      const line2 = pickDeterministicLine(GATE_LOCKED_LINES, world.seed, cellId2, stepCount);
+      const line2 = r.perMoveLine(GATE_LOCKED_LINES);
       return { message: `${GATE_NAME}
 ${line2}` };
     }
     const nextWorld = cell.kind === "gateOpen" ? world : setCellAt(world, pos, { kind: "gateOpen" });
-    const line = pickDeterministicLine(GATE_OPEN_LINES, world.seed, cellId2, stepCount);
+    const line = r.perMoveLine(GATE_OPEN_LINES);
     return { world: nextWorld, hasWon: true, message: `${GATE_NAME}
 ${line}` };
   };
@@ -1265,10 +1343,11 @@ ${line}` };
     if (cell.kind !== "henge") return { message: "" };
     const hengeCell = getCellAt(world, pos);
     if (!hengeCell || hengeCell.kind !== "henge") return { message: "" };
+    const r = RNG.createTileRandom({ world, stepCount, pos });
     const name = hengeCell.name || "A Henge";
     const readyAt = hengeCell.nextReadyStep ?? 0;
     const isReady = stepCount >= readyAt;
-    const line = isReady ? pickDeterministicLine(HENGE_LORE_LINES, world.seed, hengeCell.id, stepCount) : pickDeterministicLine(HENGE_EMPTY_LINES, world.seed, hengeCell.id, stepCount);
+    const line = isReady ? r.perMoveLine(HENGE_LORE_LINES, { cellId: hengeCell.id }) : r.perMoveLine(HENGE_EMPTY_LINES, { cellId: hengeCell.id });
     return { message: `${name} Henge
 ${line}` };
   };
@@ -1276,14 +1355,14 @@ ${line}` };
   // src/core/tiles/onEnterLocksmith.ts
   var onEnterLocksmith = ({ cell, world, pos, stepCount, resources }) => {
     if (cell.kind !== "locksmith") return { message: "" };
-    const cellId2 = pos.y * world.width + pos.x;
+    const r = RNG.createTileRandom({ world, stepCount, pos });
     if (resources.hasBronzeKey) {
-      const line2 = pickDeterministicLine(LOCKSMITH_VISITED_LINES, world.seed, cellId2, stepCount);
+      const line2 = r.perMoveLine(LOCKSMITH_VISITED_LINES);
       return { message: `${LOCKSMITH_NAME}
 ${line2}` };
     }
     if (resources.food >= BRONZE_KEY_FOOD_COST) {
-      const line2 = pickDeterministicLine(LOCKSMITH_PURCHASE_LINES, world.seed, cellId2, stepCount);
+      const line2 = r.perMoveLine(LOCKSMITH_PURCHASE_LINES);
       return {
         resources: {
           ...resources,
@@ -1295,7 +1374,7 @@ ${line2}` };
 ${line2}`
       };
     }
-    const line = pickDeterministicLine(LOCKSMITH_NO_FOOD_LINES, world.seed, cellId2, stepCount);
+    const line = r.perMoveLine(LOCKSMITH_NO_FOOD_LINES);
     return { message: `${LOCKSMITH_NAME}
 ${line}` };
   };
@@ -1387,12 +1466,13 @@ ${dir}, ${chosen.d} leagues away.`;
   });
 
   // src/core/tiles/onEnterTown.ts
-  var onEnterTown = ({ cell, world, pos, stepCount }) => {
+  var onEnterTown = ({ cell, world, pos }) => {
     if (cell.kind !== "town") return { message: "" };
     const town = getCellAt(world, pos);
     if (!town || town.kind !== "town") return { message: "" };
     const name = town.name || "A Town";
-    const line = pickDeterministicLine(TOWN_ENTER_LINES, world.seed, town.id, stepCount);
+    const r = RNG.createTileRandom({ world, stepCount: 0, pos });
+    const line = r.stableLine(TOWN_ENTER_LINES, { placeId: town.id });
     return { message: `${name} Town
 ${line}`, knowsPosition: true };
   };
@@ -1622,7 +1702,7 @@ ${line}`, knowsPosition: true };
     if (!isGameOver && !prevState.encounter) {
       const destCell = nextWorld.cells[nextPos.y][nextPos.x];
       const destKind = destCell.kind;
-      const destCellId = cellIdForPos(nextWorld, nextPos);
+      const destCellId = cellIdForPos2(nextWorld, nextPos);
       let hengeReady = true;
       if (destKind === "henge") {
         const hc = destCell;
@@ -1634,7 +1714,7 @@ ${line}`, knowsPosition: true };
         nextEncounter = { kind: "camp", sourceKind: "camp", sourceCellId: destCellId, restoreMessage: preEncounterMessage };
         didStartCamp = true;
       } else if (destKind === "town") {
-        nextEncounter = { kind: "town", sourceKind: "town", sourceCellId: destCellId, restoreMessage: preEncounterMessage, rumorCursor: 0 };
+        nextEncounter = { kind: "town", sourceKind: "town", sourceCellId: destCellId, restoreMessage: preEncounterMessage };
         didStartTown = true;
       } else {
         const event = rollTileEvent({
@@ -1661,7 +1741,7 @@ ${line}`, knowsPosition: true };
             const nextHenge = { ...hc, nextReadyStep: nextStepCount + HENGE_COOLDOWN_MOVES };
             nextWorld = setCellAt(nextWorld, nextPos, nextHenge);
           }
-          message = destKind === "henge" ? HENGE_ENCOUNTER_LINE : pickCombatEncounterLine({ seed: nextWorld.seed, stepCount: nextStepCount, cellId: destCellId });
+          message = destKind === "henge" ? HENGE_ENCOUNTER_LINE : RNG.createTileRandom({ world: nextWorld, stepCount: nextStepCount, pos: nextPos }).perMoveLine(COMBAT_ENCOUNTER_LINES);
         }
         if (event && event.kind === "lost") {
           const td = pickTeleportDestination({
@@ -1671,7 +1751,7 @@ ${line}`, knowsPosition: true };
           });
           nextWorld = { ...nextWorld, rngState: td.rngState };
           landingPos = td.destination;
-          message = pickDeterministicLine(LOST_FLAVOR_LINES, nextWorld.seed, destCellId, nextStepCount);
+          message = RNG.createTileRandom({ world: nextWorld, stepCount: nextStepCount, pos: nextPos }).perMoveLine(LOST_FLAVOR_LINES);
           teleported = true;
         }
       }
@@ -1696,6 +1776,7 @@ ${line}`, knowsPosition: true };
       world: nextWorld,
       player: { position: finalPlayerPos },
       run: {
+        ...prevState.run,
         stepCount: nextStepCount,
         hasWon: nextHasWon,
         isGameOver,
@@ -1851,7 +1932,15 @@ ${line}`, knowsPosition: true };
       return {
         world,
         player: { position: { x: playerPos.x, y: playerPos.y } },
-        run: { stepCount: 0, hasWon, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
+        run: {
+          stepCount: 0,
+          hasWon,
+          isGameOver: false,
+          knowsPosition: false,
+          path: [],
+          lostBufferStartIndex: null,
+          copyCursors: {}
+        },
         resources: {
           food: INITIAL_FOOD,
           gold: INITIAL_GOLD,
@@ -1882,14 +1971,10 @@ ${line}`, knowsPosition: true };
       const prevRes = normalizeResources(prevState.world, prevState.resources);
       const nextArmy = prevRes.armySize - 1;
       const isGameOver = nextArmy <= 0;
-      const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : prevState.run;
       const nextResources = { ...prevRes, armySize: Math.max(0, nextArmy) };
-      const nextMessage = isGameOver ? gameOverMessage(prevState.world.seed, prevState.run.stepCount) : pickCombatExitLine({
-        seed: prevState.world.seed,
-        stepCount: prevState.run.stepCount,
-        cellId: prevState.encounter.sourceCellId,
-        outcome: "flee"
-      }) || prevUi.message;
+      const fleePick = isGameOver ? null : RNG.createRunCopyRandom(prevState).advanceCursor("combat.exit.flee", COMBAT_FLEE_EXIT_LINES);
+      const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : fleePick.nextState.run;
+      const nextMessage = isGameOver ? gameOverMessage(prevState.world.seed, prevState.run.stepCount) : fleePick.line || prevUi.message;
       const baseUi = { ...prevUi, message: nextMessage };
       if (!ENABLE_ANIMATIONS) {
         return {
@@ -1958,27 +2043,21 @@ ${line}`, knowsPosition: true };
       let nextWorld = { ...prevState.world, rngState: round.rngState };
       if (round.outcome === "playerHit" && nextEncounter == null && !prevState.run.isGameOver && !prevState.run.hasWon) {
         const goldSpan = COMBAT_GOLD_REWARD_MAX - COMBAT_GOLD_REWARD_MIN + 1;
-        const g = randInt(nextWorld.rngState, goldSpan);
-        nextWorld = { ...nextWorld, rngState: g.rngState };
-        const gold = COMBAT_GOLD_REWARD_MIN + g.value;
+        const sr = RNG.createStreamRandom(nextWorld.rngState);
+        const gold = COMBAT_GOLD_REWARD_MIN + sr.intExclusive(goldSpan);
         nextResources = { ...nextResources, gold: nextResources.gold + gold };
         goldDeltas.push(gold);
-        const fb = randInt(nextWorld.rngState, COMBAT_FOOD_BONUS_MAX + 1);
-        nextWorld = { ...nextWorld, rngState: fb.rngState };
-        const foodBonus = fb.value | 0;
+        const foodBonus = sr.intExclusive(COMBAT_FOOD_BONUS_MAX + 1);
         if (foodBonus) {
           nextResources = { ...nextResources, food: nextResources.food + foodBonus };
           foodDeltas.push(foodBonus);
         }
+        nextWorld = { ...nextWorld, rngState: sr.rngState };
       }
       const isGameOver = nextResources.armySize <= 0;
-      const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : prevState.run;
-      const nextMessage = isGameOver ? gameOverMessage(nextWorld.seed, prevState.run.stepCount) : nextEncounter == null ? pickCombatExitLine({
-        seed: nextWorld.seed,
-        stepCount: prevState.run.stepCount,
-        cellId: enc.sourceCellId,
-        outcome: "victory"
-      }) || prevUi.message : prevUi.message;
+      const victoryPick = !isGameOver && nextEncounter == null ? RNG.createRunCopyRandom(prevState).advanceCursor("combat.exit.victory", COMBAT_VICTORY_EXIT_LINES) : null;
+      const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : nextEncounter == null ? victoryPick.nextState.run : prevState.run;
+      const nextMessage = isGameOver ? gameOverMessage(nextWorld.seed, prevState.run.stepCount) : nextEncounter == null ? victoryPick.line || prevUi.message : prevUi.message;
       const baseUi = { message: nextMessage, leftPanel: prevUi.leftPanel, clock: prevUi.clock, anim: prevUi.anim };
       if (!ENABLE_ANIMATIONS) {
         return {

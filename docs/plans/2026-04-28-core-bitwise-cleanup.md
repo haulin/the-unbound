@@ -1,10 +1,10 @@
-# Plan: Core bitwise cleanup (`src/core/**` → `prng.ts` only)
+# Plan: Core bitwise cleanup (`src/core/**` → `rng.ts` only)
 
 **Status:** implemented (2026-04-28)
 
 ## Goal
 
-Remove truncate-to-int / unsigned patterns (`| 0`, `>>> 0`, and similar coercions) from all of `src/core/**` **except** `src/core/prng.ts`. Keep 32-bit xorshift, hashing, and pool indexing inside `prng.ts`. Game-facing deterministic flows stay deterministic; flavor text / exit-line indices may shift if integer coercion paths change—update tests accordingly.
+Remove truncate-to-int / unsigned patterns (`| 0`, `>>> 0`, and similar coercions) from all of `src/core/**` **except** `src/core/rng.ts`. Keep 32-bit xorshift, hashing, and pool indexing inside `rng.ts`. Game-facing deterministic flows stay deterministic; flavor text / exit-line indices may shift if integer coercion paths change—update tests accordingly.
 
 ## `randInt` contract (centralize u32 here)
 
@@ -14,9 +14,9 @@ Remove truncate-to-int / unsigned patterns (`| 0`, `>>> 0`, and similar coercion
   - Otherwise: `maxExclusive = Math.trunc(maxExclusive)` and clamp to at least `1`.
   - Use the normalized value for `next % maxExclusive`.
   - Callers stop doing `(n | 0)` / `>>> 0` / `Math.max(1, ...)` before calling.
-- **Return value**: keep `value` in `0 .. maxExclusive-1` with the same distribution as today for the same normalized inputs. Returning `rngState` already in u32 form is fine **inside** `prng.ts` only.
+- **Return value**: keep `value` in `0 .. maxExclusive-1` with the same distribution as today for the same normalized inputs. Returning `rngState` already in u32 form is fine **inside** `rng.ts` only.
 
-Required: add `tests/core/prng.test.ts` (or extend existing tests) for the normalization edge cases above.
+Required: add `tests/core/rng.test.ts` (or extend existing tests) for the normalization edge cases above.
 
 ## Determinism hardening (proof, not prose)
 
@@ -28,7 +28,7 @@ Required: add `tests/core/prng.test.ts` (or extend existing tests) for the norma
 
 ## Scope
 
-- **In scope**: mechanical refactor of `src/core/**` to remove bitwise ops outside `src/core/prng.ts`.
+- **In scope**: mechanical refactor of `src/core/**` to remove bitwise ops outside `src/core/rng.ts`.
 - **Allowed scope exception**: mechanical updates to `tests/core/**` to track any expectation changes caused by the refactor.
 - **Out of scope**: `src/platform/**` changes (none expected).
 
@@ -36,7 +36,7 @@ Required: add `tests/core/prng.test.ts` (or extend existing tests) for the norma
 
 ### RNG / combat
 
-- `src/core/prng.ts` — implement `randInt` normalization; keep `u32`, `xorshift32`, `hashSeedStepCell`, `pickIndex` bitwise usage here only.
+- `src/core/rng.ts` — implement `randInt` normalization; keep `u32`, `xorshift32`, `hashSeedStepCell`, `pickIndex` bitwise usage here only.
 - `src/core/combat.ts` — remove `| 0` / `>>> 0` from cell index, army sizes, `randInt` args/returns, and comparison locals; use `Math.trunc` / `Math.max(0, …)` where non-negative integers are required.
 
 ### Reducer / world
@@ -53,12 +53,12 @@ Required: add `tests/core/prng.test.ts` (or extend existing tests) for the norma
 
 ### Other modules
 
-- Re-grep after edits: some files had no bitwise at plan time but **line-selection refactors** may touch `signpost.ts`, tile handlers, `constants.ts`, etc. without adding `| 0` / `>>> 0` outside `prng.ts`.
-- **Tests**: `tests/core/prng.test.ts` holds **normalization + golden-vector** checks for `randInt` progression.
+- Re-grep after edits: some files had no bitwise at plan time but **line-selection refactors** may touch `signpost.ts`, tile handlers, `constants.ts`, etc. without adding `| 0` / `>>> 0` outside `rng.ts`.
+- **Tests**: `tests/core/rng.test.ts` holds **normalization + golden-vector** checks for `randInt` progression.
 
 ## Ordered steps
 
-1. **Extend `randInt` in `prng.ts`** — document behavior; normalize `rngState` and `maxExclusive`; ensure modulo path matches current semantics for typical inputs.
+1. **Extend `randInt` in `rng.ts`** — document behavior; normalize `rngState` and `maxExclusive`; ensure modulo path matches current semantics for typical inputs.
 2. **Add focused `prng` tests** — required: normalization edges + golden vectors for RNG progression.
 3. **Update `combat.ts`** — rely on `randInt` normalization; use non-bitwise integer coercion for indices and army math.
 4. **Update tile handlers** (`onEnterCamp`, `onEnterFarm`, `onEnterHenge`, `poiUtils`) — align with new `randInt` usage; keep `world.rngState` threading straightforward.
@@ -70,12 +70,12 @@ Required: add `tests/core/prng.test.ts` (or extend existing tests) for the norma
 ## Acceptance criteria
 
 - **Inventory + enforcement (precise grep)**:
-  - `rg '\\| 0' src/core --glob '!**/prng.ts'` returns no matches
-  - `rg '>>> 0' src/core --glob '!**/prng.ts'` returns no matches
-  - (Optional) if needed: `rg '<<\\s*\\d|>>\\s*\\d|>>>\\s*\\d' src/core --glob '!**/prng.ts'` returns no matches
+  - `rg '\\| 0' src/core --glob '!**/rng.ts'` returns no matches
+  - `rg '>>> 0' src/core --glob '!**/rng.ts'` returns no matches
+  - (Optional) if needed: `rg '<<\\s*\\d|>>\\s*\\d|>>>\\s*\\d' src/core --glob '!**/rng.ts'` returns no matches
 - **`npm run verify`** passes (TypeScript build + cart bundle + tests as defined by the project).
 - **Determinism**: given the same initial state, RNG state evolution and combat outcomes that are intentionally seeded remain reproducible; acceptable behavior change: harvest/recruit/signpost wording or line index selection.
-- **Callers**: no `u32` / `>>> 0` / `| 0` workaround immediately before or after `randInt` except what remains encapsulated in `prng.ts`.
+- **Callers**: no `u32` / `>>> 0` / `| 0` workaround immediately before or after `randInt` except what remains encapsulated in `rng.ts`.
 
 ## Notes
 

@@ -1,6 +1,6 @@
 import { FEATURE_KINDS, TELEPORT_MIN_DISTANCE } from './constants'
 import { manhattan, torusDelta } from './math'
-import { randInt } from './prng'
+import { RNG } from './rng'
 import type { Vec2, World } from './types'
 
 const FEATURE_KIND_SET = new Set<string>(FEATURE_KINDS)
@@ -15,7 +15,7 @@ export function pickTeleportDestination(args: {
   rngState: number
 }): { destination: Vec2; rngState: number } {
   const { world, origin } = args
-  let rngState = args.rngState
+  const r = RNG.createStreamRandom(args.rngState)
 
   type Candidate = { x: number; y: number; d: number }
   const candidates: Candidate[] = []
@@ -41,11 +41,9 @@ export function pickTeleportDestination(args: {
   const pool = eligible.length > 0 ? eligible : candidates
   if (pool.length === 0) {
     // Degenerate: no non-feature terrain at all. Return origin to keep state sane.
-    return { destination: origin, rngState }
+    return { destination: origin, rngState: r.rngState }
   }
 
-  const r = randInt(rngState, pool.length)
-  rngState = r.rngState
-  const pick = pool[r.value]!
-  return { destination: { x: pick.x, y: pick.y }, rngState }
+  const pick = pool[r.intExclusive(pool.length)]!
+  return { destination: { x: pick.x, y: pick.y }, rngState: r.rngState }
 }

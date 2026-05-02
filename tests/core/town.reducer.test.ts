@@ -13,7 +13,7 @@ import {
   TOWN_SCOUT_ALREADY_HAVE_LINES,
   TOWN_SCOUT_HIRE_LINES,
 } from '../../src/core/constants'
-import { pickDeterministicLine } from '../../src/core/tiles/poiUtils'
+import { RNG } from '../../src/core/rng'
 import type { Cell, DeltaAnim, GridTransitionAnim, State, TownCell, World } from '../../src/core/types'
 
 function grass(): Cell {
@@ -51,7 +51,7 @@ function makeState(seed = 7): State {
     player: { position: { x: 1, y: 1 } },
     run: { stepCount: 10, hasWon: false, isGameOver: false, knowsPosition: true, path: [], lostBufferStartIndex: null },
     resources: { food: 0, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false },
-    encounter: { kind: 'town', sourceKind: 'town', sourceCellId: 4, restoreMessage: 'restored', rumorCursor: 0 },
+    encounter: { kind: 'town', sourceKind: 'town', sourceCellId: 4, restoreMessage: 'restored' },
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
 }
@@ -68,6 +68,24 @@ describe('town reducer', () => {
     const s2 = processAction(s1, { type: ACTION_TOWN_BUY_FOOD })!
     expect(s2.resources.gold).toBe(0)
     expect(s2.resources.food).toBe(6)
+  })
+
+  it('successful buy copy uses a run-global cursor (no repeats across purchases until cycling)', () => {
+    expect(TOWN_BUY_LINES.length).toBeGreaterThan(1)
+    const s0 = makeState()
+    s0.resources.gold = 999
+
+    const s1 = processAction(s0, { type: ACTION_TOWN_BUY_FOOD })!
+    const s2 = processAction(s1, { type: ACTION_TOWN_BUY_TROOPS })!
+
+    expect(s1.run.copyCursors?.['town.buyFeedback']).toBe(1)
+    expect(s2.run.copyCursors?.['town.buyFeedback']).toBe(2)
+
+    const body1 = s1.ui.message.split('\n').slice(1).join('\n')
+    const body2 = s2.ui.message.split('\n').slice(1).join('\n')
+    expect(TOWN_BUY_LINES.includes(body1)).toBe(true)
+    expect(TOWN_BUY_LINES.includes(body2)).toBe(true)
+    expect(body1).not.toBe(body2)
   })
 
   it('buy troops: pays gold and grants armySize', () => {
@@ -87,7 +105,7 @@ describe('town reducer', () => {
     expect(next.resources.hasScout).toBe(true)
     expect(next.resources.gold).toBe(0)
 
-    const expectedLine = pickDeterministicLine(TOWN_SCOUT_HIRE_LINES, s0.world.seed, 4, s0.run.stepCount)
+    const expectedLine = RNG.createRunCopyRandom(s0).perMoveLine(TOWN_SCOUT_HIRE_LINES, { cellId: 4 })
     expect(next.ui.message).toBe(`Stonebridge Town\n${expectedLine}`)
   })
 
@@ -99,7 +117,7 @@ describe('town reducer', () => {
     const next = processAction(s0, { type: ACTION_TOWN_HIRE_SCOUT })!
     expect(next.resources).toEqual(s0.resources)
 
-    const expectedLine = pickDeterministicLine(TOWN_SCOUT_ALREADY_HAVE_LINES, s0.world.seed, 4, s0.run.stepCount)
+    const expectedLine = RNG.createRunCopyRandom(s0).perMoveLine(TOWN_SCOUT_ALREADY_HAVE_LINES, { cellId: 4 })
     expect(next.ui.message).toBe(`Stonebridge Town\n${expectedLine}`)
   })
 
@@ -127,7 +145,7 @@ describe('town reducer', () => {
     const next = processAction(s0, { type: ACTION_TOWN_BUY_TROOPS })!
     expect(next.resources).toEqual(s0.resources)
 
-    const expectedLine = pickDeterministicLine(TOWN_NO_GOLD_LINES, s0.world.seed, 4, s0.run.stepCount)
+    const expectedLine = RNG.createRunCopyRandom(s0).perMoveLine(TOWN_NO_GOLD_LINES, { cellId: 4 })
     expect(next.ui.message).toBe(`Stonebridge Town\n${expectedLine}`)
   })
 
@@ -154,8 +172,8 @@ describe('town reducer', () => {
     const deltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'gold')
     expect(deltas.some((d) => d.params.delta === -3)).toBe(true)
 
-    const buyLine = pickDeterministicLine(TOWN_BUY_LINES, s0.world.seed, 4, s0.run.stepCount)
-    expect(next.ui.message).toBe(`Stonebridge Town\n${buyLine}`)
+    const body = next.ui.message.split('\n').slice(1).join('\n')
+    expect(TOWN_BUY_LINES.includes(body)).toBe(true)
   })
 })
 

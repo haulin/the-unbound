@@ -14,8 +14,7 @@ import {
   TOWN_SCOUT_HIRE_LINES,
 } from './constants'
 import type { Action, Resources, State, TownCell, Ui } from './types'
-import { pickIntExclusive } from './prng'
-import { pickDeterministicLine } from './tiles/poiUtils'
+import { RNG } from './rng'
 import { enqueueAnim } from './uiAnim'
 
 function gridTransitionDurationFrames(): number {
@@ -33,22 +32,13 @@ function townPrefix(town: TownCell): string {
   return `${name} Town`
 }
 
-function shuffledRumors(seed: number, townId: number): readonly string[] {
+function rumorPool(): readonly string[] {
   const pool: string[] = []
 
   const groups = Object.values(BARKEEP_TIPS) as Array<readonly string[]>
   for (let i = 0; i < groups.length; i++) {
     const lines = groups[i]!
     for (let j = 0; j < lines.length; j++) pool.push(lines[j]!)
-  }
-  if (pool.length <= 1) return pool
-
-  // Deterministic per-town shuffle so the purchase order isn't obvious after the first buy.
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = pickIntExclusive({ seed, stepCount: 0, cellId: townId, salt: i }, i + 1)
-    const tmp = pool[i]!
-    pool[i] = pool[j]!
-    pool[j] = tmp
   }
   return pool
 }
@@ -70,15 +60,14 @@ export function reduceTownAction(prevState: State, action: Action): State | null
   const town = getTownAtPlayer(prevState)
   if (!town) return prevState
 
-  const seed = prevState.world.seed
-  const stepCount = prevState.run.stepCount
   const townId = town.id
   const prefix = townPrefix(town)
+  const rnd = RNG.createRunCopyRandom(prevState)
 
   const prevRes = prevState.resources
 
   const setMessage = (line: string) => ({ ...prevState, ui: { ...prevState.ui, message: `${prefix}\n${line}` } })
-  const noGold = () => setMessage(pickDeterministicLine(TOWN_NO_GOLD_LINES, seed, townId, stepCount))
+  const noGold = () => setMessage(rnd.perMoveLine(TOWN_NO_GOLD_LINES, { cellId: townId }))
 
   if (action.type === ACTION_TOWN_LEAVE) {
     const restore = enc.restoreMessage
@@ -105,9 +94,11 @@ export function reduceTownAction(prevState: State, action: Action): State | null
       food: prevRes.food + town.bundles.food,
     }
 
-    const line = pickDeterministicLine(TOWN_BUY_LINES, seed, townId, stepCount)
+    const pick = rnd.advanceCursor('town.buyFeedback', TOWN_BUY_LINES)
+    const nextRun = pick.nextState.run
+    const line = pick.line
     const baseUi: Ui = { ...prevState.ui, message: `${prefix}\n${line}` }
-    if (!ENABLE_ANIMATIONS) return { ...prevState, resources: nextResources, ui: baseUi }
+    if (!ENABLE_ANIMATIONS) return { ...prevState, run: nextRun, resources: nextResources, ui: baseUi }
 
     const startFrame = baseUi.clock.frame
     let uiWith = baseUi
@@ -125,7 +116,7 @@ export function reduceTownAction(prevState: State, action: Action): State | null
       blocksInput: false,
       params: { target: 'food', delta: town.bundles.food },
     })
-    return { ...prevState, resources: nextResources, ui: uiWith }
+    return { ...prevState, run: nextRun, resources: nextResources, ui: uiWith }
   }
 
   if (action.type === ACTION_TOWN_BUY_TROOPS) {
@@ -138,9 +129,11 @@ export function reduceTownAction(prevState: State, action: Action): State | null
       armySize: prevRes.armySize + town.bundles.troops,
     }
 
-    const line = pickDeterministicLine(TOWN_BUY_LINES, seed, townId, stepCount)
+    const pick = rnd.advanceCursor('town.buyFeedback', TOWN_BUY_LINES)
+    const nextRun = pick.nextState.run
+    const line = pick.line
     const baseUi: Ui = { ...prevState.ui, message: `${prefix}\n${line}` }
-    if (!ENABLE_ANIMATIONS) return { ...prevState, resources: nextResources, ui: baseUi }
+    if (!ENABLE_ANIMATIONS) return { ...prevState, run: nextRun, resources: nextResources, ui: baseUi }
 
     const startFrame = baseUi.clock.frame
     let uiWith = baseUi
@@ -158,19 +151,19 @@ export function reduceTownAction(prevState: State, action: Action): State | null
       blocksInput: false,
       params: { target: 'army', delta: town.bundles.troops },
     })
-    return { ...prevState, resources: nextResources, ui: uiWith }
+    return { ...prevState, run: nextRun, resources: nextResources, ui: uiWith }
   }
 
   if (action.type === ACTION_TOWN_HIRE_SCOUT) {
     if (prevRes.hasScout) {
-      return setMessage(pickDeterministicLine(TOWN_SCOUT_ALREADY_HAVE_LINES, seed, townId, stepCount))
+      return setMessage(rnd.perMoveLine(TOWN_SCOUT_ALREADY_HAVE_LINES, { cellId: townId }))
     }
 
     const cost = town.prices.scoutGold
     if (prevRes.gold < cost) return noGold()
 
     const nextResources: Resources = { ...prevRes, hasScout: true, gold: prevRes.gold - cost }
-    const line = pickDeterministicLine(TOWN_SCOUT_HIRE_LINES, seed, townId, stepCount)
+    const line = rnd.perMoveLine(TOWN_SCOUT_HIRE_LINES, { cellId: townId })
     const baseUi: Ui = { ...prevState.ui, message: `${prefix}\n${line}` }
     if (!ENABLE_ANIMATIONS) return { ...prevState, resources: nextResources, ui: baseUi }
 
@@ -190,14 +183,12 @@ export function reduceTownAction(prevState: State, action: Action): State | null
   if (prevRes.gold < cost) return noGold()
 
   const nextResources: Resources = { ...prevRes, gold: prevRes.gold - cost }
-  const cursor = enc.rumorCursor
-  const pool = shuffledRumors(seed, townId)
-  const idx = pool.length > 0 ? cursor % pool.length : 0
-  const line = pool[idx] || pool[0] || ''
-
-  const nextEncounter = { ...enc, rumorCursor: cursor + 1 }
+  const pool = rumorPool()
+  const pick = rnd.advanceCursor(`town.rumor.${townId}`, pool, { salt: townId })
+  const line = pick.line
+  const nextRun = pick.nextState.run
   const baseUi: Ui = { ...prevState.ui, message: `${prefix}\n${line}` }
-  if (!ENABLE_ANIMATIONS) return { ...prevState, resources: nextResources, ui: baseUi }
+  if (!ENABLE_ANIMATIONS) return { ...prevState, run: nextRun, resources: nextResources, ui: baseUi }
 
   const startFrame = baseUi.clock.frame
   const uiWith = enqueueAnim(baseUi, {
@@ -207,6 +198,6 @@ export function reduceTownAction(prevState: State, action: Action): State | null
     blocksInput: false,
     params: { target: 'gold', delta: -cost },
   })
-  return { ...prevState, resources: nextResources, encounter: nextEncounter, ui: uiWith }
+  return { ...prevState, run: nextRun, resources: nextResources, ui: uiWith }
 }
 

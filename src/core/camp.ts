@@ -1,4 +1,4 @@
-import { pickIntInRange } from './prng'
+import { RNG } from './rng'
 import {
   ACTION_CAMP_LEAVE,
   ACTION_CAMP_SEARCH,
@@ -11,12 +11,11 @@ import {
   GRID_TRANSITION_STEP_FRAMES,
 } from './constants'
 import type { Action, CampCell, Resources, State, Ui } from './types'
-import { pickDeterministicLine } from './tiles/poiUtils'
 import { setCellAt } from './cells'
 import { enqueueAnim } from './uiAnim'
 
 export function computeCampArmyGain(args: { seed: number; campId: number; stepCount: number }): number {
-  return pickIntInRange({ seed: args.seed, stepCount: args.stepCount, cellId: args.campId }, 1, 2)
+  return RNG._keyedIntInRange({ seed: args.seed, stepCount: args.stepCount, cellId: args.campId }, 1, 2)
 }
 
 export type CampPreviewModel = {
@@ -80,7 +79,8 @@ export function reduceCampAction(prevState: State, action: Action): State | null
   if (action.type === ACTION_CAMP_SEARCH) {
     const readyAt = campCell.nextReadyStep ?? 0
     if (stepCount < readyAt) {
-      const line = pickDeterministicLine(CAMP_EMPTY_LINES, prevState.world.seed, campCell.id, stepCount)
+      const rnd = RNG.createRunCopyRandom(prevState)
+      const line = rnd.perMoveLine(CAMP_EMPTY_LINES, { cellId: campCell.id })
       return { ...prevState, ui: { ...prevState.ui, message: `${campName} Camp\n${line}` } }
     }
 
@@ -89,7 +89,8 @@ export function reduceCampAction(prevState: State, action: Action): State | null
     const nextWorld = setCellAt(prevState.world, pos, nextCampCell)
     const nextResources: Resources = { ...prevRes, food: prevRes.food + CAMP_FOOD_GAIN, armySize: prevRes.armySize + armyGain }
 
-    const line = pickDeterministicLine(CAMP_RECRUIT_LINES, prevState.world.seed, campCell.id, stepCount)
+    const rnd = RNG.createRunCopyRandom(prevState)
+    const line = rnd.perMoveLine(CAMP_RECRUIT_LINES, { cellId: campCell.id })
     const baseUi: Ui = { ...prevState.ui, message: `${campName} Camp\n${line}` }
     if (!ENABLE_ANIMATIONS) return { ...prevState, world: nextWorld, resources: nextResources, ui: baseUi }
 

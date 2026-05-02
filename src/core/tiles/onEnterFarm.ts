@@ -1,4 +1,4 @@
-import { randInt } from '../prng'
+import { RNG } from '../rng'
 import {
   FARM_COOLDOWN_MOVES,
   FARM_HARVEST_LINES,
@@ -6,7 +6,6 @@ import {
 } from '../constants'
 import { getCellAt, setCellAt } from '../cells'
 import type { TileEnterHandler } from './types'
-import { pickDeterministicLine } from './poiUtils'
 import type { FarmCell } from '../types'
 
 export const onEnterFarm: TileEnterHandler = ({ cell, world, pos, stepCount, resources }) => {
@@ -18,23 +17,21 @@ export const onEnterFarm: TileEnterHandler = ({ cell, world, pos, stepCount, res
   const farmName = farmCell.name || 'A Farm'
   const readyAt = farmCell.nextReadyStep ?? 0
   if (stepCount < readyAt) {
+    const r = RNG.createTileRandom({ world, stepCount, pos })
     return {
-      message: `${farmName} Farm\n${pickDeterministicLine(FARM_REVISIT_LINES, world.seed, farmCell.id, stepCount)}`,
+      message: `${farmName} Farm\n${r.perMoveLine(FARM_REVISIT_LINES, { cellId: farmCell.id })}`,
       knowsPosition: true,
     }
   }
 
-  let rngState = world.rngState
-  const rGain = randInt(rngState, 8)
-  rngState = rGain.rngState
-  const gain = rGain.value + 3
+  const sr = RNG.createStreamRandom(world.rngState)
+  const gain = sr.intExclusive(8) + 3
 
-  const rLine = randInt(rngState, FARM_HARVEST_LINES.length)
-  rngState = rLine.rngState
-  const harvestLine = FARM_HARVEST_LINES[rLine.value] || FARM_HARVEST_LINES[0] || ''
+  const r = RNG.createTileRandom({ world, stepCount, pos })
+  const harvestLine = r.stableLine(FARM_HARVEST_LINES, { placeId: farmCell.id })
 
   const nextFarmCell: FarmCell = { ...farmCell, nextReadyStep: stepCount + FARM_COOLDOWN_MOVES }
-  const nextWorld = setCellAt({ ...world, rngState }, pos, nextFarmCell)
+  const nextWorld = setCellAt({ ...world, rngState: sr.rngState }, pos, nextFarmCell)
 
   return {
     world: nextWorld,

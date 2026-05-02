@@ -8,9 +8,12 @@ import {
   ACTION_TICK,
   ACTION_TOGGLE_MAP,
   ACTION_TOGGLE_MINIMAP,
+  COMBAT_ENCOUNTER_LINES,
+  COMBAT_FLEE_EXIT_LINES,
   COMBAT_FOOD_BONUS_MAX,
   COMBAT_GOLD_REWARD_MAX,
   COMBAT_GOLD_REWARD_MIN,
+  COMBAT_VICTORY_EXIT_LINES,
   ENABLE_ANIMATIONS,
   FOOD_DELTA_FRAMES,
   GAME_OVER_LINES,
@@ -28,14 +31,13 @@ import {
 } from './constants'
 import { SPRITES } from './spriteIds'
 import { reduceCampAction } from './camp'
-import { cellIdForPos, pickCombatEncounterLine, pickCombatExitLine, resolveFightRound, spawnEnemyArmy } from './combat'
+import { cellIdForPos, resolveFightRound, spawnEnemyArmy } from './combat'
 import { reduceTownAction } from './town'
 import { rollTileEvent } from './tileEvents'
 import { pickTeleportDestination } from './teleport'
-import { pickDeterministicLine } from './tiles/poiUtils'
+import { RNG } from './rng'
 import { generateWorld } from './world'
 import { setCellAt } from './cells'
-import { randInt } from './prng'
 import { getOnEnterHandler } from './tiles/registry'
 import {
   LEFT_PANEL_KIND_AUTO,
@@ -310,7 +312,7 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
       nextEncounter = { kind: 'camp', sourceKind: 'camp', sourceCellId: destCellId, restoreMessage: preEncounterMessage }
       didStartCamp = true
     } else if (destKind === 'town') {
-      nextEncounter = { kind: 'town', sourceKind: 'town', sourceCellId: destCellId, restoreMessage: preEncounterMessage, rumorCursor: 0 }
+      nextEncounter = { kind: 'town', sourceKind: 'town', sourceCellId: destCellId, restoreMessage: preEncounterMessage }
       didStartTown = true
     } else {
       const event = rollTileEvent({
@@ -345,7 +347,7 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
         message =
           destKind === 'henge'
             ? HENGE_ENCOUNTER_LINE
-            : pickCombatEncounterLine({ seed: nextWorld.seed, stepCount: nextStepCount, cellId: destCellId })
+            : RNG.createTileRandom({ world: nextWorld, stepCount: nextStepCount, pos: nextPos }).perMoveLine(COMBAT_ENCOUNTER_LINES)
       }
 
       if (event && event.kind === 'lost') {
@@ -356,7 +358,7 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
         })
         nextWorld = { ...nextWorld, rngState: td.rngState }
         landingPos = td.destination
-        message = pickDeterministicLine(LOST_FLAVOR_LINES, nextWorld.seed, destCellId, nextStepCount)
+        message = RNG.createTileRandom({ world: nextWorld, stepCount: nextStepCount, pos: nextPos }).perMoveLine(LOST_FLAVOR_LINES)
         teleported = true
       }
     }
@@ -385,6 +387,7 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
     world: nextWorld,
     player: { position: finalPlayerPos },
     run: {
+      ...prevState.run,
       stepCount: nextStepCount,
       hasWon: nextHasWon,
       isGameOver,
@@ -564,7 +567,15 @@ export function processAction(prevState: State | null, action: Action): State | 
     return {
       world,
       player: { position: { x: playerPos.x, y: playerPos.y } },
-      run: { stepCount: 0, hasWon, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
+      run: {
+        stepCount: 0,
+        hasWon,
+        isGameOver: false,
+        knowsPosition: false,
+        path: [],
+        lostBufferStartIndex: null,
+        copyCursors: {},
+      },
       resources: {
         food: INITIAL_FOOD,
         gold: INITIAL_GOLD,
@@ -601,16 +612,10 @@ export function processAction(prevState: State | null, action: Action): State | 
     const prevRes = normalizeResources(prevState.world, prevState.resources)
     const nextArmy = prevRes.armySize - 1
     const isGameOver = nextArmy <= 0
-    const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : prevState.run
     const nextResources: Resources = { ...prevRes, armySize: Math.max(0, nextArmy) }
-    const nextMessage = isGameOver
-      ? gameOverMessage(prevState.world.seed, prevState.run.stepCount)
-      : pickCombatExitLine({
-          seed: prevState.world.seed,
-          stepCount: prevState.run.stepCount,
-          cellId: prevState.encounter.sourceCellId,
-          outcome: 'flee',
-        }) || prevUi.message
+    const fleePick = isGameOver ? null : RNG.createRunCopyRandom(prevState).advanceCursor('combat.exit.flee', COMBAT_FLEE_EXIT_LINES)
+    const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : fleePick!.nextState.run
+    const nextMessage = isGameOver ? gameOverMessage(prevState.world.seed, prevState.run.stepCount) : fleePick!.line || prevUi.message
     const baseUi: Ui = { ...prevUi, message: nextMessage }
     if (!ENABLE_ANIMATIONS) {
       return {
@@ -692,31 +697,26 @@ export function processAction(prevState: State | null, action: Action): State | 
     // Combat reward is paid once, at the end, when the enemy is eliminated.
     if (round.outcome === 'playerHit' && nextEncounter == null && !prevState.run.isGameOver && !prevState.run.hasWon) {
       const goldSpan = COMBAT_GOLD_REWARD_MAX - COMBAT_GOLD_REWARD_MIN + 1
-      const g = randInt(nextWorld.rngState, goldSpan)
-      nextWorld = { ...nextWorld, rngState: g.rngState }
-      const gold = COMBAT_GOLD_REWARD_MIN + g.value
+      const sr = RNG.createStreamRandom(nextWorld.rngState)
+      const gold = COMBAT_GOLD_REWARD_MIN + sr.intExclusive(goldSpan)
       nextResources = { ...nextResources, gold: nextResources.gold + gold }
       goldDeltas.push(gold)
 
-      const fb = randInt(nextWorld.rngState, COMBAT_FOOD_BONUS_MAX + 1)
-      nextWorld = { ...nextWorld, rngState: fb.rngState }
-      const foodBonus = fb.value | 0
+      const foodBonus = sr.intExclusive(COMBAT_FOOD_BONUS_MAX + 1)
       if (foodBonus) {
         nextResources = { ...nextResources, food: nextResources.food + foodBonus }
         foodDeltas.push(foodBonus)
       }
+      nextWorld = { ...nextWorld, rngState: sr.rngState }
     }
     const isGameOver = nextResources.armySize <= 0
-    const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : prevState.run
+    const victoryPick =
+      !isGameOver && nextEncounter == null ? RNG.createRunCopyRandom(prevState).advanceCursor('combat.exit.victory', COMBAT_VICTORY_EXIT_LINES) : null
+    const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : nextEncounter == null ? victoryPick!.nextState.run : prevState.run
     const nextMessage = isGameOver
       ? gameOverMessage(nextWorld.seed, prevState.run.stepCount)
       : nextEncounter == null
-        ? pickCombatExitLine({
-            seed: nextWorld.seed,
-            stepCount: prevState.run.stepCount,
-            cellId: enc.sourceCellId,
-            outcome: 'victory',
-          }) || prevUi.message
+        ? victoryPick!.line || prevUi.message
         : prevUi.message
 
     const baseUi: Ui = { message: nextMessage, leftPanel: prevUi.leftPanel, clock: prevUi.clock, anim: prevUi.anim }

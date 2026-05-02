@@ -4,7 +4,7 @@ import {
   WOODS_AMBUSH_PERCENT,
   WOODS_LOST_PERCENT,
 } from './constants'
-import { pickIntExclusive } from './prng'
+import { RNG } from './rng'
 import type { CellKind } from './types'
 
 export type TileEventSource = 'woods' | 'mountain' | 'swamp' | 'henge'
@@ -47,7 +47,7 @@ export function rollTileEvent(args: {
   }
 
   if (ambushPct + lostPct === 0) return null
-  const p = pickIntExclusive({ seed, stepCount, cellId }, 100)
+  const p = RNG._keyedIntExclusive({ seed, stepCount, cellId }, 100)
   if (p < ambushPct) return { kind: 'fight', source: kind as TileEventSource }
   if (p < ambushPct + lostPct) return { kind: 'lost', source: kind as 'woods' | 'swamp' }
   return null

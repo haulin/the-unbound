@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { SWAMP_LOST_PERCENT, WOODS_AMBUSH_PERCENT, WOODS_LOST_PERCENT } from '../../src/core/constants'
-import { pickIntExclusive } from '../../src/core/prng'
+import { RNG } from '../../src/core/rng'
 import { rollTileEvent } from '../../src/core/tileEvents'
 
 function findSeedForPercentileInRange(args: { stepCount: number; cellId: number; minInclusive: number; maxExclusive: number }): number {
   for (let seed = 1; seed < 200000; seed++) {
-    const p = pickIntExclusive({ seed, stepCount: args.stepCount, cellId: args.cellId }, 100)
+    const p = RNG._keyedIntExclusive({ seed, stepCount: args.stepCount, cellId: args.cellId }, 100)
     if (p >= args.minInclusive && p < args.maxExclusive) return seed
   }
   throw new Error('seed not found')

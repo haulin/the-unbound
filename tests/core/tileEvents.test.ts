@@ -6,10 +6,10 @@ import {
   WOODS_LOST_PERCENT,
 } from '../../src/core/constants'
 import { rollTileEvent } from '../../src/core/tileEvents'
-import { pickIntExclusive } from '../../src/core/prng'
+import { RNG } from '../../src/core/rng'
 
 function percentile(seed: number, stepCount: number, cellId: number) {
-  return pickIntExclusive({ seed, stepCount, cellId }, 100)
+  return RNG._keyedIntExclusive({ seed, stepCount, cellId }, 100)
 }
 
 describe('rollTileEvent', () => {

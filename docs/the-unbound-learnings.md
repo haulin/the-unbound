@@ -11,7 +11,7 @@ In practice: new features should usually be “add a new entry / new function”
 - **Single plain state + pure reducer**: `processAction(prevState, action) -> nextState` kept gameplay deterministic and iteration safe.
 - **World updates are explicit + localized**: the world is a grid of cells (`world.cells`), and feature state (e.g. cooldowns) is updated immutably by cloning only the touched row + cell.
 - **Button-as-data (extension point)**: representing the 3×3 grid as a mapping of “cell → definition” (preview + onPress) reduces edit sites when buttons change.
-- **RNG boundary discipline**: keep bitwise/u32 concerns in `src/core/prng.ts`; call sites use `randInt` + plain math.
+- **RNG boundary discipline**: keep bitwise/u32 concerns in `src/core/rng.ts`; call sites use `src/core/rng.ts` facades (copy vs stream) and plain math.
 - **Sprite single source of truth**: keep sprite numbers in one place (`src/core/spriteIds.ts` as `SPRITES`) and reference `SPRITES.*` directly in gameplay + renderer (avoid “alias layers” that just forward IDs).
 
 ## What surprised us (and what to do next time)
@@ -83,7 +83,10 @@ In practice: new features should usually be “add a new entry / new function”
 ## v0.0.9 — The Key (process + architecture notes)
 
 - **Volatile copy belongs in code**: treat player-facing strings in `src/core/constants.ts` as the source of truth; docs should use “such as” examples and avoid freezing exact wording.
-- **Deterministic flavor without perturbing RNG**: use deterministic pickers for text (seed + cellId + stepCount) and avoid consuming `world.rngState` in tile-enter handlers.
+- **Deterministic flavor without perturbing RNG**:
+  - For copy/flavor lines: use `src/core/rng.ts` (`createTileRandom(...).perMoveLine(...)` or `.stableLine(...)`) so copy does **not** consume `world.rngState`.
+  - For no-repeat action feedback: use `createRunCopyRandom(state).advanceCursor(tag, pool, { salt? })` (cursor stored in `run.copyCursors`).
+  - For simulation randomness: use `createStreamRandom(world.rngState)` and thread the returned `rngState`.
 - **Worldgen constraints need guardrails**: when adding placement constraints (e.g. minimum torus Manhattan distance between features), clamp impossible values and test across many seeds.
 - **Run start should be inert**: on spawn, don’t run tile-enter logic (no signpost clue / auto-buy / auto-win); show only the goal narrative. Tile interactions happen when you move onto tiles.
 
@@ -93,7 +96,7 @@ In practice: new features should usually be “add a new entry / new function”
 - **Tile-enter outcomes carry monotonic flags**: `TileEnterOutcome.knowsPosition?: boolean` mirrors the existing `hasWon?` pattern — handler returns true when applicable, reducer ORs into run state. Same shape lets future flags (visited, etc.) plug in without new wiring.
 - **`gridTransition` anim params encode render mode, not position**: `params.from`/`params.to` only mean blank/overworld/combat. An `'overworld' → 'overworld'` transition is visually inert (renderer resolves both phases against the already-updated `s.player.position`). For "moved without sliding" (teleport), reuse `'blank' → 'overworld'` (run-start reveal). Caveat invisible from tests — caught only by manual smoke. Worth a regression assertion on `s.ui.anim.active` if anim params evolve.
 - **Pure module + RNG-threading reuse**: `src/core/teleport.ts:pickTeleportDestination` follows the same `(args) → { result, rngState }` shape as worldgen `placeFeature`. Composable, replayable, deterministic.
-- **Reuse established pickers before inventing new ones**: a standalone `lostFlavor.ts` with a salted hash duplicated `pickDeterministicLine` (the canonical flavor-pool picker used by gate/locksmith/farm/camp/henge/terrain). Removed; reducer now calls `pickDeterministicLine(LOST_FLAVOR_LINES, …)` directly. The salt was defensive over-engineering — `h % 100` (event roll) and `h % N` (flavor pick) are nearly independent for uniform `h`. Check the established helpers in `tiles/poiUtils.ts` before adding a new module.
+- **Reuse established pickers before inventing new ones**: prefer `src/core/rng.ts` (copy + stream facades + policies) instead of creating ad-hoc “pick line” helpers in feature modules.
 - **Terrain lore as a pool teaches mechanics through repetition**: `TERRAIN_LORE_BY_KIND` gives event-bearing terrains 3-line pools (one mechanic hint per applicable event + pure flavor). Players learn that woods can ambush *or* dislocate by re-reading; explicit tutorial text not needed. Inert terrains (grass/road/lake/rainbow) stay as single-line pools.
 - **Versioning shifted to MAJOR.MINOR**: patch versions skipped — features that previously would have been v0.1.1 / v0.1.2 are v0.2 / v0.3 instead. Backlog and `package.json` reflect this.
 
@@ -103,5 +106,5 @@ In practice: new features should usually be “add a new entry / new function”
 - **Renderer consumes models, not mechanics**: for deterministic previews, compute a core “preview model” (e.g. camp preview values) in core and have platform renderers read it; the renderer should not replicate game calculations.
 - **Non-consuming deterministic picks**: for “random-looking but replay-stable” outcomes that must not perturb unrelated systems (flavor lines, event percentiles, deterministic previews), prefer keyed pickers (seed/stepCount/location + optional salt) over consuming `world.rngState`.
 - **Animation enqueueing can be shared**: keep animation state updates as pure data transforms and extract generic helpers (e.g. enqueue) so encounter modules can add animations without importing reducer internals.
-- **Deterministic shuffle without bitwise mixing**: use keyed pickers (`pickIntExclusive({ seed, stepCount:0, cellId, salt }, max)`) for per-location deterministic randomness; keep bitwise/hash arithmetic inside `prng.ts`.
+- **Deterministic shuffle without bitwise mixing**: keep hashing/bitwise in `src/core/rng.ts` (e.g. `shuffledIndices(...)`); feature modules should use `cursorAdvance(...)` / `createRunCopyRandom(...).advanceCursor(...)` instead of hand-rolled shuffles.
 

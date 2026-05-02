@@ -28,7 +28,7 @@ import {
   spriteIdForKind,
 } from './constants'
 import { manhattan, torusDelta, wrapIndex } from './math'
-import { randInt, seedToRngState } from './prng'
+import { RNG } from './rng'
 import type { Cell, CellGrid, GeneratedWorld, Vec2, World } from './types'
 
 function cellId(x: number, y: number): number {
@@ -56,7 +56,7 @@ type PlaceFeatureOpts = {
 function placeFeature(cells: CellGrid, rngState: number, opts: PlaceFeatureOpts): { placed: Vec2[]; rngState: number } {
   const placed: Vec2[] = []
   while (placed.length < opts.count) {
-    const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT)
+    const r = RNG._int(rngState, WORLD_WIDTH * WORLD_HEIGHT)
     rngState = r.rngState
     const x = r.value % WORLD_WIDTH
     const y = Math.floor(r.value / WORLD_WIDTH)
@@ -97,7 +97,7 @@ function generateBaseTerrainCells(rngState: number): { cells: CellGrid; rngState
   for (let y = 0; y < WORLD_HEIGHT; y++) {
     const row: number[] = []
     for (let x = 0; x < WORLD_WIDTH; x++) {
-      const r = randInt(rngState, NOISE_VALUE_MAX)
+      const r = RNG._int(rngState, NOISE_VALUE_MAX)
       rngState = r.rngState
       row.push(r.value)
     }
@@ -174,7 +174,7 @@ function placeNamedFeature(cells: CellGrid, rngState: number, opts: PlaceNamedFe
     buildCell: (x, y, nextRng) => {
       let name = opts.fallbackName
       if (remainingNames.length > 0) {
-        const pick = randInt(nextRng, remainingNames.length)
+        const pick = RNG._int(nextRng, remainingNames.length)
         nextRng = pick.rngState
         name = remainingNames.splice(pick.value, 1)[0] || opts.fallbackName
       }
@@ -200,7 +200,7 @@ function placeNamedFeatureRng(cells: CellGrid, rngState: number, opts: PlaceName
     buildCell: (x, y, nextRng) => {
       let name = opts.fallbackName
       if (remainingNames.length > 0) {
-        const pick = randInt(nextRng, remainingNames.length)
+        const pick = RNG._int(nextRng, remainingNames.length)
         nextRng = pick.rngState
         name = remainingNames.splice(pick.value, 1)[0] || opts.fallbackName
       }
@@ -246,11 +246,11 @@ function placeNamedTowns(cells: CellGrid, rngState: number): number {
       // Offer set: omit exactly 1 kind, keep the remaining 3 in base order.
       let omitIdx: number
       if (townIndex === 0) {
-        const pick = randInt(nextRng, omitNoScoutIndices.length)
+        const pick = RNG._int(nextRng, omitNoScoutIndices.length)
         nextRng = pick.rngState
         omitIdx = omitNoScoutIndices[pick.value]!
       } else {
-        const pick = randInt(nextRng, baseOffers.length)
+        const pick = RNG._int(nextRng, baseOffers.length)
         nextRng = pick.rngState
         omitIdx = pick.value
       }
@@ -260,25 +260,25 @@ function placeNamedTowns(cells: CellGrid, rngState: number): number {
       // Prices: fixed per town, derived from RNG in a fixed order.
       const loFood = Math.min(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX)
       const hiFood = Math.max(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX)
-      const rf = randInt(nextRng, hiFood - loFood + 1)
+      const rf = RNG._int(nextRng, hiFood - loFood + 1)
       nextRng = rf.rngState
       const foodGold = loFood + rf.value
 
       const loTroops = Math.min(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX)
       const hiTroops = Math.max(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX)
-      const rt = randInt(nextRng, hiTroops - loTroops + 1)
+      const rt = RNG._int(nextRng, hiTroops - loTroops + 1)
       nextRng = rt.rngState
       const troopsGold = loTroops + rt.value
 
       const loScout = Math.min(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX)
       const hiScout = Math.max(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX)
-      const rs = randInt(nextRng, hiScout - loScout + 1)
+      const rs = RNG._int(nextRng, hiScout - loScout + 1)
       nextRng = rs.rngState
       const scoutGold = loScout + rs.value
 
       const loRumor = Math.min(TOWN_PRICE_RUMOR_MIN, TOWN_PRICE_RUMOR_MAX)
       const hiRumor = Math.max(TOWN_PRICE_RUMOR_MIN, TOWN_PRICE_RUMOR_MAX)
-      const rr = randInt(nextRng, hiRumor - loRumor + 1)
+      const rr = RNG._int(nextRng, hiRumor - loRumor + 1)
       nextRng = rr.rngState
       const rumorGold = loRumor + rr.value
 
@@ -317,7 +317,7 @@ function placeSignposts(cells: CellGrid, rngState: number): number {
 }
 
 function pickStart({ rngState }: { rngState: number }) {
-  const r = randInt(rngState, WORLD_WIDTH * WORLD_HEIGHT)
+  const r = RNG._int(rngState, WORLD_WIDTH * WORLD_HEIGHT)
   rngState = r.rngState
   const x = r.value % WORLD_WIDTH
   const y = Math.floor(r.value / WORLD_WIDTH)
@@ -332,7 +332,7 @@ export function getSpriteIdAt(world: World, x: number, y: number) {
 }
 
 export function generateWorld(seed: number): GeneratedWorld {
-  let rngState = seedToRngState(seed)
+  let rngState = RNG.createStreamRandomFromSeed(seed).rngState
   const base = generateBaseTerrainCells(rngState)
   rngState = base.rngState
 

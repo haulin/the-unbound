@@ -5,21 +5,21 @@ import {
   LOCKSMITH_PURCHASE_LINES,
   LOCKSMITH_VISITED_LINES,
 } from '../constants'
-import { pickDeterministicLine } from './poiUtils'
+import { RNG } from '../rng'
 import type { TileEnterHandler } from './types'
 
 export const onEnterLocksmith: TileEnterHandler = ({ cell, world, pos, stepCount, resources }) => {
   if (cell.kind !== 'locksmith') return { message: '' }
 
-  const cellId = pos.y * world.width + pos.x
+  const r = RNG.createTileRandom({ world, stepCount, pos })
 
   if (resources.hasBronzeKey) {
-    const line = pickDeterministicLine(LOCKSMITH_VISITED_LINES, world.seed, cellId, stepCount)
+    const line = r.perMoveLine(LOCKSMITH_VISITED_LINES)
     return { message: `${LOCKSMITH_NAME}\n${line}` }
   }
 
   if (resources.food >= BRONZE_KEY_FOOD_COST) {
-    const line = pickDeterministicLine(LOCKSMITH_PURCHASE_LINES, world.seed, cellId, stepCount)
+    const line = r.perMoveLine(LOCKSMITH_PURCHASE_LINES)
     return {
       resources: {
         ...resources,
@@ -31,7 +31,7 @@ export const onEnterLocksmith: TileEnterHandler = ({ cell, world, pos, stepCount
     }
   }
 
-  const line = pickDeterministicLine(LOCKSMITH_NO_FOOD_LINES, world.seed, cellId, stepCount)
+  const line = r.perMoveLine(LOCKSMITH_NO_FOOD_LINES)
   return { message: `${LOCKSMITH_NAME}\n${line}` }
 }
 
