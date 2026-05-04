@@ -1,49 +1,25 @@
-import { RNG } from '../../rng'
 import {
-  FARM_COOLDOWN_MOVES,
-  FARM_HARVEST_LINES,
-  FARM_REVISIT_LINES,
+  ACTION_FARM_BUY_BEAST,
+  ACTION_FARM_BUY_FOOD,
+  ACTION_FARM_LEAVE,
 } from '../../constants'
-import { getCellAt, setCellAt } from '../../cells'
-import type { FarmCell } from '../../types'
+import { FARM_ENTER_LINES } from '../../lore'
+import { SPRITES } from '../../spriteIds'
+import { getCellAt } from '../../cells'
+import { RNG } from '../../rng'
 import type { MechanicDef } from '../types'
 import type { TileEnterHandler } from '../types'
 
-const onEnterFarm: TileEnterHandler = ({ cell, world, pos, stepCount, resources }) => {
+const onEnterFarm: TileEnterHandler = ({ cell, world, pos, stepCount }) => {
   if (cell.kind !== 'farm') return { message: '' }
 
   const farmCell = getCellAt(world, pos)
   if (!farmCell || farmCell.kind !== 'farm') return { message: '' }
 
   const farmName = farmCell.name || 'A Farm'
-  const readyAt = farmCell.nextReadyStep ?? 0
-  if (stepCount < readyAt) {
-    const r = RNG.createTileRandom({ world, stepCount, pos })
-    return {
-      message: `${farmName} Farm\n${r.perMoveLine(FARM_REVISIT_LINES, { cellId: farmCell.id })}`,
-      knowsPosition: true,
-    }
-  }
-
-  const sr = RNG.createStreamRandom(world.rngState)
-  const gain = sr.intExclusive(8) + 3
-
   const r = RNG.createTileRandom({ world, stepCount, pos })
-  const harvestLine = r.stableLine(FARM_HARVEST_LINES, { placeId: farmCell.id })
-
-  const nextFarmCell: FarmCell = { ...farmCell, nextReadyStep: stepCount + FARM_COOLDOWN_MOVES }
-  const nextWorld = setCellAt({ ...world, rngState: sr.rngState }, pos, nextFarmCell)
-
-  return {
-    world: nextWorld,
-    resources: {
-      ...resources,
-      food: resources.food + gain,
-    },
-    foodDeltas: [gain],
-    message: `${farmName} Farm\n${harvestLine}`,
-    knowsPosition: true,
-  }
+  const line = r.stableLine(FARM_ENTER_LINES, { placeId: farmCell.id })
+  return { message: `${farmName} Farm\n${line}`, knowsPosition: true }
 }
 
 export const farmMechanic: MechanicDef = {
@@ -51,4 +27,21 @@ export const farmMechanic: MechanicDef = {
   kinds: ['farm'],
   mapLabel: 'F',
   onEnter: onEnterFarm,
+  startEncounter: ({ cellId, restoreMessage }) => ({
+    kind: 'farm',
+    sourceKind: 'farm',
+    sourceCellId: cellId,
+    restoreMessage,
+  }),
+  rightGridEncounterKind: 'farm',
+  rightGrid: (_s, row, col) => {
+    if (row === 0 && col === 1)
+      return { spriteId: SPRITES.buttons.food, action: { type: ACTION_FARM_BUY_FOOD } }
+    if (row === 1 && col === 0)
+      return { spriteId: SPRITES.buttons.beast, action: { type: ACTION_FARM_BUY_BEAST } }
+    if (row === 1 && col === 2)
+      return { spriteId: SPRITES.buttons.return, action: { type: ACTION_FARM_LEAVE } }
+    if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.farmBarn, action: null }
+    return { action: null }
+  },
 }

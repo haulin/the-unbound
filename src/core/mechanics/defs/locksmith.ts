@@ -1,13 +1,17 @@
 import {
-  BRONZE_KEY_FOOD_COST,
-  LOCKSMITH_NAME,
-  LOCKSMITH_NO_FOOD_LINES,
-  LOCKSMITH_PURCHASE_LINES,
-  LOCKSMITH_VISITED_LINES,
+  ACTION_LOCKSMITH_LEAVE,
+  ACTION_LOCKSMITH_PAY_FOOD,
+  ACTION_LOCKSMITH_PAY_GOLD,
 } from '../../constants'
+import {
+  LOCKSMITH_ENTER_LINES,
+  LOCKSMITH_NAME,
+  LOCKSMITH_VISITED_LINES,
+} from '../../lore'
+import { SPRITES } from '../../spriteIds'
 import { RNG } from '../../rng'
-import type { TileEnterHandler } from '../types'
 import type { MechanicDef } from '../types'
+import type { TileEnterHandler } from '../types'
 
 const onEnterLocksmith: TileEnterHandler = ({ cell, world, pos, stepCount, resources }) => {
   if (cell.kind !== 'locksmith') return { message: '' }
@@ -19,20 +23,7 @@ const onEnterLocksmith: TileEnterHandler = ({ cell, world, pos, stepCount, resou
     return { message: `${LOCKSMITH_NAME}\n${line}` }
   }
 
-  if (resources.food >= BRONZE_KEY_FOOD_COST) {
-    const line = r.perMoveLine(LOCKSMITH_PURCHASE_LINES)
-    return {
-      resources: {
-        ...resources,
-        food: resources.food - BRONZE_KEY_FOOD_COST,
-        hasBronzeKey: true,
-      },
-      foodDeltas: [-BRONZE_KEY_FOOD_COST],
-      message: `${LOCKSMITH_NAME}\n${line}`,
-    }
-  }
-
-  const line = r.perMoveLine(LOCKSMITH_NO_FOOD_LINES)
+  const line = r.stableLine(LOCKSMITH_ENTER_LINES)
   return { message: `${LOCKSMITH_NAME}\n${line}` }
 }
 
@@ -41,4 +32,21 @@ export const locksmithMechanic: MechanicDef = {
   kinds: ['locksmith'],
   mapLabel: 'L',
   onEnter: onEnterLocksmith,
+  startEncounter: ({ cellId, restoreMessage }) => ({
+    kind: 'locksmith',
+    sourceKind: 'locksmith',
+    sourceCellId: cellId,
+    restoreMessage,
+  }),
+  rightGridEncounterKind: 'locksmith',
+  rightGrid: (_s, row, col) => {
+    if (row === 0 && col === 1)
+      return { spriteId: SPRITES.buttons.gold, action: { type: ACTION_LOCKSMITH_PAY_GOLD } }
+    if (row === 1 && col === 0)
+      return { spriteId: SPRITES.buttons.food, action: { type: ACTION_LOCKSMITH_PAY_FOOD } }
+    if (row === 1 && col === 2)
+      return { spriteId: SPRITES.buttons.return, action: { type: ACTION_LOCKSMITH_LEAVE } }
+    if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.locksmithKiln, action: null }
+    return { action: null }
+  },
 }

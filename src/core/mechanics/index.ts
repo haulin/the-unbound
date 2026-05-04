@@ -9,6 +9,8 @@ import { hengeMechanic } from './defs/henge'
 import { townMechanic } from './defs/town'
 import { terrainHazardsMechanic } from './defs/terrainHazards'
 import { combatMechanic } from './defs/combat'
+import { fishingLakeMechanic } from './defs/fishingLake'
+import { rainbowEndMechanic } from './defs/rainbowEnd'
 
 export const MECHANICS: readonly MechanicDef[] = [
   gateMechanic,
@@ -20,6 +22,8 @@ export const MECHANICS: readonly MechanicDef[] = [
   townMechanic,
   terrainHazardsMechanic,
   combatMechanic,
+  fishingLakeMechanic,
+  rainbowEndMechanic,
 ] as const
 
 export const MECHANIC_INDEX = buildMechanicIndex(MECHANICS)

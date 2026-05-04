@@ -5,15 +5,15 @@
 export const SPRITES = {
   tiles: {
     // Terrain / tiles
-    farm: 2,
-    mountains: 4,
-    plains: 6,
-    gravel: 8,
-    signpost: 10,
-    rainbow: 12,
-    lake: 34,
-    woods: 36,
-    swamp: 38,
+    mountains: 2,
+    woods: 4,
+    swamp: 6,
+    plains: 8,
+    gravel: 10,
+    farm: 34,
+    lake: 36,
+    signpost: 42,
+    rainbow: 76,
   },
 
   interactivePois: {
@@ -26,12 +26,14 @@ export const SPRITES = {
   },
 
   buttons: {
-    return: 98,
+    gold: 98,
     fight: 100,
     map: 102,
     troop: 104,
+    return: 108,
     goal: 110,
     food: 130,
+    beast: 132,
     scout: 134,
     rumorTip: 136,
     search: 138,
@@ -40,9 +42,12 @@ export const SPRITES = {
   },
 
   cosmetics: {
+    farmBarn: 162,
+    beastIllustration: 164,
     rumorIllustration: 168,
     campfireIcon: 170,
     tombstoneIllustration: 174,
+    locksmithKiln: 194,
     marketStall: 200,
   },
 
@@ -62,7 +67,7 @@ export const SPRITES = {
   },
 
   ui8x8: {
-    // Nine-slice 3×3, arranged as 3 columns × 3 rows (row stride is +16 sprite ids).
+    // Nine-slice 3x3, arranged as 3 columns x 3 rows (row stride is +16 sprite ids).
     panelBorder: {
       tl: 258,
       t: 259,

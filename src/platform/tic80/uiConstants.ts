@@ -17,7 +17,7 @@ export const UI_COLOR_GRID_HOVER_TINT = 15
 
 // Sprite IDs are referenced directly from `SPRITES` in the renderer.
 
-// 64×64 illustration preview (16×16 sprite scaled up).
+// 64x64 illustration preview (16x16 sprite scaled up).
 export const UI_ILLUSTRATION_SCALE = 4 // 16->64
 export const UI_TEXTURE_TILE_PX = 8
 export const UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR = 8
@@ -45,9 +45,6 @@ export const UI_LEFT_PANEL_PADDING = 7
 export const UI_LEFT_PANEL_INNER_GAP = 6
 
 export const UI_STATUS_ICON_SIZE = 8
-export const UI_STATUS_ICON_GAP = 3
-export const UI_STATUS_LINE_GAP = 3
-export const UI_STATUS_TEXT_OFFSET_Y = 1
 
 // Resource + stats stack spacing (tweak to tighten the column).
 export const UI_HERO_RESOURCE_GAP_PX = 2

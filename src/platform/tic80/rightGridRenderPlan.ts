@@ -42,20 +42,25 @@ function crossRevealIndex(row: number, col: number): number {
   return -1
 }
 
-function spriteIdForModeCrossCell(s: State, mode: 'blank' | 'overworld' | 'combat' | 'camp' | 'town', row: number, col: number): number | null {
+function spriteIdForModeCrossCell(
+  s: State,
+  mode: 'blank' | 'overworld' | 'combat' | 'camp' | 'town' | 'farm' | 'locksmith',
+  row: number,
+  col: number,
+): number | null {
   if (mode === 'blank') return null
 
   const pos = s.player.position
   const sourceKind = s.world.cells[pos.y]?.[pos.x]?.kind ?? 'grass'
 
-  const s2: State =
-    mode === 'overworld'
-      ? { ...s, encounter: null }
-      : mode === 'camp'
-        ? { ...s, encounter: { kind: 'camp', sourceKind: 'camp', sourceCellId: -1, restoreMessage: '' } }
-        : mode === 'town'
-          ? { ...s, encounter: { kind: 'town', sourceKind: 'town', sourceCellId: -1, restoreMessage: '' } }
-          : { ...s, encounter: { kind: 'combat', enemyArmySize: 0, sourceKind, sourceCellId: -1, restoreMessage: '' } }
+  const s2: State = (() => {
+    if (mode === 'overworld') return { ...s, encounter: null }
+    if (mode === 'camp') return { ...s, encounter: { kind: 'camp', sourceKind: 'camp', sourceCellId: -1, restoreMessage: '' } }
+    if (mode === 'town') return { ...s, encounter: { kind: 'town', sourceKind: 'town', sourceCellId: -1, restoreMessage: '' } }
+    if (mode === 'farm') return { ...s, encounter: { kind: 'farm', sourceKind: 'farm', sourceCellId: -1, restoreMessage: '' } }
+    if (mode === 'locksmith') return { ...s, encounter: { kind: 'locksmith', sourceKind: 'locksmith', sourceCellId: -1, restoreMessage: '' } }
+    return { ...s, encounter: { kind: 'combat', enemyArmySize: 0, sourceKind, sourceCellId: -1, restoreMessage: '' } }
+  })()
 
   const def = getRightGridCellDef(s2, row, col)
   if (def.spriteId != null) return def.spriteId
@@ -66,7 +71,7 @@ function spriteIdForModeCrossCell(s: State, mode: 'blank' | 'overworld' | 'comba
 }
 
 function previewSpriteIdForCell(s: State, row: number, col: number): number | null {
-  // During a grid transition, we render a hybrid from-mode → to-mode layout.
+  // During a grid transition, we render a hybrid from-mode -> to-mode layout.
   let transition: GridTransitionAnim | null = null
   if (ENABLE_ANIMATIONS) {
     const anims = s.ui.anim.active

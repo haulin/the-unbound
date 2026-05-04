@@ -8,14 +8,14 @@ import {
   CAMP_RECRUIT_LINES,
   ENABLE_ANIMATIONS,
   FOOD_DELTA_FRAMES,
-  GRID_TRANSITION_STEP_FRAMES,
 } from './constants'
 import type { Action, CampCell, Resources, State, Ui } from './types'
+import { resourcesWithClampedFoodIfNeeded } from './foodCarry'
 import { setCellAt } from './cells'
-import { enqueueAnim } from './uiAnim'
+import { enqueueAnim, enqueueGridTransition } from './uiAnim'
 
 export function computeCampArmyGain(args: { seed: number; campId: number; stepCount: number }): number {
-  return RNG._keyedIntInRange({ seed: args.seed, stepCount: args.stepCount, cellId: args.campId }, 1, 2)
+  return RNG.keyedIntInRange({ seed: args.seed, stepCount: args.stepCount, cellId: args.campId }, 1, 2)
 }
 
 export type CampPreviewModel = {
@@ -43,10 +43,6 @@ export function computeCampPreviewModel(s: State): CampPreviewModel | null {
   return { campName, foodGain, armyGain, scoutFoodCost }
 }
 
-function gridTransitionDurationFrames(): number {
-  return Math.max(1, Math.trunc(GRID_TRANSITION_STEP_FRAMES)) * 5
-}
-
 export function reduceCampAction(prevState: State, action: Action): State | null {
   if (action.type !== ACTION_CAMP_LEAVE && action.type !== ACTION_CAMP_SEARCH) return null
 
@@ -65,14 +61,7 @@ export function reduceCampAction(prevState: State, action: Action): State | null
     const restore = enc.restoreMessage
     const baseUi: Ui = { ...prevState.ui, message: restore }
     if (!ENABLE_ANIMATIONS) return { ...prevState, encounter: null, ui: baseUi }
-    const startFrame = baseUi.clock.frame
-    const uiWith = enqueueAnim(baseUi, {
-      kind: 'gridTransition',
-      startFrame,
-      durationFrames: gridTransitionDurationFrames(),
-      blocksInput: true,
-      params: { from: 'camp', to: 'overworld' },
-    })
+    const uiWith = enqueueGridTransition(baseUi, { from: 'camp', to: 'overworld' })
     return { ...prevState, encounter: null, ui: uiWith }
   }
 
@@ -87,7 +76,9 @@ export function reduceCampAction(prevState: State, action: Action): State | null
     const armyGain = computeCampArmyGain({ seed: prevState.world.seed, campId: campCell.id, stepCount })
     const nextCampCell: CampCell = { ...campCell, nextReadyStep: stepCount + CAMP_COOLDOWN_MOVES }
     const nextWorld = setCellAt(prevState.world, pos, nextCampCell)
-    const nextResources: Resources = { ...prevRes, food: prevRes.food + CAMP_FOOD_GAIN, armySize: prevRes.armySize + armyGain }
+    const gained: Resources = { ...prevRes, food: prevRes.food + CAMP_FOOD_GAIN, armySize: prevRes.armySize + armyGain }
+    const nextResources = resourcesWithClampedFoodIfNeeded(gained)
+    const foodGain = nextResources.food - prevRes.food
 
     const rnd = RNG.createRunCopyRandom(prevState)
     const line = rnd.perMoveLine(CAMP_RECRUIT_LINES, { cellId: campCell.id })
@@ -96,13 +87,15 @@ export function reduceCampAction(prevState: State, action: Action): State | null
 
     const startFrame = baseUi.clock.frame
     let uiWith = baseUi
-    uiWith = enqueueAnim(uiWith, {
-      kind: 'delta',
-      startFrame,
-      durationFrames: FOOD_DELTA_FRAMES,
-      blocksInput: false,
-      params: { target: 'food', delta: CAMP_FOOD_GAIN },
-    })
+    if (foodGain) {
+      uiWith = enqueueAnim(uiWith, {
+        kind: 'delta',
+        startFrame,
+        durationFrames: FOOD_DELTA_FRAMES,
+        blocksInput: false,
+        params: { target: 'food', delta: foodGain },
+      })
+    }
     uiWith = enqueueAnim(uiWith, {
       kind: 'delta',
       startFrame,

@@ -145,6 +145,10 @@ Determinism:
 
 - **Ordering & constraints**: some features are interdependent. Prefer grouping coupled placement into one placer rather than introducing a general dependency solver early.
 - **Testability**: add a small “worldgen determinism” test harness (same seed → same feature layout) before moving the more complex placers.
+- **Failure modes**: today’s “place until count is reached” loops can hang if constraints become unsatisfiable. Worldgen steps should have a bounded attempt budget and fail loudly with seed + step name.
+- **Context objects over positional args**: standardize placer callback signatures to accept a single ctx object (`{ x, y, rng }`) so call sites aren’t forced to thread unused params.
+- **Shared helpers for repeated math**: extract and reuse clamp helpers (e.g. min torus Manhattan distance clamping) instead of copy/paste between placers.
+- **Separate data from logic**: keep tuning/name pools/offer sets in one place per feature; keep placement mechanics small and composable.
 
 ---
 

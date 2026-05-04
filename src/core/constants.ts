@@ -23,19 +23,19 @@ export const CAMP_COUNT = 3
 export const CAMP_COOLDOWN_MOVES = 3
 export const CAMP_FOOD_GAIN = 2
 
-// v0.3 — Towns
+// v0.3 - Towns
 export const TOWN_COUNT = 2
 export const TOWN_FOOD_BUNDLE = 3
 export const TOWN_TROOPS_BUNDLE = 2
 
-export const TOWN_PRICE_FOOD_MIN = 3
-export const TOWN_PRICE_FOOD_MAX = 6
+export const TOWN_PRICE_FOOD_MIN = 5
+export const TOWN_PRICE_FOOD_MAX = 8
 export const TOWN_PRICE_TROOPS_MIN = 5
 export const TOWN_PRICE_TROOPS_MAX = 10
-export const TOWN_PRICE_SCOUT_MIN = 8
-export const TOWN_PRICE_SCOUT_MAX = 12
-export const TOWN_PRICE_RUMOR_MIN = 3
-export const TOWN_PRICE_RUMOR_MAX = 6
+export const TOWN_PRICE_SCOUT_MIN = 10
+export const TOWN_PRICE_SCOUT_MAX = 15
+export const TOWN_PRICE_RUMOR_MIN = 2
+export const TOWN_PRICE_RUMOR_MAX = 4
 
 
 export const HENGE_COUNT = 3
@@ -47,15 +47,13 @@ export const MAP_GEN_ALGORITHM = MAP_GEN_NOISE
 export const NOISE_SMOOTH_PASSES = 2
 export const NOISE_VALUE_MAX = 10000
 
-// v0.0.9 — Gate + Key
+// v0.0.9 - Gate + Key
 export const BRONZE_KEY_FOOD_COST = 10
 
 
 export const INITIAL_FOOD = 15
 export const INITIAL_GOLD = 15
 export const FOOD_COST_DEFAULT = 1
-// Legacy name retained for now; should match default enter-cost.
-export const FOOD_MOVE_COST = FOOD_COST_DEFAULT
 export const FOOD_COST_MOUNTAIN = 2
 export const FOOD_COST_SWAMP = 2
 export const FOOD_WARNING_THRESHOLD = 5
@@ -63,42 +61,55 @@ export const FOOD_WARNING_THRESHOLD = 5
 export const FARM_COUNT = 3
 export const FARM_COOLDOWN_MOVES = 3
 
-export const TERRAIN_KINDS = ['grass', 'road', 'mountain', 'lake', 'swamp', 'woods', 'rainbow'] as const satisfies readonly TerrainKind[]
-export const FEATURE_KINDS = ['gate', 'gateOpen', 'locksmith', 'signpost', 'farm', 'camp', 'henge', 'town'] as const satisfies readonly FeatureKind[]
+// v0.4 - Placed lakes / rainbow ends + farm/locksmith tuning
+export const FISHING_LAKE_COUNT = 6
+export const FISHING_LAKE_COOLDOWN_MOVES = 3
+export const RAINBOW_END_COUNT = 2
+export const RAINBOW_END_MIN_DISTANCE = 7
+export const RAINBOW_END_GOLD_PAYOUT = 30
+
+export const FARM_BUY_FOOD_GOLD_COST = 3
+export const FARM_BUY_FOOD_AMOUNT = 3
+export const FARM_BEAST_GOLD_MIN = 10
+export const FARM_BEAST_GOLD_MAX = 15
+export const BEAST_CARRY_CAP_BONUS = 50
+
+export const LOCKSMITH_KEY_FOOD_COST = 10
+export const LOCKSMITH_KEY_GOLD_COST = 20
+
+export const TERRAIN_KINDS = ['grass', 'road', 'mountain', 'grass', 'swamp', 'woods', 'road'] as const satisfies readonly TerrainKind[]
+export const FEATURE_KINDS = [
+  'gate',
+  'gateOpen',
+  'locksmith',
+  'signpost',
+  'farm',
+  'camp',
+  'henge',
+  'town',
+  'fishingLake',
+  'rainbowEnd',
+] as const satisfies readonly FeatureKind[]
 
 export const TERRAIN: Record<TerrainKind, { spriteId: number }> = {
   grass: { spriteId: SPRITES.tiles.plains },
   road: { spriteId: SPRITES.tiles.gravel },
   mountain: { spriteId: SPRITES.tiles.mountains },
-  lake: { spriteId: SPRITES.tiles.lake },
   swamp: { spriteId: SPRITES.tiles.swamp },
   woods: { spriteId: SPRITES.tiles.woods },
-  rainbow: { spriteId: SPRITES.tiles.rainbow },
 }
 
-export const FEATURES: Record<FeatureKind, { spriteId: number }> & {
-  farm: { spriteId: number; count: number; cooldownMoves: number }
-  camp: { spriteId: number; count: number; cooldownMoves: number; foodGain: number }
-  signpost: { spriteId: number; count: number }
-  town: { spriteId: number; count: number }
-  gate: { spriteId: number }
-  gateOpen: { spriteId: number }
-  locksmith: { spriteId: number }
-  henge: { spriteId: number; count: number }
-} = {
+export const FEATURES: Record<FeatureKind, { spriteId: number }> = {
   gate: { spriteId: SPRITES.interactivePois.gate },
   gateOpen: { spriteId: SPRITES.interactivePois.gateOpen },
   locksmith: { spriteId: SPRITES.interactivePois.locksmith },
-  signpost: { spriteId: SPRITES.tiles.signpost, count: SIGNPOST_COUNT },
-  farm: { spriteId: SPRITES.tiles.farm, count: FARM_COUNT, cooldownMoves: FARM_COOLDOWN_MOVES },
-  camp: {
-    spriteId: SPRITES.interactivePois.camp,
-    count: CAMP_COUNT,
-    cooldownMoves: CAMP_COOLDOWN_MOVES,
-    foodGain: CAMP_FOOD_GAIN,
-  },
-  henge: { spriteId: SPRITES.interactivePois.henge, count: HENGE_COUNT },
-  town: { spriteId: SPRITES.interactivePois.town, count: TOWN_COUNT },
+  signpost: { spriteId: SPRITES.tiles.signpost },
+  farm: { spriteId: SPRITES.tiles.farm },
+  camp: { spriteId: SPRITES.interactivePois.camp },
+  henge: { spriteId: SPRITES.interactivePois.henge },
+  town: { spriteId: SPRITES.interactivePois.town },
+  fishingLake: { spriteId: SPRITES.tiles.lake },
+  rainbowEnd: { spriteId: SPRITES.tiles.rainbow },
 }
 
 export function spriteIdForKind(kind: CellKind): number {
@@ -106,10 +117,8 @@ export function spriteIdForKind(kind: CellKind): number {
     case 'grass':
     case 'road':
     case 'mountain':
-    case 'lake':
     case 'swamp':
     case 'woods':
-    case 'rainbow':
       return TERRAIN[kind].spriteId
     case 'gate':
     case 'gateOpen':
@@ -119,6 +128,8 @@ export function spriteIdForKind(kind: CellKind): number {
     case 'camp':
     case 'henge':
     case 'town':
+    case 'fishingLake':
+    case 'rainbowEnd':
       return FEATURES[kind].spriteId
   }
 }
@@ -128,10 +139,8 @@ export function terrainLoreLinesForKind(kind: CellKind): readonly string[] {
     case 'grass':
     case 'road':
     case 'mountain':
-    case 'lake':
     case 'swamp':
     case 'woods':
-    case 'rainbow':
       return TERRAIN_LORE_BY_KIND[kind]
     case 'gate':
     case 'gateOpen':
@@ -141,6 +150,8 @@ export function terrainLoreLinesForKind(kind: CellKind): readonly string[] {
     case 'camp':
     case 'henge':
     case 'town':
+    case 'fishingLake':
+    case 'rainbowEnd':
       return []
   }
 }
@@ -149,7 +160,7 @@ export const FOOD_DELTA_FRAMES = 24
 
 // Lore strings + name pools are defined in `lore.ts`.
 
-// v0.1 — Lost (per-tile event roll + teleport)
+// v0.1 - Lost (per-tile event roll + teleport)
 export const WOODS_AMBUSH_PERCENT = 15
 export const WOODS_LOST_PERCENT = 10
 export const MOUNTAIN_AMBUSH_PERCENT = 25
@@ -157,8 +168,6 @@ export const SWAMP_LOST_PERCENT = 20
 export const TELEPORT_MIN_DISTANCE = 4
 // LOST_* are defined in `lore.ts`.
 
-export const COMBAT_REWARD_MIN = 5
-export const COMBAT_REWARD_MAX = 15
 export const COMBAT_GOLD_REWARD_MIN = 8
 export const COMBAT_GOLD_REWARD_MAX = 20
 export const COMBAT_FOOD_BONUS_MAX = 4 // 0..4
@@ -185,6 +194,14 @@ export const ACTION_TOWN_BUY_TROOPS = 'buyTroops' as const
 export const ACTION_TOWN_HIRE_SCOUT = 'hireScout' as const
 export const ACTION_TOWN_BUY_RUMOR = 'buyRumors' as const
 export const ACTION_TOWN_LEAVE = 'TOWN_LEAVE' as const
+
+export const ACTION_FARM_BUY_FOOD = 'FARM_BUY_FOOD' as const
+export const ACTION_FARM_BUY_BEAST = 'FARM_BUY_BEAST' as const
+export const ACTION_FARM_LEAVE = 'FARM_LEAVE' as const
+
+export const ACTION_LOCKSMITH_PAY_GOLD = 'LOCKSMITH_PAY_GOLD' as const
+export const ACTION_LOCKSMITH_PAY_FOOD = 'LOCKSMITH_PAY_FOOD' as const
+export const ACTION_LOCKSMITH_LEAVE = 'LOCKSMITH_LEAVE' as const
 
 export const MOVE_SLIDE_FRAMES = 15
 export const LORE_MAX_CHARS_PER_LINE = 19

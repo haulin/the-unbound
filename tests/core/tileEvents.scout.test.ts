@@ -5,7 +5,7 @@ import { rollMoveEvent } from '../../src/core/mechanics/moveEvents'
 
 function findSeedForPercentileInRange(args: { stepCount: number; cellId: number; minInclusive: number; maxExclusive: number }): number {
   for (let seed = 1; seed < 200000; seed++) {
-    const p = RNG._keyedIntExclusive({ seed, stepCount: args.stepCount, cellId: args.cellId }, 100)
+    const p = RNG.keyedIntExclusive({ seed, stepCount: args.stepCount, cellId: args.cellId }, 100)
     if (p >= args.minInclusive && p < args.maxExclusive) return seed
   }
   throw new Error('seed not found')

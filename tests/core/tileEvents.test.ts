@@ -9,12 +9,12 @@ import { rollMoveEvent } from '../../src/core/mechanics/moveEvents'
 import { RNG } from '../../src/core/rng'
 
 function percentile(seed: number, stepCount: number, cellId: number) {
-  return RNG._keyedIntExclusive({ seed, stepCount, cellId }, 100)
+  return RNG.keyedIntExclusive({ seed, stepCount, cellId }, 100)
 }
 
 describe('rollMoveEvent', () => {
-  it('grass / road / lake / rainbow yield no event', () => {
-    for (const kind of ['grass', 'road', 'lake', 'rainbow'] as const) {
+  it('grass / road yield no event', () => {
+    for (const kind of ['grass', 'road'] as const) {
       const out = rollMoveEvent({ seed: 1, stepCount: 1, cellId: 1, cell: { kind }, hasScout: false })
       expect(out).toBe(null)
     }

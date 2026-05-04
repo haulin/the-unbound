@@ -1,6 +1,9 @@
 import {
   ENABLE_ANIMATIONS,
+  FARM_BUY_FOOD_GOLD_COST,
   FOOD_WARNING_THRESHOLD,
+  LOCKSMITH_KEY_FOOD_COST,
+  LOCKSMITH_KEY_GOLD_COST,
   LORE_MAX_CHARS_PER_LINE,
   LOST_COORD_LABEL,
 } from '../../core/constants'
@@ -94,7 +97,7 @@ function loreLinesForMessage(message: string, maxChars: number): LoreLine[] {
 // ----------------------------
 function drawIllustrationWithTextureOverlay(spriteId: number, x: number, y: number) {
   spr(spriteId, x, y, -1, UI.UI_ILLUSTRATION_SCALE, 0, 0, 2, 2)
-  // Texture overlay: tile an 8×8 sprite over the 64×64 illustration.
+  // Texture overlay: tile an 8x8 sprite over the 64x64 illustration.
   // Key off a non-black color so the grain can use black safely.
   const illPx = 16 * UI.UI_ILLUSTRATION_SCALE
   for (let oy = 0; oy < illPx; oy += UI.UI_TEXTURE_TILE_PX) {
@@ -120,7 +123,7 @@ function drawMap(s: State, x: number, y: number, sizePx: number) {
   const px = s.player.position.x
   const py = s.player.position.y
 
-  // Tile background: stamp the 8×8 map background sprite (visible area is 6×6), aligned top-left.
+  // Tile background: stamp the 8x8 map background sprite (visible area is 6x6), aligned top-left.
   for (let vy = -radius; vy <= radius; vy++) {
     for (let vx = -radius; vx <= radius; vx++) {
       spr(SPRITES.ui8x8.mapBackground, centerX + vx * pitch, centerY + vy * pitch, 0)
@@ -137,7 +140,7 @@ function drawMap(s: State, x: number, y: number, sizePx: number) {
   }
 
   // Player marker never disappears on the rolling map.
-  // 8×8 outline sprite, inset -1,-1 so it surrounds the full pitch cell.
+  // 8x8 outline sprite, inset -1,-1 so it surrounds the full pitch cell.
   spr(SPRITES.ui8x8.mapHereMarker, centerX - 1, centerY - 1, 0)
 }
 
@@ -151,9 +154,7 @@ function drawLeftPanel(s: State) {
     fallbackBorderColor: UI.UI_COLOR_DIM,
   })
 
-  const isCombat = !!(s.encounter && s.encounter.kind === 'combat')
-  const isCamp = !!(s.encounter && s.encounter.kind === 'camp')
-  const isTown = !!(s.encounter && s.encounter.kind === 'town')
+  const encounterKind = s.encounter?.kind ?? null
   const pos = s.player.position
   const spriteIdAtPos = getSpriteIdAt(s.world, pos.x, pos.y)
   const leftPanel = s.ui.leftPanel
@@ -173,11 +174,11 @@ function drawLeftPanel(s: State) {
     // Game over: use a fixed tombstone illustration.
     drawIllustrationWithTextureOverlay(SPRITES.cosmetics.tombstoneIllustration, illX, illY)
   } else {
-    if (!isCombat && !isCamp && !isTown) {
+    if (!encounterKind) {
       drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
-    } else if (isCombat) {
-      // Combat preview: use the 64×64 illustration space as a composite.
-      // - Render the underlying tile as a full 64×64 preview.
+    } else if (encounterKind === 'combat') {
+      // Combat preview: use the 64x64 illustration space as a composite.
+      // - Render the underlying tile as a full 64x64 preview.
       // - Overlay a small "enemy stats" plate on top (filled + bordered),
       //   using the same icon/value/delta layout constants as the player stats.
       drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
@@ -223,7 +224,7 @@ function drawLeftPanel(s: State) {
           xCursor += label.length * 6 + UI.UI_DELTA_GAP_PX
         }
       }
-    } else if (isCamp) {
+    } else if (encounterKind === 'camp') {
       // Camp preview: underlying tile + up to three stacked stat lines.
       drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
 
@@ -260,7 +261,7 @@ function drawLeftPanel(s: State) {
           }
         }
       }
-    } else {
+    } else if (encounterKind === 'town') {
       // Town preview: show offer prices.
       drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
 
@@ -306,6 +307,65 @@ function drawLeftPanel(s: State) {
           }
         }
       }
+    } else if (encounterKind === 'farm') {
+      // Farm preview: keep the tile preview; show farm shop costs.
+      drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
+
+      const here = s.world.cells[pos.y]![pos.x]!
+      if (here.kind === 'farm') {
+        type Line = { spriteId: number; text: string; color: number }
+        const lines: Line[] = [
+          { spriteId: SPRITES.stats.food, text: `-${FARM_BUY_FOOD_GOLD_COST | 0}`, color: UI.UI_COLOR_TEXT },
+          { spriteId: SPRITES.cosmetics.beastIllustration, text: `-${here.beastGoldCost | 0}`, color: UI.UI_COLOR_TEXT },
+        ]
+
+        const platePad = UI.UI_COMBAT_PREVIEW_PLATE_PAD
+        const plateW = UI.UI_COMBAT_PREVIEW_PLATE_W
+        const plateH = 16 * lines.length + platePad * 2
+        const plateX = illX + illSize - plateW - UI.UI_COMBAT_PREVIEW_PLATE_INSET
+        const plateY = illY + UI.UI_COMBAT_PREVIEW_PLATE_INSET
+        rect(plateX, plateY, plateW, plateH, UI.UI_COLOR_BG)
+        rectb(plateX, plateY, plateW, plateH, UI.UI_COLOR_DIM)
+
+        for (let i = 0; i < lines.length; i++) {
+          const ln = lines[i]!
+          const iconX = plateX + platePad
+          const iconY = plateY + platePad + i * 16
+          spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2)
+
+          const valueX = iconX + UI.UI_FOOD_VALUE_OFFSET_X
+          const valueY = iconY + UI.UI_FOOD_VALUE_OFFSET_Y
+          print(ln.text, valueX, valueY, ln.color)
+        }
+      }
+    } else if (encounterKind === 'locksmith') {
+      // Locksmith preview: keep the tile preview; show key costs (gold or food).
+      drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
+
+      type Line = { spriteId: number; text: string; color: number }
+      const lines: Line[] = [
+        { spriteId: SPRITES.stats.gold, text: `-${LOCKSMITH_KEY_GOLD_COST | 0}`, color: UI.UI_COLOR_TEXT },
+        { spriteId: SPRITES.stats.food, text: `-${LOCKSMITH_KEY_FOOD_COST | 0}`, color: UI.UI_COLOR_TEXT },
+      ]
+
+      const platePad = UI.UI_COMBAT_PREVIEW_PLATE_PAD
+      const plateW = UI.UI_COMBAT_PREVIEW_PLATE_W
+      const plateH = 16 * lines.length + platePad * 2
+      const plateX = illX + illSize - plateW - UI.UI_COMBAT_PREVIEW_PLATE_INSET
+      const plateY = illY + UI.UI_COMBAT_PREVIEW_PLATE_INSET
+      rect(plateX, plateY, plateW, plateH, UI.UI_COLOR_BG)
+      rectb(plateX, plateY, plateW, plateH, UI.UI_COLOR_DIM)
+
+      for (let i = 0; i < lines.length; i++) {
+        const ln = lines[i]!
+        const iconX = plateX + platePad
+        const iconY = plateY + platePad + i * 16
+        spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2)
+
+        const valueX = iconX + UI.UI_FOOD_VALUE_OFFSET_X
+        const valueY = iconY + UI.UI_FOOD_VALUE_OFFSET_Y
+        print(ln.text, valueX, valueY, ln.color)
+      }
     }
   }
 
@@ -317,7 +377,7 @@ function drawLeftPanel(s: State) {
   // Army gets the hero slot in v0.0.6.
   const armyX = statusX
   const armyY = statusY
-  spr(SPRITES.stats.troop, armyX, armyY, -1, 1, 0, 0, 2, 2) // 16×16
+  spr(SPRITES.stats.troop, armyX, armyY, -1, 1, 0, 0, 2, 2) // 16x16
   const armyValueX = armyX + UI.UI_ARMY_VALUE_OFFSET_X
   const armyValueY = armyY + UI.UI_ARMY_VALUE_OFFSET_Y
   const armyColor = s.resources.armySize < 6 ? UI.UI_COLOR_WARN : UI.UI_COLOR_TEXT
@@ -325,7 +385,7 @@ function drawLeftPanel(s: State) {
 
   const foodX = statusX
   const foodY = armyY + UI.UI_ARMY_ICON_H_PX + UI.UI_HERO_RESOURCE_GAP_PX
-  spr(SPRITES.stats.food, foodX, foodY, -1, 1, 0, 0, 2, 2) // 16×16
+  spr(SPRITES.stats.food, foodX, foodY, -1, 1, 0, 0, 2, 2) // 16x16
   const foodValueX = foodX + UI.UI_FOOD_VALUE_OFFSET_X
   const foodValueY = foodY + UI.UI_FOOD_VALUE_OFFSET_Y
   const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? UI.UI_COLOR_WARN : UI.UI_COLOR_TEXT
@@ -333,7 +393,7 @@ function drawLeftPanel(s: State) {
 
   const goldX = statusX
   const goldY = foodY + UI.UI_FOOD_ICON_H_PX + UI.UI_HERO_RESOURCE_GAP_PX
-  spr(SPRITES.stats.gold, goldX, goldY, -1, 1, 0, 0, 2, 2) // 16×16
+  spr(SPRITES.stats.gold, goldX, goldY, -1, 1, 0, 0, 2, 2) // 16x16
   const goldValueX = goldX + UI.UI_GOLD_VALUE_OFFSET_X
   const goldValueY = goldY + UI.UI_GOLD_VALUE_OFFSET_Y
   print(`${s.resources.gold}`, goldValueX, goldValueY, UI.UI_COLOR_TEXT)
@@ -422,11 +482,12 @@ function drawRightTopBar(s: State) {
   const iconY = y0 + 2
   const valueY = y0 + 11
 
-  // Right → left status icons inside the bar.
+  // Right -> left status icons inside the bar.
   const iconGap = 2
   let rightInset = 0
   if (s.resources.hasBronzeKey) rightInset += 16 + iconGap
   if (s.resources.hasScout) rightInset += 16 + iconGap
+  if (s.resources.hasTameBeast) rightInset += 16 + iconGap
   if (rightInset) rightInset -= iconGap
 
   const statsMaxX = x0 + w - padX - rightInset
@@ -459,7 +520,7 @@ function drawRightTopBar(s: State) {
   drawStatItem(1, SPRITES.smallStats8x8.position, formatPositionLabel(s))
   drawStatItem(2, SPRITES.smallStats8x8.steps, `${s.run.stepCount}`)
 
-  // Right → left status icons inside the bar.
+  // Right -> left status icons inside the bar.
   let xr = x0 + w - padX - 16
   const bigIconY = y0 + 1
   if (s.resources.hasBronzeKey) {
@@ -468,6 +529,10 @@ function drawRightTopBar(s: State) {
   }
   if (s.resources.hasScout) {
     spr(SPRITES.stats.scout, xr, bigIconY, 0, 1, 0, 0, 2, 2)
+    xr -= 16 + 2
+  }
+  if (s.resources.hasTameBeast) {
+    spr(SPRITES.cosmetics.beastIllustration, xr, bigIconY, 0, 1, 0, 0, 2, 2)
     xr -= 16 + 2
   }
 }
@@ -492,7 +557,7 @@ function getMinimapTilePixels(tileId: number) {
   if (cached) return cached
 
   // TIC-80 can't draw sprites at scale < 1, and JS builds don't expose `sget()`.
-  // Instead, we temporarily draw the 16×16 sprite to a scratch area and sample it via `pix()`.
+  // Instead, we temporarily draw the 16x16 sprite to a scratch area and sample it via `pix()`.
   const scratchX = UI.UI_LEFT_PANEL_PADDING
   const scratchY = UI.UI_LEFT_PANEL_PADDING
   spr(k, scratchX, scratchY, -1, 1, 0, 0, 2, 2)
@@ -500,7 +565,7 @@ function getMinimapTilePixels(tileId: number) {
   const out: number[] = []
   for (let py = 0; py < MINIMAP_CELL_PX; py++) {
     for (let px = 0; px < MINIMAP_CELL_PX; px++) {
-      // Center-crop: sample the middle 6×6 of the 16×16 sprite.
+      // Center-crop: sample the middle 6x6 of the 16x16 sprite.
       const off = ((16 - MINIMAP_CELL_PX) / 2) | 0
       const sx = scratchX + off + px
       const sy = scratchY + off + py
@@ -508,7 +573,7 @@ function getMinimapTilePixels(tileId: number) {
     }
   }
 
-  // Clear scratch (it sits inside the 64×64 block we redraw anyway).
+  // Clear scratch (it sits inside the 64x64 block we redraw anyway).
   rect(scratchX, scratchY, 16, 16, UI.UI_COLOR_BG)
 
   MINIMAP_TILE_CACHE[k] = out

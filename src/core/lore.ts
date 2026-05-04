@@ -8,14 +8,16 @@ Mechanics index (keep this list current):
 
 - Resources
   - Army: combat unit and HP; hits 0 = game over.
-  - Food: depletes 1/move, 2 on mountains/swamps; hits 0 reduces army;
+  - Food: depletes 1/move, 2 on mountains/swamps; hits 0 reduces army.
+  - Food carry cap: 2 per soldier (+50 if you have a tame beast). Excess food gains clamp to the cap.
   - Scout
     - Halves woods/swamp lost chance (floor).
     - Map reveal: when oriented, Scout reveals farms/camps/henges globally; gate/locksmith remain gated by mapping.
   - Bronze key - allows to open Gate, can be only obtained from Locksmith.
+  - Tame beast - one per run, increases food carry cap by +50.
 
 - Navigation
-  - In‑game map
+  - In-game map
     - Toggle map temporarily overrides lore text; closing restores previous text if unchanged.
     - Rendering is platform-specific (see `src/platform/tic80/`); this file holds the player-facing strings.
   - Coords show "??" while lost; woods/swamp can teleport (lost); signpost/farm re-orient (knowsPosition).
@@ -23,13 +25,15 @@ Mechanics index (keep this list current):
 
 - Encounters / POIs
   - Combat: fight/flee; deterministic encounter flavor + exit lines.
-  - Farms: harvest food when ready; cooldown revisit lines.
+  - Farms: modal encounter; buy food (gold), buy tame beast (gold, one per run), or leave.
   - Camps: modal encounter; Search grants deterministic reinforcements when ready; Hire Scout costs food; Leave exits.
   - Henges: combat encounter when ready; cooldown; henge-specific encounter line.
-  - Gate / Locksmith: purchase key with food; gate opens only with key.
+  - Gate / Locksmith: locksmith is modal (pay gold or food) and is skipped if you already have the key; gate opens only with key.
+  - Fishing lakes: placed PoIs; grant 1-3 food when ready; cooldown 3; do not appear on the map.
+  - Rainbow's End: placed PoIs; grant +30 gold once per end (then spent).
   - Woods / Mountains: ambush chance
 
-Note: Not every mechanic must be taught by ambient lore. "Clear tips" can live in a future Tavern/Rumors module.
+Note: Not every mechanic must be taught by ambient lore. Short teaching lines can also live in Town rumors (`BARKEEP_TIPS`).
 */
 
 import type { TerrainKind } from "./types";
@@ -52,6 +56,11 @@ export const BARKEEP_TIPS = {
   movementAndHunger: [
     "Most steps cost 1 ration. Mountains and swamps cost 2.",
     "If you don't have rations, your soldiers will start to starve.",
+  ],
+  carryCapacity: [
+    "You can only carry so many rations: 2 per soldier.",
+    "A tame beast lets you carry 50 more rations.",
+    "If you're already full, you can't buy more rations.",
   ],
   lostAndOrientation: [
     "Woods and swamps can pull you off course.",
@@ -90,6 +99,11 @@ export const LOCKSMITH_PURCHASE_LINES = [
   "They take what you offer and give you what you came for.",
 ] as const;
 
+export const LOCKSMITH_ENTER_LINES = [
+  'The forge offers a key - for a price.',
+  'Heat rolls out from the kiln. The smith waits.',
+] as const;
+
 export const LOCKSMITH_VISITED_LINES = [
   "The forge is cold. The work is done.",
   "Nothing left to make for you here.",
@@ -115,8 +129,6 @@ export const TERRAIN_LORE_BY_KIND: Record<TerrainKind, readonly string[]> = {
     "A track worn down by those who never stopped walking.",
     "The dust rises and settles like it has done this before.",
   ],
-  lake: ["The water is still. Something moves beneath."],
-  rainbow: ["The light here bends wrong."],
   mountain: [
     "The peaks ahead do not look closer. Stone and thin air. Your supplies will feel it.",
     "Narrow passes. Notorious for ambushes.",
@@ -188,10 +200,58 @@ export const FARM_HARVEST_LINES = [
   "The farmer is long gone. The food remains.",
 ] as const;
 
+export const FARM_ENTER_LINES = [
+  "The barn still trades - food for coin, beasts for travelers with purse enough.",
+  "Stalls line the yard: rations, and a pensmith's fee for a steady companion.",
+  "Someone left this place open. Stock and prices are scratched on the door.",
+] as const;
+
+export const FARM_BEAST_ALREADY_LINES = [
+  "You already have a beast at heel. Another would be trouble.",
+  "One is enough - the pen is closed to you.",
+  "Your pack-beast is already yours. No second sale today.",
+] as const;
+
+export const FARM_BUY_FOOD_LINES = [
+  "Sacks changed hands. The barn nod is all the thanks you get.",
+  "Fair weight on the scale - you count every parcel twice.",
+  "The trade is quick; hunger won't be, if you ration well.",
+] as const;
+
+export const FARM_BUY_BEAST_LINES = [
+  "Coins pass; a horned head lowers, then follows.",
+  "The handler knots the lead - yours now, for better or worse.",
+  "Lean muscle, patient eyes. It will carry more than you alone.",
+] as const;
+
 export const FARM_REVISIT_LINES = [
   "You already took what there was.",
   "The stores are empty now. Come back later.",
   "Nothing left here. It will regrow in time.",
+] as const;
+
+export const FISHING_LAKE_READY_LINES = [
+  "A tug on the line. Supper tonight.",
+  "The lake gives. You pack it away.",
+  "Silver flicker - then weight. Rations secured.",
+] as const;
+
+export const FISHING_LAKE_COOLDOWN_LINES = [
+  "The fish aren't biting. Not yet.",
+  "Still water. Give it time.",
+  "Nothing on the hook. Later, maybe.",
+] as const;
+
+export const RAINBOW_END_PAYOUT_LINES = [
+  "The arc ends here - with weight in your purse.",
+  "Light pools where the road stops. Coins find you.",
+  "A small fortune in what the sky left behind - not for long, but enough.",
+] as const;
+
+export const RAINBOW_END_SPENT_LINES = [
+  "Only a memory of color now. Nothing left to take.",
+  "The rainbow has moved on. So should you.",
+  "You already claimed what lingered here.",
 ] as const;
 
 export const CAMP_RECRUIT_LINES = [

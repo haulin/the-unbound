@@ -215,10 +215,8 @@ export const RNG = {
   createStreamRandom,
   createStreamRandomFromSeed,
 
-  // Minimal primitives for mechanics/tests that need explicit keyed/stream draws.
-  _seedToRngState: seedToRngState,
-  _int: randInt,
-  _keyedIntExclusive: pickIntExclusive,
-  _keyedIntInRange: pickIntInRange,
+  // Keyed deterministic helpers (stable, no global rngState consumption).
+  keyedIntExclusive: pickIntExclusive,
+  keyedIntInRange: pickIntInRange,
 } as const
 

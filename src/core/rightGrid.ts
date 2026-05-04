@@ -6,7 +6,7 @@ import {
   ACTION_TOGGLE_MINIMAP,
 } from './constants'
 import { SPRITES } from './spriteIds'
-import type { Action, State, TownOfferKind } from './types'
+import type { Action, State } from './types'
 import { MECHANIC_INDEX } from './mechanics'
 
 const { rightGridByEncounterKind } = MECHANIC_INDEX
@@ -17,15 +17,6 @@ export type RightGridCellDef = {
   spriteId?: number
   tilePreview?: RightGridTilePreview
   action?: Action | null
-}
-
-export function spriteIdForTownOffer(o: TownOfferKind | undefined): number | null {
-  if (!o) return null
-  if (o === 'buyFood') return SPRITES.buttons.food
-  if (o === 'buyTroops') return SPRITES.buttons.troop
-  if (o === 'hireScout') return SPRITES.buttons.scout
-  if (o === 'buyRumors') return SPRITES.buttons.rumorTip
-  return null
 }
 
 export function getRightGridCellDef(s: State, row: number, col: number): RightGridCellDef {

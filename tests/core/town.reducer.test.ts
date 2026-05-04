@@ -13,6 +13,7 @@ import {
   TOWN_SCOUT_ALREADY_HAVE_LINES,
   TOWN_SCOUT_HIRE_LINES,
 } from '../../src/core/constants'
+import { FOOD_CARRY_FULL_MESSAGE } from '../../src/core/foodCarry'
 import { RNG } from '../../src/core/rng'
 import type { Cell, DeltaAnim, GridTransitionAnim, State, TownCell, World } from '../../src/core/types'
 
@@ -50,7 +51,7 @@ function makeState(seed = 7): State {
     world,
     player: { position: { x: 1, y: 1 } },
     run: { stepCount: 10, hasWon: false, isGameOver: false, knowsPosition: true, path: [], lostBufferStartIndex: null },
-    resources: { food: 0, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false },
+    resources: { food: 0, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
     encounter: { kind: 'town', sourceKind: 'town', sourceCellId: 4, restoreMessage: 'restored' },
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -68,6 +69,17 @@ describe('town reducer', () => {
     const s2 = processAction(s1, { type: ACTION_TOWN_BUY_FOOD })!
     expect(s2.resources.gold).toBe(0)
     expect(s2.resources.food).toBe(6)
+  })
+
+  it('buy food when at carry cap: no gold or food change; carry-full message', () => {
+    const s0 = makeState()
+    s0.resources.food = 10
+    s0.resources.gold = 99
+
+    const next = processAction(s0, { type: ACTION_TOWN_BUY_FOOD })!
+    expect(next.resources.gold).toBe(99)
+    expect(next.resources.food).toBe(10)
+    expect(next.ui.message).toContain(FOOD_CARRY_FULL_MESSAGE)
   })
 
   it('successful buy copy uses a run-global cursor (no repeats across purchases until cycling)', () => {

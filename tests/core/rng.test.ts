@@ -2,29 +2,30 @@ import { describe, expect, it } from 'vitest'
 import { RNG } from '../../src/core/rng'
 
 describe('rng', () => {
-  it('seedToRngState', () => {
-    expect(RNG._seedToRngState(1)).toBe(2779096484)
+  it('createStreamRandomFromSeed starts from a deterministic rngState', () => {
+    expect(RNG.createStreamRandomFromSeed(1).rngState).toBe(2779096484)
   })
 
-  it('int', () => {
-    expect(RNG._int(1, 10).value).toBe(9)
+  it('createStreamRandom.intExclusive', () => {
+    const r = RNG.createStreamRandom(1)
+    expect(r.intExclusive(10)).toBe(9)
   })
 
-  it('int normalizes maxExclusive', () => {
-    expect(RNG._int(1, 0).value).toBe(0)
-    expect(RNG._int(1, -10).value).toBe(0)
-    expect(RNG._int(1, NaN).value).toBe(0)
-    expect(RNG._int(1, 1.9).value).toBe(0)
+  it('intExclusive normalizes maxExclusive', () => {
+    const r = RNG.createStreamRandom(1)
+    expect(r.intExclusive(0)).toBe(0)
+    expect(r.intExclusive(-10)).toBe(0)
+    expect(r.intExclusive(NaN)).toBe(0)
+    expect(r.intExclusive(1.9)).toBe(0)
   })
 
-  it('int golden vector (rng progression)', () => {
-    let rng = 1
+  it('intExclusive golden vector (rng progression)', () => {
+    const r = RNG.createStreamRandom(1)
     const maxes = [10, 8, 3, 1, 0, -1, 1.9]
     const out: Array<[number, number]> = []
     for (let i = 0; i < maxes.length; i++) {
-      const r = RNG._int(rng, maxes[i]!)
-      rng = r.rngState
-      out.push([r.rngState, r.value])
+      const value = r.intExclusive(maxes[i]!)
+      out.push([r.rngState, value])
     }
     expect(out).toEqual([
       [270369, 9],

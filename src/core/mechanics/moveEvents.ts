@@ -31,7 +31,7 @@ export function rollMoveEvent(args: {
 
   if (ambushPercent + lostPercent === 0) return null
 
-  const percentile = RNG._keyedIntExclusive({ seed, stepCount, cellId }, 100)
+  const percentile = RNG.keyedIntExclusive({ seed, stepCount, cellId }, 100)
   const hazardSource: MoveEventSource | null =
     kind === 'woods' || kind === 'swamp' || kind === 'mountain' || kind === 'henge' ? kind : null
   if (!hazardSource) return null

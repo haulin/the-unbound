@@ -13,7 +13,7 @@ function makeWorld(): World {
     height: 4,
     mapGenAlgorithm: 'TEST',
     cells: [
-      [{ kind: 'farm', id: 1, name: 'F', nextReadyStep: 0 }, { kind: 'camp', id: 2, name: 'C', nextReadyStep: 0 }, { kind: 'henge', id: 3, name: 'H', nextReadyStep: 0 }, { kind: 'gate' }],
+      [{ kind: 'farm', id: 1, name: 'F', beastGoldCost: 10 }, { kind: 'camp', id: 2, name: 'C', nextReadyStep: 0 }, { kind: 'henge', id: 3, name: 'H', nextReadyStep: 0 }, { kind: 'gate' }],
       [
         { kind: 'locksmith' },
         {
@@ -39,7 +39,7 @@ function makeState(): State {
     world: makeWorld(),
     player: { position: { x: 0, y: 0 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: 10, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false },
+    resources: { food: 10, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }

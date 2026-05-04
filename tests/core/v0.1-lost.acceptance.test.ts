@@ -4,6 +4,7 @@ import {
   ACTION_MOVE,
   ACTION_NEW_RUN,
   INITIAL_FOOD,
+  INITIAL_ARMY_SIZE,
   LOST_COORD_LABEL,
   LOST_FLAVOR_LINES,
   SWAMP_LOST_PERCENT,
@@ -47,7 +48,7 @@ function makeState(world: World): State {
     world,
     player: { position: { x: 2, y: 1 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: INITIAL_FOOD, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false },
+    resources: { food: INITIAL_FOOD, gold: 0, armySize: INITIAL_ARMY_SIZE, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -56,7 +57,7 @@ function makeState(world: World): State {
 // Find a {seed, stepCount, cellId} where the percentile lands in [lo, hi).
 function findEventSeed(opts: { stepCount: number; cellId: number; lo: number; hi: number }): number {
   for (let seed = 1; seed < 200000; seed++) {
-    const p = RNG._keyedIntExclusive({ seed, stepCount: opts.stepCount, cellId: opts.cellId }, 100)
+    const p = RNG.keyedIntExclusive({ seed, stepCount: opts.stepCount, cellId: opts.cellId }, 100)
     if (p >= opts.lo && p < opts.hi) return seed
   }
   throw new Error('no seed found in range')
@@ -79,7 +80,7 @@ describe('v0.1 lost acceptance', () => {
 
   // S3
   it('stepping onto a farm orients the player', () => {
-    const s = makeState(blankWorld({ center: { kind: 'farm', id: 12, name: 'The Stemming', nextReadyStep: 0 } }))
+    const s = makeState(blankWorld({ center: { kind: 'farm', id: 12, name: 'The Stemming', beastGoldCost: 10 } }))
     const next = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     expect(next.run.knowsPosition).toBe(true)
   })
@@ -130,7 +131,7 @@ describe('v0.1 lost acceptance', () => {
     const dy = torusDelta(before.y, next.player.position.y, 5)
     expect(manhattan(dx, dy)).toBeGreaterThanOrEqual(TELEPORT_MIN_DISTANCE)
     const dest = next.world.cells[next.player.position.y]![next.player.position.x]!
-    expect(['grass', 'road', 'mountain', 'lake', 'swamp', 'woods', 'rainbow']).toContain(dest.kind)
+    expect(['grass', 'road', 'mountain', 'swamp', 'woods']).toContain(dest.kind)
     expect(next.run.knowsPosition).toBe(false)
     const flavor: readonly string[] = LOST_FLAVOR_LINES
     expect(flavor.includes(next.ui.message)).toBe(true)

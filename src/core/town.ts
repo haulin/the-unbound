@@ -7,19 +7,15 @@ import {
   BARKEEP_TIPS,
   ENABLE_ANIMATIONS,
   FOOD_DELTA_FRAMES,
-  GRID_TRANSITION_STEP_FRAMES,
   TOWN_BUY_LINES,
   TOWN_NO_GOLD_LINES,
   TOWN_SCOUT_ALREADY_HAVE_LINES,
   TOWN_SCOUT_HIRE_LINES,
 } from './constants'
 import type { Action, Resources, State, TownCell, Ui } from './types'
+import { foodCarryCap, FOOD_CARRY_FULL_MESSAGE, resourcesWithClampedFoodIfNeeded } from './foodCarry'
 import { RNG } from './rng'
-import { enqueueAnim } from './uiAnim'
-
-function gridTransitionDurationFrames(): number {
-  return Math.max(1, Math.trunc(GRID_TRANSITION_STEP_FRAMES)) * 5
-}
+import { enqueueAnim, enqueueGridTransition } from './uiAnim'
 
 function getTownAtPlayer(s: State): TownCell | null {
   const p = s.player.position
@@ -73,26 +69,26 @@ export function reduceTownAction(prevState: State, action: Action): State | null
     const restore = enc.restoreMessage
     const baseUi: Ui = { ...prevState.ui, message: restore }
     if (!ENABLE_ANIMATIONS) return { ...prevState, encounter: null, ui: baseUi }
-    const startFrame = baseUi.clock.frame
-    const uiWith = enqueueAnim(baseUi, {
-      kind: 'gridTransition',
-      startFrame,
-      durationFrames: gridTransitionDurationFrames(),
-      blocksInput: true,
-      params: { from: 'town', to: 'overworld' },
-    })
+    const uiWith = enqueueGridTransition(baseUi, { from: 'town', to: 'overworld' })
     return { ...prevState, encounter: null, ui: uiWith }
   }
 
   if (action.type === ACTION_TOWN_BUY_FOOD) {
+    const cap = foodCarryCap(prevRes)
+    if (prevRes.food >= cap) {
+      return setMessage(FOOD_CARRY_FULL_MESSAGE)
+    }
+
     const cost = town.prices.foodGold
     if (prevRes.gold < cost) return noGold()
 
-    const nextResources: Resources = {
+    const nextResourcesRaw: Resources = {
       ...prevRes,
       gold: prevRes.gold - cost,
       food: prevRes.food + town.bundles.food,
     }
+    const nextResources = resourcesWithClampedFoodIfNeeded(nextResourcesRaw)
+    const foodGain = nextResources.food - prevRes.food
 
     const pick = rnd.advanceCursor('town.buyFeedback', TOWN_BUY_LINES)
     const nextRun = pick.nextState.run
@@ -109,13 +105,15 @@ export function reduceTownAction(prevState: State, action: Action): State | null
       blocksInput: false,
       params: { target: 'gold', delta: -cost },
     })
-    uiWith = enqueueAnim(uiWith, {
-      kind: 'delta',
-      startFrame,
-      durationFrames: FOOD_DELTA_FRAMES,
-      blocksInput: false,
-      params: { target: 'food', delta: town.bundles.food },
-    })
+    if (foodGain) {
+      uiWith = enqueueAnim(uiWith, {
+        kind: 'delta',
+        startFrame,
+        durationFrames: FOOD_DELTA_FRAMES,
+        blocksInput: false,
+        params: { target: 'food', delta: foodGain },
+      })
+    }
     return { ...prevState, run: nextRun, resources: nextResources, ui: uiWith }
   }
 

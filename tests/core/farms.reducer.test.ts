@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
 import {
+  ACTION_FARM_LEAVE,
   ACTION_MOVE,
-  ENABLE_ANIMATIONS,
-  FARM_COOLDOWN_MOVES,
-  FARM_REVISIT_LINES,
   INITIAL_FOOD,
 } from '../../src/core/constants'
-import type { DeltaAnim, State, World } from '../../src/core/types'
+import { foodCarryCap } from '../../src/core/foodCarry'
+import type { State, World } from '../../src/core/types'
 
 function makeWorld(): World {
   return {
@@ -17,7 +16,7 @@ function makeWorld(): World {
     mapGenAlgorithm: 'TEST',
     cells: [
       [{ kind: 'grass' }, { kind: 'grass' }, { kind: 'grass' }],
-      [{ kind: 'grass' }, { kind: 'farm', id: 4, name: 'Greyfield', nextReadyStep: 0 }, { kind: 'grass' }],
+      [{ kind: 'grass' }, { kind: 'farm', id: 4, name: 'Greyfield', beastGoldCost: 10 }, { kind: 'grass' }],
       [{ kind: 'grass' }, { kind: 'grass' }, { kind: 'grass' }],
     ],
     rngState: 123,
@@ -29,8 +28,16 @@ function makeState(): State {
   return {
     world: w,
     player: { position: { x: 1, y: 0 } },
-    run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: INITIAL_FOOD, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false },
+    run: {
+      stepCount: 0,
+      hasWon: false,
+      isGameOver: false,
+      knowsPosition: false,
+      path: [],
+      lostBufferStartIndex: null,
+      copyCursors: {},
+    },
+    resources: { food: INITIAL_FOOD, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -42,50 +49,32 @@ describe('farms + food reducer', () => {
     s.resources.food = 0
     s.resources.armySize = 5
 
-    // Move onto a non-farm tile.
     const next = processAction(s, { type: ACTION_MOVE, dx: 1, dy: 0 })!
 
     expect(next.resources.food).toBe(0)
     expect(next.resources.armySize).toBe(4)
-
-    if (ENABLE_ANIMATIONS) {
-      const foodDeltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'food')
-      expect(foodDeltas.length).toBe(0)
-
-      const armyDeltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'army')
-      expect(armyDeltas.length).toBe(1)
-      expect(armyDeltas[0]!.params.delta).toBe(-1)
-    }
   })
 
-  it('harvests on ready farm, sets cooldown, advances rngState', () => {
+  it('stepping onto farm opens modal encounter; only move food cost applies', () => {
     const s = makeState()
     const beforeRng = s.world.rngState
     const next = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
 
-    expect(next.resources.food).toBeGreaterThan(INITIAL_FOOD - 1)
+    expect(next.encounter?.kind).toBe('farm')
+    const cap = foodCarryCap({ armySize: 5, hasTameBeast: false })
+    expect(next.resources.food).toBe(Math.min(INITIAL_FOOD - 1, cap))
+    expect(next.world.rngState).toBe(beforeRng)
     const cell = next.world.cells[1]![1]!
     expect(cell.kind).toBe('farm')
-    expect(cell.kind === 'farm' ? cell.nextReadyStep : null).toBe(next.run.stepCount + FARM_COOLDOWN_MOVES)
-    expect(next.world.rngState).not.toBe(beforeRng)
-
-    const deltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'food')
-    // expect at least -1 and +gain
-    expect(deltas.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('revisit in cooldown uses deterministic line without advancing rngState', () => {
+  it('leaving farm clears encounter so further MOVE applies', () => {
     let s = makeState()
-    // First, harvest by stepping onto farm
     s = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
-    const harvestedRng = s.world.rngState
-
-    // Move away then back within cooldown window
-    s = processAction(s, { type: ACTION_MOVE, dx: 0, dy: -1 })!
-    const back = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
-
-    expect(back.world.rngState).toBe(harvestedRng)
-    expect(FARM_REVISIT_LINES.some((l) => back.ui.message.includes(l))).toBe(true)
+    expect(s.encounter?.kind).toBe('farm')
+    s = processAction(s, { type: ACTION_FARM_LEAVE })!
+    expect(s.encounter).toBe(null)
+    const next = processAction(s, { type: ACTION_MOVE, dx: 1, dy: 0 })!
+    expect(next.player.position).toEqual({ x: 2, y: 1 })
   })
 })
-

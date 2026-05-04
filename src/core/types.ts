@@ -1,7 +1,13 @@
 import type {
+  ACTION_FARM_BUY_BEAST,
+  ACTION_FARM_BUY_FOOD,
+  ACTION_FARM_LEAVE,
   ACTION_FIGHT,
   ACTION_CAMP_LEAVE,
   ACTION_CAMP_SEARCH,
+  ACTION_LOCKSMITH_LEAVE,
+  ACTION_LOCKSMITH_PAY_FOOD,
+  ACTION_LOCKSMITH_PAY_GOLD,
   ACTION_MOVE,
   ACTION_NEW_RUN,
   ACTION_RETURN,
@@ -19,8 +25,18 @@ import type {
 
 export type Vec2 = { x: number; y: number }
 
-export type TerrainKind = 'grass' | 'road' | 'mountain' | 'lake' | 'swamp' | 'woods' | 'rainbow'
-export type FeatureKind = 'gate' | 'gateOpen' | 'locksmith' | 'signpost' | 'farm' | 'camp' | 'henge' | 'town'
+export type TerrainKind = 'grass' | 'road' | 'mountain' | 'swamp' | 'woods'
+export type FeatureKind =
+  | 'gate'
+  | 'gateOpen'
+  | 'locksmith'
+  | 'signpost'
+  | 'farm'
+  | 'camp'
+  | 'henge'
+  | 'town'
+  | 'fishingLake'
+  | 'rainbowEnd'
 export type CellKind = TerrainKind | FeatureKind
 
 export type TerrainCell = { kind: TerrainKind }
@@ -28,9 +44,11 @@ export type GateCell = { kind: 'gate' }
 export type GateOpenCell = { kind: 'gateOpen' }
 export type LocksmithCell = { kind: 'locksmith' }
 export type SignpostCell = { kind: 'signpost' }
-export type FarmCell = { kind: 'farm'; id: number; name: string; nextReadyStep: number }
+export type FarmCell = { kind: 'farm'; id: number; name: string; beastGoldCost: number }
 export type CampCell = { kind: 'camp'; id: number; name: string; nextReadyStep: number }
 export type HengeCell = { kind: 'henge'; id: number; name: string; nextReadyStep: number }
+export type FishingLakeCell = { kind: 'fishingLake'; id: number; nextReadyStep: number }
+export type RainbowEndCell = { kind: 'rainbowEnd'; id: number; hasPaidOut: boolean }
 
 export type TownOfferKind =
   | typeof ACTION_TOWN_BUY_FOOD
@@ -46,7 +64,18 @@ export type TownCell = {
   bundles: { food: number; troops: number }
 }
 
-export type Cell = TerrainCell | GateCell | GateOpenCell | LocksmithCell | SignpostCell | FarmCell | CampCell | HengeCell | TownCell
+export type Cell =
+  | TerrainCell
+  | GateCell
+  | GateOpenCell
+  | LocksmithCell
+  | SignpostCell
+  | FarmCell
+  | CampCell
+  | HengeCell
+  | FishingLakeCell
+  | RainbowEndCell
+  | TownCell
 
 export type CellGrid = Cell[][]
 
@@ -101,7 +130,10 @@ export type DeltaAnim = BaseAnim & {
 
 export type GridTransitionAnim = BaseAnim & {
   kind: 'gridTransition'
-  params: { from: 'blank' | 'overworld' | 'combat' | 'camp' | 'town'; to: 'overworld' | 'combat' | 'camp' | 'town' }
+  params: {
+    from: 'blank' | 'overworld' | 'combat' | 'camp' | 'town' | 'farm' | 'locksmith'
+    to: 'overworld' | 'combat' | 'camp' | 'town' | 'farm' | 'locksmith'
+  }
 }
 
 export type Anim = MoveSlideAnim | DeltaAnim | GridTransitionAnim
@@ -129,6 +161,7 @@ export type Resources = {
   armySize: number
   hasBronzeKey: boolean
   hasScout: boolean
+  hasTameBeast: boolean
 }
 
 export type CombatEncounter = {
@@ -153,7 +186,21 @@ export type TownEncounter = {
   restoreMessage: string
 }
 
-export type Encounter = CombatEncounter | CampEncounter | TownEncounter
+export type FarmEncounter = {
+  kind: 'farm'
+  sourceKind: 'farm'
+  sourceCellId: number
+  restoreMessage: string
+}
+
+export type LocksmithEncounter = {
+  kind: 'locksmith'
+  sourceKind: 'locksmith'
+  sourceCellId: number
+  restoreMessage: string
+}
+
+export type Encounter = CombatEncounter | CampEncounter | TownEncounter | FarmEncounter | LocksmithEncounter
 
 export type State = { world: World; player: Player; run: Run; resources: Resources; encounter: Encounter | null; ui: Ui }
 
@@ -174,4 +221,10 @@ export type Action =
   | { type: typeof ACTION_TOWN_HIRE_SCOUT }
   | { type: typeof ACTION_TOWN_BUY_RUMOR }
   | { type: typeof ACTION_TOWN_LEAVE }
+  | { type: typeof ACTION_FARM_BUY_FOOD }
+  | { type: typeof ACTION_FARM_BUY_BEAST }
+  | { type: typeof ACTION_FARM_LEAVE }
+  | { type: typeof ACTION_LOCKSMITH_PAY_GOLD }
+  | { type: typeof ACTION_LOCKSMITH_PAY_FOOD }
+  | { type: typeof ACTION_LOCKSMITH_LEAVE }
 

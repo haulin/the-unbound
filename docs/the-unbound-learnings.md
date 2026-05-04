@@ -1,111 +1,69 @@
-# The Unbound prototype v1 — learnings
+# The Unbound — coding guide
 
-## Terms
+This is a short guide for writing maintainable code in this repo. It prioritizes **durable principles** over “what we changed in v0.x”. Deep dives belong in design/plan docs; keep this file lean enough to be safe default context.
 
-**OCP (Open/Closed Principle)**: design modules so they are **open for extension** (you can add new behavior) but **closed for modification** (you don’t have to edit existing control-flow in many places to add it).
+## General principles (mostly repo-agnostic)
 
-In practice: new features should usually be “add a new entry / new function” rather than “touch 4 unrelated switch statements”.
+- **OCP mindset (Open/Closed Principle)**: design modules to be **open for extension** but **closed for modification** — new behavior should often be “add a new module/entry” rather than “edit 4 unrelated switch statements”.
+- **Optimize for the reader**: reduce branching, reduce “where do I look?” tax, name things for clarity.
+- **One source of truth**: don’t keep the same fact in two places (tables, re-exports, string→string maps). Unify types/values so wiring becomes obvious.
+- **Make change vectors explicit**: write down what’s likely to change, then add *just enough* structure to support it. Avoid speculative abstraction.
+- **Keep state simple**: prefer plain data models; keep side-effects localized; keep updates explicit and easy to diff.
+- **Prefer composable seams**: design helper APIs so they can be reused without importing half the codebase (pure functions in, pure values out).
 
-## What worked well (keep for future phases)
+## “Plan-shaped code” vs “human-shaped code”
 
-- **Single plain state + pure reducer**: `processAction(prevState, action) -> nextState` kept gameplay deterministic and iteration safe.
-- **World updates are explicit + localized**: the world is a grid of cells (`world.cells`), and feature state (e.g. cooldowns) is updated immutably by cloning only the touched row + cell.
-- **Button-as-data (extension point)**: representing the 3×3 grid as a mapping of “cell → definition” (preview + onPress) reduces edit sites when buttons change.
-- **RNG boundary discipline**: keep bitwise/u32 concerns in `src/core/rng.ts`; call sites use `src/core/rng.ts` facades (copy vs stream) and plain math.
-- **Sprite single source of truth**: keep sprite numbers in one place (`src/core/spriteIds.ts` as `SPRITES`) and reference `SPRITES.*` directly in gameplay + renderer (avoid “alias layers” that just forward IDs).
+Executing a strict task list tends to produce the minimum structure that passes today’s tests. Humans usually also anticipate *known change vectors* once they’re confirmed.
 
-## What surprised us (and what to do next time)
+- Before implementing, write down the **expected change vectors** (what’s likely to get more cases, more UI states, more mechanics).
+- Add extension points where they reduce future “sprinkled edits”, but avoid speculative abstraction.
 
-- **“Plan-shaped code” vs “human-shaped code”**
-  - Executing a strict task list tends to produce narrowly-scoped structures first.
-  - Human code often anticipates *known change vectors* (e.g. buttons becoming contextual), but only after those vectors are confirmed.
-  - Recommendation: explicitly write down the **expected change vectors** up front, then decide which ones deserve an extension point now vs later.
+## Repo preferences (when multiple approaches exist)
 
-- **UI mode/focus needs one stable concept**
-  - Goal doesn’t move the player but still needs to update the left illustration + message.
-  - Ad-hoc fields per new requirement become a smell.
-  - Recommendation: carry a single stable concept in UI state (e.g. `ui.focusSpriteId` / a “focused thing”), and drive it through the same button pipeline as movement.
+### Mechanics live in mechanic modules
 
-## “Known future change vectors” worth designing for
+Prefer adding/changing gameplay behavior by editing a mechanic module and registering it once, instead of touching multiple switch statements.
 
-- **Contextual buttons**: the 3×3 grid will likely depend on current tile, inventory, encounters, cooldowns, etc.
-  - Recommendation: keep `ButtonDef` style, but make it *contextual* via a pure builder:
-    - `getButtonDefs(state) -> ButtonDef[3][3]` (or a `{key -> def}` map)
-    - Each `ButtonDef` stays pure: `previewSpriteId(state)`, `onPress(state)`.
-  - Keep functions **out of `state`**; `state` stays serializable data.
+- **Where**: `src/core/mechanics/defs/*` + registry in `src/core/mechanics/index.ts`
+- **Why**: reduces “sprinkled logic” and makes extensions mostly “add module + register”.
+- **More**: `docs/plans/2026-05-04-mechanic-modules-registry-design.md` and `docs/refactor-mechanics-encounters-worldgen.md`
 
-- **Animation as progressive enhancement**: movement benefits from continuity/legibility, but animation should not infect game logic.
-  - Recommendation: keep animations as plain data in state (`ui.clock.frame` + `ui.anim.active[]`) advanced only via `TICK`.
-  - Keep one knob to disable all animations (debug/feel comparison, accessibility).
-  - For move transitions, lock input while the transition is active to avoid “multiple moves per blur” feel.
-  - Rendering lesson: if sprites slide, add explicit masking/clipping to the grid bounds each frame; otherwise tiles will “appear from nowhere” / “disappear suddenly” at animation start/end.
+### RNG discipline: don’t perturb simulation for flavor
 
-- **Map generation decision**: we evaluated multiple generators and picked **NOISE** for v2 because it produces small distinct blobs (less “slot machine”), while still avoiding long same-terrain runs that can make limited visibility feel monotonous.
-  - Alternatives considered: IID-per-cell baseline, BLOBS smoothing, DRUNKWALK/carve.
-  - We removed the non-chosen generators from the cart to keep iteration focused (can revisit once final tile taxonomy is locked).
+Be explicit about which kind of “randomness” you need.
 
-## Workflow note (iteration vs elegance loop)
+- **Flavor / copy**: use deterministic keyed picks that do **not** consume `world.rngState`.
+- **Simulation**: consume stream RNG and thread the returned `rngState` forward.
+- **No-repeat feedback**: store cursors in run state (data-only) and advance them explicitly.
+- **More**: `src/core/rng.ts` and `docs/plans/2026-05-02-rng-copy-policy-plan.md`
 
-- For **feel iteration** (UI/UX, tuning counts, copy tone): iterate quickly, keep changes small, and update the design doc when a tweak becomes “the contract”.
-- Once the direction stabilizes: do one “elegance pass” refactor to consolidate geometry/constants and remove accumulated one-off branching.
-- If a UI/layout change has multiple plausible shapes, agree on one approach before implementing (avoid mixing half-solutions).
+### Single-source-of-truth is a rule, not a vibe
 
-## UI rendering learnings (TIC-80 specifics)
+If you notice any of these, treat it as a cleanup candidate:
 
-- **Transparency is part of UI design**: if a hover highlight/tint is drawn behind an icon, the sprite often needs an explicit transparency key (colorkey) so its “background pixels” don’t erase the tint.
-- **Avoid sprite alias layers**: if a UI constant is just `FOO = SPRITES.bar.baz`, prefer using `SPRITES.*` at the call site and keep `uiConstants.ts` for tweakables (layout/spacing/colors).
+- duplicated tables (“same mapping in two files”)
+- re-export stubs that add no meaning
+- “mapping one string to another” just to satisfy a call site
+
+Prefer unifying the underlying concept so the code becomes direct.
+
+### Animation as progressive enhancement
+
+Animation should improve feel/legibility without infecting game logic.
+
+- Prefer **animation as data** advanced by a simple clock/tick, so it can be replaced or disabled without rewriting core mechanics.
+- Prefer **renderer consumes models, not mechanics**: compute deterministic models in core; platform renderers should not replicate game rules.
+
+## Process notes (keep brief)
+
+- **Iterate quickly** while tuning feel/UX/tables; keep diffs small.
+- When direction stabilizes, do an **elegance pass**: consolidate constants, remove one-offs, delete dead exports.
+- **Don’t assume; ask**: when UI/feel seems wrong, gather observations and expectations before attributing a cause.
+- **Choice prompts (ordering)**: when you need a decision, state your recommendation first (with 1–2 reasons), then present the options.
+- **Doc-as-contract during iteration**: once a tweak becomes the baseline, capture it in the relevant design/plan doc; avoid freezing volatile copy strings in docs.
 
 ## Refactor philosophy (boy scout rule)
 
-- **Optimize for the reader**: the cost of writing is not the constraint here — the cost of reading is.
 - **Code churn isn’t the enemy**: refactor freely when it improves clarity and reduces parallel bookkeeping.
-- **“From scratch” test**: ask “Would I design this feature this way from scratch, knowing what I know now?” If not, refactor toward that shape.
-- **Prefer fewer sources of truth**: if data belongs to a thing, store it on the thing (e.g. cooldown on a cell), not in a parallel array “somewhere else”.
-
-## Roadmap architecture note (cell objects)
-
-- World state uses cell objects (`world.cells: Cell[][]`) with a string `kind` per coordinate (e.g. `grass`, `farm`, `camp`).
-- Feature-specific state (like farm/camp cooldowns) lives on the cell itself (`nextReadyStep`) instead of parallel arrays, so adding more PoIs (or richer tiles like towns) doesn’t multiply bookkeeping.
-
-## Type safety note (avoid `any`)
-
-- Prefer **type guards / discriminated unions** over `: any` or `as any`.
-- If you must weaken types, use **`unknown` + narrowing at explicit boundaries**, not deep inside core gameplay code.
-- **Core / reducer surfaces**: prefer **fail-fast, typed `Ui`** in helpers that assume full UI shape — don’t accept `unknown` at those boundaries just to save casts at call sites.
-- If the codebase grows, consider adding linting later (e.g. forbid explicit `any`) — but don’t block prototype iteration on tooling.
-
-## Workflow/meta decisions (v1)
-
-- **Prototype-as-foundation**: optimize for learning speed *and* long-term maintainability. Treat the codebase as something we’ll grow, refactor, and keep readable.
-- **“Don’t assume; ask” norm**: when UI/feel looks wrong, gather the user’s observations before attributing a cause (especially with TIC-80 sprite/rendering quirks).
-- **Choice prompts (ordering)**: when you need a user decision, **state your recommendation first** (with 1–2 reasons), then present the options for selection. Avoid “pick first, pros/cons later” — it feels backwards and wastes the choice UI.
-- **Doc-as-contract during iteration**: once a tweak becomes stable (layout constants, button semantics, signpost count), capture it in the design doc so future diffs have an explicit baseline.
-
-## v0.0.9 — The Key (process + architecture notes)
-
-- **Volatile copy belongs in code**: treat player-facing strings in `src/core/constants.ts` as the source of truth; docs should use “such as” examples and avoid freezing exact wording.
-- **Deterministic flavor without perturbing RNG**:
-  - For copy/flavor lines: use `src/core/rng.ts` (`createTileRandom(...).perMoveLine(...)` or `.stableLine(...)`) so copy does **not** consume `world.rngState`.
-  - For no-repeat action feedback: use `createRunCopyRandom(state).advanceCursor(tag, pool, { salt? })` (cursor stored in `run.copyCursors`).
-  - For simulation randomness: use `createStreamRandom(world.rngState)` and thread the returned `rngState`.
-- **Worldgen constraints need guardrails**: when adding placement constraints (e.g. minimum torus Manhattan distance between features), clamp impossible values and test across many seeds.
-- **Run start should be inert**: on spawn, don’t run tile-enter logic (no signpost clue / auto-buy / auto-win); show only the goal narrative. Tile interactions happen when you move onto tiles.
-
-## v0.1 — Lost (process + architecture notes)
-
-- **Single per-move event roll beats parallel rolls**: when multiple outcomes compete for the same trigger surface (woods → combat or lost), a single percentile-bucketed function (`src/core/tileEvents.ts:rollTileEvent`) makes mutual exclusion structural and each outcome tunable as one knob per terrain. Avoids stacked-density surprises (two independent 25% rolls = 50% any-event).
-- **Tile-enter outcomes carry monotonic flags**: `TileEnterOutcome.knowsPosition?: boolean` mirrors the existing `hasWon?` pattern — handler returns true when applicable, reducer ORs into run state. Same shape lets future flags (visited, etc.) plug in without new wiring.
-- **`gridTransition` anim params encode render mode, not position**: `params.from`/`params.to` only mean blank/overworld/combat. An `'overworld' → 'overworld'` transition is visually inert (renderer resolves both phases against the already-updated `s.player.position`). For "moved without sliding" (teleport), reuse `'blank' → 'overworld'` (run-start reveal). Caveat invisible from tests — caught only by manual smoke. Worth a regression assertion on `s.ui.anim.active` if anim params evolve.
-- **Pure module + RNG-threading reuse**: `src/core/teleport.ts:pickTeleportDestination` follows the same `(args) → { result, rngState }` shape as worldgen `placeFeature`. Composable, replayable, deterministic.
-- **Reuse established pickers before inventing new ones**: prefer `src/core/rng.ts` (copy + stream facades + policies) instead of creating ad-hoc “pick line” helpers in feature modules.
-- **Terrain lore as a pool teaches mechanics through repetition**: `TERRAIN_LORE_BY_KIND` gives event-bearing terrains 3-line pools (one mechanic hint per applicable event + pure flavor). Players learn that woods can ambush *or* dislocate by re-reading; explicit tutorial text not needed. Inert terrains (grass/road/lake/rainbow) stay as single-line pools.
-- **Versioning shifted to MAJOR.MINOR**: patch versions skipped — features that previously would have been v0.1.1 / v0.1.2 are v0.2 / v0.3 instead. Backlog and `package.json` reflect this.
-
-## v0.2 — Map & Scout (process + architecture notes)
-
-- **Encounters as modules (OCP)**: keep `processAction` as an orchestrator and delegate encounter-specific actions to the encounter module (e.g. `reduceCampAction(prevState, action)`), so new encounters add new files instead of growing the main reducer.
-- **Renderer consumes models, not mechanics**: for deterministic previews, compute a core “preview model” (e.g. camp preview values) in core and have platform renderers read it; the renderer should not replicate game calculations.
-- **Non-consuming deterministic picks**: for “random-looking but replay-stable” outcomes that must not perturb unrelated systems (flavor lines, event percentiles, deterministic previews), prefer keyed pickers (seed/stepCount/location + optional salt) over consuming `world.rngState`.
-- **Animation enqueueing can be shared**: keep animation state updates as pure data transforms and extract generic helpers (e.g. enqueue) so encounter modules can add animations without importing reducer internals.
-- **Deterministic shuffle without bitwise mixing**: keep hashing/bitwise in `src/core/rng.ts` (e.g. `shuffledIndices(...)`); feature modules should use `cursorAdvance(...)` / `createRunCopyRandom(...).advanceCursor(...)` instead of hand-rolled shuffles.
+- **“From scratch” test**: ask “Would I design this this way from scratch, knowing what I know now?” If not, refactor toward that shape.
 

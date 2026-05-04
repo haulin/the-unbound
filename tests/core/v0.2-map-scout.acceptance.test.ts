@@ -43,7 +43,7 @@ function makeState(world: World): State {
     world,
     player: { position: { x: 1, y: 0 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: INITIAL_FOOD, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false },
+    resources: { food: INITIAL_FOOD, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -51,7 +51,7 @@ function makeState(world: World): State {
 
 function findSeedForSwampLost(stepCount: number, cellId: number): number {
   for (let seed = 1; seed < 200000; seed++) {
-    const p = RNG._keyedIntExclusive({ seed, stepCount, cellId }, 100)
+    const p = RNG.keyedIntExclusive({ seed, stepCount, cellId }, 100)
     if (p < SWAMP_LOST_PERCENT) return seed
   }
   throw new Error('seed not found')

@@ -18,7 +18,6 @@ import {
   FOOD_DELTA_FRAMES,
   GAME_OVER_LINES,
   GOAL_NARRATIVE,
-  GRID_TRANSITION_STEP_FRAMES,
   HENGE_COOLDOWN_MOVES,
   HENGE_ENCOUNTER_LINE,
   INITIAL_ARMY_SIZE,
@@ -32,6 +31,8 @@ import {
 import { SPRITES } from './spriteIds'
 import { reduceCampAction } from './camp'
 import { cellIdForPos, resolveFightRound, spawnEnemyArmy } from './combat'
+import { reduceFarmAction } from './farmEncounter'
+import { reduceLocksmithAction } from './locksmithEncounter'
 import { reduceTownAction } from './town'
 import { rollMoveEvent } from './mechanics/moveEvents'
 import { pickTeleportDestination } from './teleport'
@@ -58,7 +59,8 @@ import {
   type Vec2,
   type World,
 } from './types'
-import { enqueueAnim } from './uiAnim'
+import { enqueueAnim, enqueueGridTransition } from './uiAnim'
+import { resourcesWithClampedFoodIfNeeded } from './foodCarry'
 
 const { startEncounterByKind } = MECHANIC_INDEX
 const { enterFoodCostByKind } = MECHANIC_INDEX
@@ -110,10 +112,6 @@ export function hasBlockingAnim(ui: Ui): boolean {
   return false
 }
 
-function gridTransitionDurationFrames(): number {
-  return Math.max(1, Math.trunc(GRID_TRANSITION_STEP_FRAMES)) * 5
-}
-
 function clearSpriteFocusIfAny(ui: Ui): LeftPanel {
   const lp = getLeftPanel(ui)
   if (lp.kind === LEFT_PANEL_KIND_SPRITE) return { kind: LEFT_PANEL_KIND_AUTO }
@@ -121,13 +119,22 @@ function clearSpriteFocusIfAny(ui: Ui): LeftPanel {
 }
 
 function normalizeResources(_world: World, raw: Resources | null | undefined): Resources {
-  if (!raw) return { food: INITIAL_FOOD, gold: INITIAL_GOLD, armySize: INITIAL_ARMY_SIZE, hasBronzeKey: false, hasScout: false }
+  if (!raw)
+    return {
+      food: INITIAL_FOOD,
+      gold: INITIAL_GOLD,
+      armySize: INITIAL_ARMY_SIZE,
+      hasBronzeKey: false,
+      hasScout: false,
+      hasTameBeast: false,
+    }
   return {
     food: raw.food,
     gold: raw.gold ?? 0,
     armySize: raw.armySize,
     hasBronzeKey: !!raw.hasBronzeKey,
     hasScout: !!raw.hasScout,
+    hasTameBeast: !!raw.hasTameBeast,
   }
 }
 
@@ -279,8 +286,13 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
   const outcome = handler({ cell, world, pos: nextPos, stepCount: nextStepCount, resources: baseResources })
 
   let nextWorld = outcome.world || world
-  let nextResources = outcome.resources || baseResources
-  if (outcome.foodDeltas && outcome.foodDeltas.length) foodDeltas.push(...outcome.foodDeltas)
+  const rawOutcomeResources = outcome.resources || baseResources
+  let nextResources = resourcesWithClampedFoodIfNeeded(rawOutcomeResources)
+  // Reflect the *applied* food delta after any carry-cap clamping (prevents +N popups when only +k fits).
+  if (rawOutcomeResources.food !== baseResources.food || (outcome.foodDeltas && outcome.foodDeltas.length)) {
+    const applied = nextResources.food - baseResources.food
+    if (applied) foodDeltas.push(applied)
+  }
   if (outcome.armyDeltas && outcome.armyDeltas.length) armyDeltas.push(...outcome.armyDeltas)
   const nextHasWon = prevState.run.hasWon || !!outcome.hasWon
   const nextKnowsPosition = prevState.run.knowsPosition || !!outcome.knowsPosition
@@ -295,6 +307,8 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
   let didStartCombat = false
   let didStartCamp = false
   let didStartTown = false
+  let didStartFarm = false
+  let didStartLocksmith = false
   let teleported = false
   let landingPos = nextPos
   if (!isGameOver && !prevState.encounter) {
@@ -308,8 +322,14 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
     const starter = startEncounterByKind[destKind]
     if (starter) {
       nextEncounter = starter({ kind: destKind, cellId: destCellId, restoreMessage: preEncounterMessage })
-      didStartCamp = nextEncounter.kind === 'camp'
-      didStartTown = nextEncounter.kind === 'town'
+      if (destKind === 'locksmith' && nextResources.hasBronzeKey) {
+        nextEncounter = null
+      } else {
+        didStartCamp = nextEncounter!.kind === 'camp'
+        didStartTown = nextEncounter!.kind === 'town'
+        didStartFarm = nextEncounter!.kind === 'farm'
+        didStartLocksmith = nextEncounter!.kind === 'locksmith'
+      }
     } else {
       const event = rollMoveEvent({
         seed: nextWorld.seed,
@@ -424,42 +444,26 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
 
   if (didStartCombat) {
     const revealStart = startFrame + MOVE_SLIDE_FRAMES
-    uiWith = enqueueAnim(uiWith, {
-      kind: 'gridTransition',
-      startFrame: revealStart,
-      durationFrames: gridTransitionDurationFrames(),
-      blocksInput: true,
-      params: { from: 'overworld', to: 'combat' },
-    })
+    uiWith = enqueueGridTransition(uiWith, { startFrame: revealStart, from: 'overworld', to: 'combat' })
   }
   if (didStartCamp) {
     const revealStart = startFrame + MOVE_SLIDE_FRAMES
-    uiWith = enqueueAnim(uiWith, {
-      kind: 'gridTransition',
-      startFrame: revealStart,
-      durationFrames: gridTransitionDurationFrames(),
-      blocksInput: true,
-      params: { from: 'overworld', to: 'camp' },
-    })
+    uiWith = enqueueGridTransition(uiWith, { startFrame: revealStart, from: 'overworld', to: 'camp' })
   }
   if (didStartTown) {
     const revealStart = startFrame + MOVE_SLIDE_FRAMES
-    uiWith = enqueueAnim(uiWith, {
-      kind: 'gridTransition',
-      startFrame: revealStart,
-      durationFrames: gridTransitionDurationFrames(),
-      blocksInput: true,
-      params: { from: 'overworld', to: 'town' },
-    })
+    uiWith = enqueueGridTransition(uiWith, { startFrame: revealStart, from: 'overworld', to: 'town' })
+  }
+  if (didStartFarm) {
+    const revealStart = startFrame + MOVE_SLIDE_FRAMES
+    uiWith = enqueueGridTransition(uiWith, { startFrame: revealStart, from: 'overworld', to: 'farm' })
+  }
+  if (didStartLocksmith) {
+    const revealStart = startFrame + MOVE_SLIDE_FRAMES
+    uiWith = enqueueGridTransition(uiWith, { startFrame: revealStart, from: 'overworld', to: 'locksmith' })
   }
   if (teleported) {
-    uiWith = enqueueAnim(uiWith, {
-      kind: 'gridTransition',
-      startFrame,
-      durationFrames: gridTransitionDurationFrames(),
-      blocksInput: true,
-      params: { from: 'blank', to: 'overworld' },
-    })
+    uiWith = enqueueGridTransition(uiWith, { startFrame, from: 'blank', to: 'overworld' })
   } else {
     uiWith = enqueueAnim(uiWith, {
       kind: 'moveSlide',
@@ -550,13 +554,7 @@ export function processAction(prevState: State | null, action: Action): State | 
     }
 
     const ui = ENABLE_ANIMATIONS
-      ? enqueueAnim(baseUi, {
-          kind: 'gridTransition',
-          startFrame: 0,
-          durationFrames: gridTransitionDurationFrames(),
-          blocksInput: true,
-          params: { from: 'blank', to: 'overworld' },
-        })
+      ? enqueueGridTransition(baseUi, { startFrame: 0, from: 'blank', to: 'overworld' })
       : baseUi
 
     return {
@@ -577,6 +575,7 @@ export function processAction(prevState: State | null, action: Action): State | 
         armySize: INITIAL_ARMY_SIZE,
         hasBronzeKey: false,
         hasScout: false,
+        hasTameBeast: false,
       },
       encounter: null,
       ui,
@@ -594,6 +593,12 @@ export function processAction(prevState: State | null, action: Action): State | 
 
   const campHandled = reduceCampAction(prevState, action)
   if (campHandled) return campHandled
+
+  const farmHandled = reduceFarmAction(prevState, action)
+  if (farmHandled) return farmHandled
+
+  const locksmithHandled = reduceLocksmithAction(prevState, action)
+  if (locksmithHandled) return locksmithHandled
 
   const townHandled = reduceTownAction(prevState, action)
   if (townHandled) return townHandled
@@ -640,13 +645,7 @@ export function processAction(prevState: State | null, action: Action): State | 
       encounter: null,
       ui: isGameOver
         ? uiWith
-        : enqueueAnim(uiWith, {
-            kind: 'gridTransition',
-            startFrame,
-            durationFrames: gridTransitionDurationFrames(),
-            blocksInput: true,
-            params: { from: 'combat', to: 'overworld' },
-          }),
+        : enqueueGridTransition(uiWith, { from: 'combat', to: 'overworld' }),
     }
   }
   if (action.type === ACTION_FIGHT) {
@@ -700,10 +699,12 @@ export function processAction(prevState: State | null, action: Action): State | 
       const foodBonus = sr.intExclusive(COMBAT_FOOD_BONUS_MAX + 1)
       if (foodBonus) {
         nextResources = { ...nextResources, food: nextResources.food + foodBonus }
-        foodDeltas.push(foodBonus)
       }
       nextWorld = { ...nextWorld, rngState: sr.rngState }
     }
+    nextResources = resourcesWithClampedFoodIfNeeded(nextResources)
+    const appliedFoodDelta = nextResources.food - prevRes.food
+    if (appliedFoodDelta) foodDeltas.push(appliedFoodDelta)
     const isGameOver = nextResources.armySize <= 0
     const victoryPick =
       !isGameOver && nextEncounter == null ? RNG.createRunCopyRandom(prevState).advanceCursor('combat.exit.victory', COMBAT_VICTORY_EXIT_LINES) : null
@@ -774,13 +775,7 @@ export function processAction(prevState: State | null, action: Action): State | 
     }
 
     if (!isGameOver && nextEncounter == null) {
-      uiWith = enqueueAnim(uiWith, {
-        kind: 'gridTransition',
-        startFrame,
-        durationFrames: gridTransitionDurationFrames(),
-        blocksInput: true,
-        params: { from: 'combat', to: 'overworld' },
-      })
+      uiWith = enqueueGridTransition(uiWith, { from: 'combat', to: 'overworld' })
     }
 
     return {
