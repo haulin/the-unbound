@@ -7,19 +7,7 @@ import { SPRITES } from './spriteIds'
 // Re-export lore/name pools (defined in `src/core/lore.ts`).
 export * from './lore'
 
-export type GameMapLabel = 'F' | 'C' | 'H' | 'T' | 'G' | 'L'
-
-export const SCOUT_GLOBAL_REVEAL_KINDS = ['farm', 'camp', 'henge', 'town'] as const satisfies readonly FeatureKind[]
-
-export const GAME_MAP_LABEL_BY_KIND = {
-  farm: 'F',
-  camp: 'C',
-  henge: 'H',
-  town: 'T',
-  gate: 'G',
-  gateOpen: 'G',
-  locksmith: 'L',
-} as const satisfies Partial<Record<CellKind, GameMapLabel>>
+export const SCOUT_GLOBAL_REVEAL_KINDS: readonly CellKind[] = ['farm', 'camp', 'henge', 'town']
 
 export const WORLD_WIDTH = 10
 export const WORLD_HEIGHT = 10
@@ -78,40 +66,39 @@ export const FARM_COOLDOWN_MOVES = 3
 export const TERRAIN_KINDS = ['grass', 'road', 'mountain', 'lake', 'swamp', 'woods', 'rainbow'] as const satisfies readonly TerrainKind[]
 export const FEATURE_KINDS = ['gate', 'gateOpen', 'locksmith', 'signpost', 'farm', 'camp', 'henge', 'town'] as const satisfies readonly FeatureKind[]
 
-export const TERRAIN: Record<TerrainKind, { spriteId: number; enterFoodCost: number }> = {
-  grass: { spriteId: SPRITES.tiles.plains, enterFoodCost: FOOD_COST_DEFAULT },
-  road: { spriteId: SPRITES.tiles.gravel, enterFoodCost: FOOD_COST_DEFAULT },
-  mountain: { spriteId: SPRITES.tiles.mountains, enterFoodCost: FOOD_COST_MOUNTAIN },
-  lake: { spriteId: SPRITES.tiles.lake, enterFoodCost: FOOD_COST_DEFAULT },
-  swamp: { spriteId: SPRITES.tiles.swamp, enterFoodCost: FOOD_COST_SWAMP },
-  woods: { spriteId: SPRITES.tiles.woods, enterFoodCost: FOOD_COST_DEFAULT },
-  rainbow: { spriteId: SPRITES.tiles.rainbow, enterFoodCost: FOOD_COST_DEFAULT },
+export const TERRAIN: Record<TerrainKind, { spriteId: number }> = {
+  grass: { spriteId: SPRITES.tiles.plains },
+  road: { spriteId: SPRITES.tiles.gravel },
+  mountain: { spriteId: SPRITES.tiles.mountains },
+  lake: { spriteId: SPRITES.tiles.lake },
+  swamp: { spriteId: SPRITES.tiles.swamp },
+  woods: { spriteId: SPRITES.tiles.woods },
+  rainbow: { spriteId: SPRITES.tiles.rainbow },
 }
 
-export const FEATURES: Record<FeatureKind, { spriteId: number; enterFoodCost: number }> & {
-  farm: { spriteId: number; enterFoodCost: number; count: number; cooldownMoves: number }
-  camp: { spriteId: number; enterFoodCost: number; count: number; cooldownMoves: number; foodGain: number }
-  signpost: { spriteId: number; enterFoodCost: number; count: number }
-  town: { spriteId: number; enterFoodCost: number; count: number }
-  gate: { spriteId: number; enterFoodCost: number }
-  gateOpen: { spriteId: number; enterFoodCost: number }
-  locksmith: { spriteId: number; enterFoodCost: number }
-  henge: { spriteId: number; enterFoodCost: number; count: number }
+export const FEATURES: Record<FeatureKind, { spriteId: number }> & {
+  farm: { spriteId: number; count: number; cooldownMoves: number }
+  camp: { spriteId: number; count: number; cooldownMoves: number; foodGain: number }
+  signpost: { spriteId: number; count: number }
+  town: { spriteId: number; count: number }
+  gate: { spriteId: number }
+  gateOpen: { spriteId: number }
+  locksmith: { spriteId: number }
+  henge: { spriteId: number; count: number }
 } = {
-  gate: { spriteId: SPRITES.interactivePois.gate, enterFoodCost: FOOD_COST_DEFAULT },
-  gateOpen: { spriteId: SPRITES.interactivePois.gateOpen, enterFoodCost: FOOD_COST_DEFAULT },
-  locksmith: { spriteId: SPRITES.interactivePois.locksmith, enterFoodCost: FOOD_COST_DEFAULT },
-  signpost: { spriteId: SPRITES.tiles.signpost, enterFoodCost: FOOD_COST_DEFAULT, count: SIGNPOST_COUNT },
-  farm: { spriteId: SPRITES.tiles.farm, enterFoodCost: FOOD_COST_DEFAULT, count: FARM_COUNT, cooldownMoves: FARM_COOLDOWN_MOVES },
+  gate: { spriteId: SPRITES.interactivePois.gate },
+  gateOpen: { spriteId: SPRITES.interactivePois.gateOpen },
+  locksmith: { spriteId: SPRITES.interactivePois.locksmith },
+  signpost: { spriteId: SPRITES.tiles.signpost, count: SIGNPOST_COUNT },
+  farm: { spriteId: SPRITES.tiles.farm, count: FARM_COUNT, cooldownMoves: FARM_COOLDOWN_MOVES },
   camp: {
     spriteId: SPRITES.interactivePois.camp,
-    enterFoodCost: FOOD_COST_DEFAULT,
     count: CAMP_COUNT,
     cooldownMoves: CAMP_COOLDOWN_MOVES,
     foodGain: CAMP_FOOD_GAIN,
   },
-  henge: { spriteId: SPRITES.interactivePois.henge, enterFoodCost: FOOD_COST_DEFAULT, count: HENGE_COUNT },
-  town: { spriteId: SPRITES.interactivePois.town, enterFoodCost: FOOD_COST_DEFAULT, count: TOWN_COUNT },
+  henge: { spriteId: SPRITES.interactivePois.henge, count: HENGE_COUNT },
+  town: { spriteId: SPRITES.interactivePois.town, count: TOWN_COUNT },
 }
 
 export function spriteIdForKind(kind: CellKind): number {
@@ -133,28 +120,6 @@ export function spriteIdForKind(kind: CellKind): number {
     case 'henge':
     case 'town':
       return FEATURES[kind].spriteId
-  }
-}
-
-export function enterFoodCostForKind(kind: CellKind): number {
-  switch (kind) {
-    case 'grass':
-    case 'road':
-    case 'mountain':
-    case 'lake':
-    case 'swamp':
-    case 'woods':
-    case 'rainbow':
-      return TERRAIN[kind].enterFoodCost
-    case 'gate':
-    case 'gateOpen':
-    case 'locksmith':
-    case 'signpost':
-    case 'farm':
-    case 'camp':
-    case 'henge':
-    case 'town':
-      return FEATURES[kind].enterFoodCost
   }
 }
 
@@ -215,10 +180,10 @@ export const ACTION_TICK = 'TICK' as const
 export const ACTION_CAMP_SEARCH = 'CAMP_SEARCH' as const
 export const ACTION_CAMP_LEAVE = 'CAMP_LEAVE' as const
 
-export const ACTION_TOWN_BUY_FOOD = 'TOWN_BUY_FOOD' as const
-export const ACTION_TOWN_BUY_TROOPS = 'TOWN_BUY_TROOPS' as const
-export const ACTION_TOWN_HIRE_SCOUT = 'TOWN_HIRE_SCOUT' as const
-export const ACTION_TOWN_BUY_RUMOR = 'TOWN_BUY_RUMOR' as const
+export const ACTION_TOWN_BUY_FOOD = 'buyFood' as const
+export const ACTION_TOWN_BUY_TROOPS = 'buyTroops' as const
+export const ACTION_TOWN_HIRE_SCOUT = 'hireScout' as const
+export const ACTION_TOWN_BUY_RUMOR = 'buyRumors' as const
 export const ACTION_TOWN_LEAVE = 'TOWN_LEAVE' as const
 
 export const MOVE_SLIDE_FRAMES = 15

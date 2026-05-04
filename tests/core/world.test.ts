@@ -10,7 +10,7 @@ import {
 } from '../../src/core/constants'
 import { generateWorld } from '../../src/core/world'
 import { manhattan, torusDelta } from '../../src/core/math'
-import type { Cell } from '../../src/core/types'
+import type { CampCell, Cell, FarmCell, HengeCell } from '../../src/core/types'
 
 function countKinds(cells: { kind: string }[][], kind: string): number {
   let n = 0
@@ -48,26 +48,23 @@ describe('world', () => {
     expect(countKinds(g.world.cells, 'signpost')).toBe(SIGNPOST_COUNT)
 
     const cells = allCells(g.world)
-    const farms = cells.filter((c) => c.cell.kind === 'farm')
-    const camps = cells.filter((c) => c.cell.kind === 'camp')
-    const henges = cells.filter((c) => c.cell.kind === 'henge')
+    const farms = cells.filter((c): c is { x: number; y: number; cell: FarmCell } => c.cell.kind === 'farm')
+    const camps = cells.filter((c): c is { x: number; y: number; cell: CampCell } => c.cell.kind === 'camp')
+    const henges = cells.filter((c): c is { x: number; y: number; cell: HengeCell } => c.cell.kind === 'henge')
 
-    expect(new Set(farms.map((f) => (f.cell.kind === 'farm' ? f.cell.name : ''))).size).toBe(FARM_COUNT)
+    expect(new Set(farms.map((f) => f.cell.name)).size).toBe(FARM_COUNT)
     expect(new Set(farms.map((f) => `${f.x},${f.y}`)).size).toBe(FARM_COUNT)
     for (const f of farms) {
-      if (f.cell.kind !== 'farm') throw new Error('expected farm cell')
       expect(f.cell.id).toBe(f.y * WORLD_WIDTH + f.x)
     }
 
-    expect(new Set(camps.map((c) => (c.cell.kind === 'camp' ? c.cell.name : ''))).size).toBe(CAMP_COUNT)
+    expect(new Set(camps.map((c) => c.cell.name)).size).toBe(CAMP_COUNT)
     expect(new Set(camps.map((c) => `${c.x},${c.y}`)).size).toBe(CAMP_COUNT)
     for (const c of camps) {
-      if (c.cell.kind !== 'camp') throw new Error('expected camp cell')
       expect(c.cell.id).toBe(c.y * WORLD_WIDTH + c.x)
     }
 
     for (const h of henges) {
-      if (h.cell.kind !== 'henge') throw new Error('expected henge cell')
       expect(h.cell.id).toBe(h.y * WORLD_WIDTH + h.x)
     }
   })

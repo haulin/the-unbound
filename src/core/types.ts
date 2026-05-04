@@ -32,7 +32,11 @@ export type FarmCell = { kind: 'farm'; id: number; name: string; nextReadyStep: 
 export type CampCell = { kind: 'camp'; id: number; name: string; nextReadyStep: number }
 export type HengeCell = { kind: 'henge'; id: number; name: string; nextReadyStep: number }
 
-export type TownOfferKind = 'buyFood' | 'buyTroops' | 'hireScout' | 'buyRumors'
+export type TownOfferKind =
+  | typeof ACTION_TOWN_BUY_FOOD
+  | typeof ACTION_TOWN_BUY_TROOPS
+  | typeof ACTION_TOWN_HIRE_SCOUT
+  | typeof ACTION_TOWN_BUY_RUMOR
 export type TownCell = {
   kind: 'town'
   id: number

@@ -296,15 +296,6 @@
 
   // src/core/constants.ts
   var SCOUT_GLOBAL_REVEAL_KINDS = ["farm", "camp", "henge", "town"];
-  var GAME_MAP_LABEL_BY_KIND = {
-    farm: "F",
-    camp: "C",
-    henge: "H",
-    town: "T",
-    gate: "G",
-    gateOpen: "G",
-    locksmith: "L"
-  };
   var WORLD_WIDTH = 10;
   var WORLD_HEIGHT = 10;
   var INITIAL_SEED = 47;
@@ -343,29 +334,28 @@
   var TERRAIN_KINDS = ["grass", "road", "mountain", "lake", "swamp", "woods", "rainbow"];
   var FEATURE_KINDS = ["gate", "gateOpen", "locksmith", "signpost", "farm", "camp", "henge", "town"];
   var TERRAIN = {
-    grass: { spriteId: SPRITES.tiles.plains, enterFoodCost: FOOD_COST_DEFAULT },
-    road: { spriteId: SPRITES.tiles.gravel, enterFoodCost: FOOD_COST_DEFAULT },
-    mountain: { spriteId: SPRITES.tiles.mountains, enterFoodCost: FOOD_COST_MOUNTAIN },
-    lake: { spriteId: SPRITES.tiles.lake, enterFoodCost: FOOD_COST_DEFAULT },
-    swamp: { spriteId: SPRITES.tiles.swamp, enterFoodCost: FOOD_COST_SWAMP },
-    woods: { spriteId: SPRITES.tiles.woods, enterFoodCost: FOOD_COST_DEFAULT },
-    rainbow: { spriteId: SPRITES.tiles.rainbow, enterFoodCost: FOOD_COST_DEFAULT }
+    grass: { spriteId: SPRITES.tiles.plains },
+    road: { spriteId: SPRITES.tiles.gravel },
+    mountain: { spriteId: SPRITES.tiles.mountains },
+    lake: { spriteId: SPRITES.tiles.lake },
+    swamp: { spriteId: SPRITES.tiles.swamp },
+    woods: { spriteId: SPRITES.tiles.woods },
+    rainbow: { spriteId: SPRITES.tiles.rainbow }
   };
   var FEATURES = {
-    gate: { spriteId: SPRITES.interactivePois.gate, enterFoodCost: FOOD_COST_DEFAULT },
-    gateOpen: { spriteId: SPRITES.interactivePois.gateOpen, enterFoodCost: FOOD_COST_DEFAULT },
-    locksmith: { spriteId: SPRITES.interactivePois.locksmith, enterFoodCost: FOOD_COST_DEFAULT },
-    signpost: { spriteId: SPRITES.tiles.signpost, enterFoodCost: FOOD_COST_DEFAULT, count: SIGNPOST_COUNT },
-    farm: { spriteId: SPRITES.tiles.farm, enterFoodCost: FOOD_COST_DEFAULT, count: FARM_COUNT, cooldownMoves: FARM_COOLDOWN_MOVES },
+    gate: { spriteId: SPRITES.interactivePois.gate },
+    gateOpen: { spriteId: SPRITES.interactivePois.gateOpen },
+    locksmith: { spriteId: SPRITES.interactivePois.locksmith },
+    signpost: { spriteId: SPRITES.tiles.signpost, count: SIGNPOST_COUNT },
+    farm: { spriteId: SPRITES.tiles.farm, count: FARM_COUNT, cooldownMoves: FARM_COOLDOWN_MOVES },
     camp: {
       spriteId: SPRITES.interactivePois.camp,
-      enterFoodCost: FOOD_COST_DEFAULT,
       count: CAMP_COUNT,
       cooldownMoves: CAMP_COOLDOWN_MOVES,
       foodGain: CAMP_FOOD_GAIN
     },
-    henge: { spriteId: SPRITES.interactivePois.henge, enterFoodCost: FOOD_COST_DEFAULT, count: HENGE_COUNT },
-    town: { spriteId: SPRITES.interactivePois.town, enterFoodCost: FOOD_COST_DEFAULT, count: TOWN_COUNT }
+    henge: { spriteId: SPRITES.interactivePois.henge, count: HENGE_COUNT },
+    town: { spriteId: SPRITES.interactivePois.town, count: TOWN_COUNT }
   };
   function spriteIdForKind(kind) {
     switch (kind) {
@@ -386,27 +376,6 @@
       case "henge":
       case "town":
         return FEATURES[kind].spriteId;
-    }
-  }
-  function enterFoodCostForKind(kind) {
-    switch (kind) {
-      case "grass":
-      case "road":
-      case "mountain":
-      case "lake":
-      case "swamp":
-      case "woods":
-      case "rainbow":
-        return TERRAIN[kind].enterFoodCost;
-      case "gate":
-      case "gateOpen":
-      case "locksmith":
-      case "signpost":
-      case "farm":
-      case "camp":
-      case "henge":
-      case "town":
-        return FEATURES[kind].enterFoodCost;
     }
   }
   function terrainLoreLinesForKind(kind) {
@@ -452,10 +421,10 @@
   var ACTION_TICK = "TICK";
   var ACTION_CAMP_SEARCH = "CAMP_SEARCH";
   var ACTION_CAMP_LEAVE = "CAMP_LEAVE";
-  var ACTION_TOWN_BUY_FOOD = "TOWN_BUY_FOOD";
-  var ACTION_TOWN_BUY_TROOPS = "TOWN_BUY_TROOPS";
-  var ACTION_TOWN_HIRE_SCOUT = "TOWN_HIRE_SCOUT";
-  var ACTION_TOWN_BUY_RUMOR = "TOWN_BUY_RUMOR";
+  var ACTION_TOWN_BUY_FOOD = "buyFood";
+  var ACTION_TOWN_BUY_TROOPS = "buyTroops";
+  var ACTION_TOWN_HIRE_SCOUT = "hireScout";
+  var ACTION_TOWN_BUY_RUMOR = "buyRumors";
   var ACTION_TOWN_LEAVE = "TOWN_LEAVE";
   var MOVE_SLIDE_FRAMES = 15;
   var LORE_MAX_CHARS_PER_LINE = 19;
@@ -922,35 +891,140 @@ ${line}` };
     return { ...prevState, run: nextRun, resources: nextResources, ui: uiWith };
   }
 
-  // src/core/tileEvents.ts
-  function rollTileEvent(args) {
-    const { seed, stepCount, cellId: cellId2, kind, hengeReady, hasScout } = args;
-    if (kind === "henge") {
-      return hengeReady ? { kind: "fight", source: "henge" } : null;
+  // src/core/mechanics/registry.ts
+  function buildMechanicIndex(mechanics) {
+    const seenIds = /* @__PURE__ */ new Set();
+    const ownerByKind = {};
+    const onEnterByKind2 = {};
+    const startEncounterByKind2 = {};
+    const rightGridByEncounterKind2 = {};
+    const mapLabelByKind = {};
+    const enterFoodCostByKind2 = {};
+    const moveEventPolicyByKind2 = {};
+    for (let i = 0; i < mechanics.length; i++) {
+      const m = mechanics[i];
+      if (seenIds.has(m.id)) {
+        throw new Error(`Duplicate mechanic id: ${m.id}`);
+      }
+      seenIds.add(m.id);
+      const encounterKind = m.rightGridEncounterKind;
+      const provider = m.rightGrid;
+      if (encounterKind && !provider || !encounterKind && provider) {
+        throw new Error(`Mechanic ${m.id} must set both rightGridEncounterKind and rightGrid`);
+      }
+      if (encounterKind && provider) {
+        const prev = rightGridByEncounterKind2[encounterKind];
+        if (prev) throw new Error(`Duplicate rightGridEncounterKind: ${encounterKind}`);
+        rightGridByEncounterKind2[encounterKind] = provider;
+      }
+      const costByKind = m.enterFoodCostByKind;
+      if (costByKind) {
+        for (const kindKey of Object.keys(costByKind)) {
+          if (!m.kinds.includes(kindKey)) {
+            throw new Error(`Mechanic ${m.id} sets enterFoodCostByKind for ${kindKey} but does not claim that kind`);
+          }
+          const cost = costByKind[kindKey];
+          if (cost < 0) {
+            throw new Error(`enterFoodCostByKind for ${kindKey} must be >= 0`);
+          }
+        }
+      }
+      const policyByKind = m.moveEventPolicyByKind;
+      if (policyByKind) {
+        for (const kindKey of Object.keys(policyByKind)) {
+          if (!m.kinds.includes(kindKey)) {
+            throw new Error(`Mechanic ${m.id} sets moveEventPolicyByKind for ${kindKey} but does not claim that kind`);
+          }
+          const policy = policyByKind[kindKey];
+          const ambushPercent = policy.ambushPercent;
+          const lostPercent = policy.lostPercent;
+          if (ambushPercent < 0 || lostPercent < 0 || ambushPercent > 100 || lostPercent > 100 || ambushPercent + lostPercent > 100) {
+            throw new Error(
+              `MoveEventPolicy for ${kindKey} must have ambushPercent and lostPercent in [0, 100] with sum <= 100`
+            );
+          }
+        }
+      }
+      for (let k = 0; k < m.kinds.length; k++) {
+        const kind = m.kinds[k];
+        const prevOwner = ownerByKind[kind];
+        if (prevOwner) {
+          throw new Error(`Duplicate kind ownership: ${kind} claimed by ${prevOwner} and ${m.id}`);
+        }
+        ownerByKind[kind] = m.id;
+        if (m.onEnter) onEnterByKind2[kind] = m.onEnter;
+        if (m.startEncounter) startEncounterByKind2[kind] = m.startEncounter;
+        if (m.mapLabel != null) mapLabelByKind[kind] = m.mapLabel;
+        const cost = costByKind?.[kind];
+        if (cost != null) enterFoodCostByKind2[kind] = cost;
+        const policy = policyByKind?.[kind];
+        if (policy) moveEventPolicyByKind2[kind] = policy;
+      }
     }
-    let ambushPct = 0;
-    let lostPct = 0;
-    if (kind === "woods") {
-      ambushPct = WOODS_AMBUSH_PERCENT;
-      lostPct = WOODS_LOST_PERCENT;
-    } else if (kind === "mountain") {
-      ambushPct = MOUNTAIN_AMBUSH_PERCENT;
-      lostPct = 0;
-    } else if (kind === "swamp") {
-      ambushPct = 0;
-      lostPct = SWAMP_LOST_PERCENT;
-    } else {
-      return null;
-    }
-    if (hasScout && (kind === "woods" || kind === "swamp")) {
-      lostPct = Math.floor(lostPct / 2);
-    }
-    if (ambushPct + lostPct === 0) return null;
-    const p = RNG._keyedIntExclusive({ seed, stepCount, cellId: cellId2 }, 100);
-    if (p < ambushPct) return { kind: "fight", source: kind };
-    if (p < ambushPct + lostPct) return { kind: "lost", source: kind };
-    return null;
+    return {
+      ownerByKind,
+      onEnterByKind: onEnterByKind2,
+      startEncounterByKind: startEncounterByKind2,
+      rightGridByEncounterKind: rightGridByEncounterKind2,
+      mapLabelByKind,
+      enterFoodCostByKind: enterFoodCostByKind2,
+      moveEventPolicyByKind: moveEventPolicyByKind2
+    };
   }
+
+  // src/core/mechanics/defs/gate.ts
+  var onEnterGate = ({ cell, world, pos, stepCount, resources }) => {
+    if (cell.kind !== "gate" && cell.kind !== "gateOpen") return { message: "" };
+    const r = RNG.createTileRandom({ world, stepCount, pos });
+    if (!resources.hasBronzeKey) {
+      const line2 = r.perMoveLine(GATE_LOCKED_LINES);
+      return { message: `${GATE_NAME}
+${line2}` };
+    }
+    const nextWorld = cell.kind === "gateOpen" ? world : setCellAt(world, pos, { kind: "gateOpen" });
+    const line = r.perMoveLine(GATE_OPEN_LINES);
+    return { world: nextWorld, hasWon: true, message: `${GATE_NAME}
+${line}` };
+  };
+  var gateMechanic = {
+    id: "gate",
+    kinds: ["gate", "gateOpen"],
+    mapLabel: "G",
+    onEnter: onEnterGate
+  };
+
+  // src/core/mechanics/defs/locksmith.ts
+  var onEnterLocksmith = ({ cell, world, pos, stepCount, resources }) => {
+    if (cell.kind !== "locksmith") return { message: "" };
+    const r = RNG.createTileRandom({ world, stepCount, pos });
+    if (resources.hasBronzeKey) {
+      const line2 = r.perMoveLine(LOCKSMITH_VISITED_LINES);
+      return { message: `${LOCKSMITH_NAME}
+${line2}` };
+    }
+    if (resources.food >= BRONZE_KEY_FOOD_COST) {
+      const line2 = r.perMoveLine(LOCKSMITH_PURCHASE_LINES);
+      return {
+        resources: {
+          ...resources,
+          food: resources.food - BRONZE_KEY_FOOD_COST,
+          hasBronzeKey: true
+        },
+        foodDeltas: [-BRONZE_KEY_FOOD_COST],
+        message: `${LOCKSMITH_NAME}
+${line2}`
+      };
+    }
+    const line = r.perMoveLine(LOCKSMITH_NO_FOOD_LINES);
+    return { message: `${LOCKSMITH_NAME}
+${line}` };
+  };
+  var locksmithMechanic = {
+    id: "locksmith",
+    kinds: ["locksmith"],
+    mapLabel: "L",
+    onEnter: onEnterLocksmith
+  };
 
   // src/core/math.ts
   function wrapIndex(i, size) {
@@ -979,6 +1053,323 @@ ${line}` };
     if (dx < 0) s += "W";
     else if (dx > 0) s += "E";
     return s;
+  }
+
+  // src/core/signpost.ts
+  function formatNearestPoiSignpostMessage(playerPos, world) {
+    const SIGNPOST_MIN_TARGET_DISTANCE = 2;
+    const POI_KIND_RANK = {
+      gate: 0,
+      gateOpen: 0,
+      locksmith: 1,
+      farm: 2,
+      town: 3,
+      camp: 4,
+      henge: 5
+    };
+    const kindRank = (k) => POI_KIND_RANK[k];
+    function candidateId(x, y) {
+      return y * world.width + x;
+    }
+    const candidates = [];
+    function pushNamedCandidate(kind, id, baseName, suffix, x, y) {
+      const name = `${baseName} ${suffix}`;
+      candidates.push({ kind, id, name, pos: { x, y } });
+    }
+    const cells = world.cells;
+    for (let y = 0; y < cells.length; y++) {
+      const row = cells[y];
+      for (let x = 0; x < row.length; x++) {
+        const cell = row[x];
+        switch (cell.kind) {
+          case "gate":
+            candidates.push({ kind: "gate", id: candidateId(x, y), name: GATE_NAME, pos: { x, y } });
+            break;
+          case "gateOpen":
+            candidates.push({ kind: "gateOpen", id: candidateId(x, y), name: GATE_NAME, pos: { x, y } });
+            break;
+          case "locksmith":
+            candidates.push({ kind: "locksmith", id: candidateId(x, y), name: LOCKSMITH_NAME, pos: { x, y } });
+            break;
+          case "farm":
+            pushNamedCandidate("farm", cell.id, cell.name || "A Farm", "Farm", x, y);
+            break;
+          case "camp":
+            pushNamedCandidate("camp", cell.id, cell.name || "A Camp", "Camp", x, y);
+            break;
+          case "henge":
+            pushNamedCandidate("henge", cell.id, cell.name || "A Henge", "Henge", x, y);
+            break;
+          case "town":
+            pushNamedCandidate("town", cell.id, cell.name || "A Town", "Town", x, y);
+            break;
+        }
+      }
+    }
+    if (candidates.length === 0) return "";
+    function evalCandidate(c) {
+      const dx = torusDelta(playerPos.x, c.pos.x, world.width);
+      const dy = torusDelta(playerPos.y, c.pos.y, world.height);
+      const d = manhattan(dx, dy);
+      const rank = kindRank(c.kind);
+      return { ...c, dx, dy, d, rank };
+    }
+    function isBetter(a, b) {
+      if (a.d !== b.d) return a.d < b.d;
+      if (a.rank !== b.rank) return a.rank < b.rank;
+      return a.id < b.id;
+    }
+    let bestAny = null;
+    let bestFar = null;
+    for (let i = 0; i < candidates.length; i++) {
+      const e = evalCandidate(candidates[i]);
+      if (!bestAny || isBetter(e, bestAny)) bestAny = e;
+      if (e.d > SIGNPOST_MIN_TARGET_DISTANCE) {
+        if (!bestFar || isBetter(e, bestFar)) bestFar = e;
+      }
+    }
+    const chosen = bestFar || bestAny;
+    if (!chosen) return "";
+    const dir = dirLabel(chosen.dx, chosen.dy);
+    return `${chosen.name}
+${dir}, ${chosen.d} leagues away.`;
+  }
+
+  // src/core/mechanics/defs/signpost.ts
+  var onEnterSignpost = ({ world, pos }) => ({
+    message: formatNearestPoiSignpostMessage(pos, world),
+    knowsPosition: true
+  });
+  var signpostMechanic = {
+    id: "signpost",
+    kinds: ["signpost"],
+    onEnter: onEnterSignpost
+  };
+
+  // src/core/mechanics/defs/farm.ts
+  var onEnterFarm = ({ cell, world, pos, stepCount, resources }) => {
+    if (cell.kind !== "farm") return { message: "" };
+    const farmCell = getCellAt(world, pos);
+    if (!farmCell || farmCell.kind !== "farm") return { message: "" };
+    const farmName = farmCell.name || "A Farm";
+    const readyAt = farmCell.nextReadyStep ?? 0;
+    if (stepCount < readyAt) {
+      const r2 = RNG.createTileRandom({ world, stepCount, pos });
+      return {
+        message: `${farmName} Farm
+${r2.perMoveLine(FARM_REVISIT_LINES, { cellId: farmCell.id })}`,
+        knowsPosition: true
+      };
+    }
+    const sr = RNG.createStreamRandom(world.rngState);
+    const gain = sr.intExclusive(8) + 3;
+    const r = RNG.createTileRandom({ world, stepCount, pos });
+    const harvestLine = r.stableLine(FARM_HARVEST_LINES, { placeId: farmCell.id });
+    const nextFarmCell = { ...farmCell, nextReadyStep: stepCount + FARM_COOLDOWN_MOVES };
+    const nextWorld = setCellAt({ ...world, rngState: sr.rngState }, pos, nextFarmCell);
+    return {
+      world: nextWorld,
+      resources: {
+        ...resources,
+        food: resources.food + gain
+      },
+      foodDeltas: [gain],
+      message: `${farmName} Farm
+${harvestLine}`,
+      knowsPosition: true
+    };
+  };
+  var farmMechanic = {
+    id: "farm",
+    kinds: ["farm"],
+    mapLabel: "F",
+    onEnter: onEnterFarm
+  };
+
+  // src/core/mechanics/defs/camp.ts
+  var onEnterCamp = ({ cell, world, pos }) => {
+    if (cell.kind !== "camp") return { message: "" };
+    const camp = getCellAt(world, pos);
+    if (!camp || camp.kind !== "camp") return { message: "" };
+    const name = camp.name || "A Camp";
+    return { message: `${name} Camp` };
+  };
+  var campMechanic = {
+    id: "camp",
+    kinds: ["camp"],
+    mapLabel: "C",
+    onEnter: onEnterCamp,
+    startEncounter: ({ cellId: cellId2, restoreMessage }) => ({
+      kind: "camp",
+      sourceKind: "camp",
+      sourceCellId: cellId2,
+      restoreMessage
+    }),
+    rightGridEncounterKind: "camp",
+    rightGrid: (_s, row, col) => {
+      if (row === 0 && col === 1) return { action: null };
+      if (row === 1 && col === 0) return { spriteId: SPRITES.buttons.search, action: { type: ACTION_CAMP_SEARCH } };
+      if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_CAMP_LEAVE } };
+      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.campfireIcon, action: null };
+      return { action: null };
+    }
+  };
+
+  // src/core/mechanics/defs/henge.ts
+  var onEnterHenge = ({ cell, world, pos, stepCount }) => {
+    if (cell.kind !== "henge") return { message: "" };
+    const hengeCell = getCellAt(world, pos);
+    if (!hengeCell || hengeCell.kind !== "henge") return { message: "" };
+    const r = RNG.createTileRandom({ world, stepCount, pos });
+    const name = hengeCell.name || "A Henge";
+    const readyAt = hengeCell.nextReadyStep ?? 0;
+    const isReady = stepCount >= readyAt;
+    const line = isReady ? r.perMoveLine(HENGE_LORE_LINES, { cellId: hengeCell.id }) : r.perMoveLine(HENGE_EMPTY_LINES, { cellId: hengeCell.id });
+    return { message: `${name} Henge
+${line}` };
+  };
+  var hengeMechanic = {
+    id: "henge",
+    kinds: ["henge"],
+    mapLabel: "H",
+    moveEventPolicyByKind: { henge: { ambushPercent: 100, lostPercent: 0 } },
+    onEnter: onEnterHenge
+  };
+
+  // src/core/mechanics/defs/town.ts
+  var onEnterTown = ({ cell, world, pos }) => {
+    if (cell.kind !== "town") return { message: "" };
+    const town = getCellAt(world, pos);
+    if (!town || town.kind !== "town") return { message: "" };
+    const name = town.name || "A Town";
+    const r = RNG.createTileRandom({ world, stepCount: 0, pos });
+    const line = r.stableLine(TOWN_ENTER_LINES, { placeId: town.id });
+    return { message: `${name} Town
+${line}`, knowsPosition: true };
+  };
+  var townMechanic = {
+    id: "town",
+    kinds: ["town"],
+    mapLabel: "T",
+    onEnter: onEnterTown,
+    startEncounter: ({ cellId: cellId2, restoreMessage }) => ({
+      kind: "town",
+      sourceKind: "town",
+      sourceCellId: cellId2,
+      restoreMessage
+    }),
+    rightGridEncounterKind: "town",
+    rightGrid: (s, row, col) => {
+      const pos = s.player.position;
+      const cell = s.world.cells[pos.y][pos.x];
+      if (cell.kind !== "town") return { action: null };
+      const town = cell;
+      function spriteIdForOffer(o) {
+        if (!o) return null;
+        if (o === "buyFood") return SPRITES.buttons.food;
+        if (o === "buyTroops") return SPRITES.buttons.troop;
+        if (o === "hireScout") return SPRITES.buttons.scout;
+        if (o === "buyRumors") return SPRITES.buttons.rumorTip;
+        return null;
+      }
+      const offerAt = (idx) => {
+        const o = town.offers[idx];
+        if (!o) return { action: null };
+        const spriteId = spriteIdForOffer(o);
+        if (spriteId == null) return { action: null };
+        return { spriteId, action: { type: o } };
+      };
+      if (row === 0 && col === 1) return offerAt(0);
+      if (row === 1 && col === 0) return offerAt(1);
+      if (row === 2 && col === 1) return offerAt(2);
+      if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_TOWN_LEAVE } };
+      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.marketStall, action: null };
+      return { action: null };
+    }
+  };
+
+  // src/core/mechanics/defs/terrainHazards.ts
+  var woodsPolicy = {
+    ambushPercent: WOODS_AMBUSH_PERCENT,
+    lostPercent: WOODS_LOST_PERCENT,
+    scoutLostHalves: true
+  };
+  var swampPolicy = {
+    ambushPercent: 0,
+    lostPercent: SWAMP_LOST_PERCENT,
+    scoutLostHalves: true
+  };
+  var mountainPolicy = { ambushPercent: MOUNTAIN_AMBUSH_PERCENT, lostPercent: 0 };
+  var terrainHazardsMechanic = {
+    id: "terrainHazards",
+    kinds: ["woods", "swamp", "mountain"],
+    enterFoodCostByKind: {
+      swamp: FOOD_COST_SWAMP,
+      mountain: FOOD_COST_MOUNTAIN
+    },
+    moveEventPolicyByKind: {
+      woods: woodsPolicy,
+      swamp: swampPolicy,
+      mountain: mountainPolicy
+    }
+  };
+
+  // src/core/mechanics/defs/combat.ts
+  var combatRightGrid = (_s, row, col) => {
+    if (row === 1 && col === 0) return { spriteId: SPRITES.buttons.fight, action: { type: ACTION_FIGHT } };
+    if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_RETURN } };
+    if (row === 1 && col === 1) return { spriteId: SPRITES.stats.enemy, action: null };
+    return { action: null };
+  };
+  var combatMechanic = {
+    id: "combat",
+    kinds: [],
+    rightGridEncounterKind: "combat",
+    rightGrid: combatRightGrid
+  };
+
+  // src/core/mechanics/index.ts
+  var MECHANICS = [
+    gateMechanic,
+    locksmithMechanic,
+    signpostMechanic,
+    farmMechanic,
+    campMechanic,
+    hengeMechanic,
+    townMechanic,
+    terrainHazardsMechanic,
+    combatMechanic
+  ];
+  var MECHANIC_INDEX = buildMechanicIndex(MECHANICS);
+
+  // src/core/mechanics/moveEvents.ts
+  var { moveEventPolicyByKind } = MECHANIC_INDEX;
+  function rollMoveEvent(args) {
+    const { seed, stepCount, cellId: cellId2, cell, hasScout } = args;
+    const kind = cell.kind;
+    if (kind === "henge") {
+      const readyAt = cell.nextReadyStep ?? 0;
+      if (stepCount < readyAt) return null;
+    }
+    const policy = moveEventPolicyByKind[kind];
+    if (!policy) return null;
+    const ambushPercent = policy.ambushPercent;
+    let lostPercent = policy.lostPercent;
+    if (hasScout && policy.scoutLostHalves) {
+      lostPercent = Math.floor(lostPercent / 2);
+    }
+    if (ambushPercent + lostPercent === 0) return null;
+    const percentile = RNG._keyedIntExclusive({ seed, stepCount, cellId: cellId2 }, 100);
+    const hazardSource = kind === "woods" || kind === "swamp" || kind === "mountain" || kind === "henge" ? kind : null;
+    if (!hazardSource) return null;
+    if (percentile < ambushPercent) {
+      return { kind: "fight", source: hazardSource };
+    }
+    if (percentile < ambushPercent + lostPercent) {
+      if (hazardSource === "mountain" || hazardSource === "henge") return null;
+      return { kind: "lost", source: hazardSource };
+    }
+    return null;
   }
 
   // src/core/teleport.ts
@@ -1174,7 +1565,12 @@ ${line}` };
     });
   }
   function placeNamedTowns(cells, rngState) {
-    const baseOffers = ["buyFood", "buyTroops", "hireScout", "buyRumors"];
+    const baseOffers = [
+      ACTION_TOWN_BUY_FOOD,
+      ACTION_TOWN_BUY_TROOPS,
+      ACTION_TOWN_HIRE_SCOUT,
+      ACTION_TOWN_BUY_RUMOR
+    ];
     const omitNoScoutIndices = [0, 1, 3];
     let townIndex = 0;
     return placeNamedFeatureRng(cells, rngState, {
@@ -1284,219 +1680,11 @@ ${line}` };
     return { world, startPosition: startPick.startPosition };
   }
 
-  // src/core/tiles/onEnterCamp.ts
-  var onEnterCamp = ({ cell, world, pos }) => {
-    if (cell.kind !== "camp") return { message: "" };
-    const camp = getCellAt(world, pos);
-    if (!camp || camp.kind !== "camp") return { message: "" };
-    const name = camp.name || "A Camp";
-    return { message: `${name} Camp` };
-  };
-
-  // src/core/tiles/onEnterDefaultTerrain.ts
+  // src/core/mechanics/onEnter.ts
+  var { onEnterByKind } = MECHANIC_INDEX;
   var onEnterDefaultTerrain = ({ cell, world, pos, stepCount }) => {
     const r = RNG.createTileRandom({ world, stepCount, pos });
     return { message: r.perMoveLine(terrainLoreLinesForKind(cell.kind)) };
-  };
-
-  // src/core/tiles/onEnterFarm.ts
-  var onEnterFarm = ({ cell, world, pos, stepCount, resources }) => {
-    if (cell.kind !== "farm") return { message: "" };
-    const farmCell = getCellAt(world, pos);
-    if (!farmCell || farmCell.kind !== "farm") return { message: "" };
-    const farmName = farmCell.name || "A Farm";
-    const readyAt = farmCell.nextReadyStep ?? 0;
-    if (stepCount < readyAt) {
-      const r2 = RNG.createTileRandom({ world, stepCount, pos });
-      return {
-        message: `${farmName} Farm
-${r2.perMoveLine(FARM_REVISIT_LINES, { cellId: farmCell.id })}`,
-        knowsPosition: true
-      };
-    }
-    const sr = RNG.createStreamRandom(world.rngState);
-    const gain = sr.intExclusive(8) + 3;
-    const r = RNG.createTileRandom({ world, stepCount, pos });
-    const harvestLine = r.stableLine(FARM_HARVEST_LINES, { placeId: farmCell.id });
-    const nextFarmCell = { ...farmCell, nextReadyStep: stepCount + FARM_COOLDOWN_MOVES };
-    const nextWorld = setCellAt({ ...world, rngState: sr.rngState }, pos, nextFarmCell);
-    return {
-      world: nextWorld,
-      resources: {
-        ...resources,
-        food: resources.food + gain
-      },
-      foodDeltas: [gain],
-      message: `${farmName} Farm
-${harvestLine}`,
-      knowsPosition: true
-    };
-  };
-
-  // src/core/tiles/onEnterGate.ts
-  var onEnterGate = ({ cell, world, pos, stepCount, resources }) => {
-    if (cell.kind !== "gate" && cell.kind !== "gateOpen") return { message: "" };
-    const r = RNG.createTileRandom({ world, stepCount, pos });
-    if (!resources.hasBronzeKey) {
-      const line2 = r.perMoveLine(GATE_LOCKED_LINES);
-      return { message: `${GATE_NAME}
-${line2}` };
-    }
-    const nextWorld = cell.kind === "gateOpen" ? world : setCellAt(world, pos, { kind: "gateOpen" });
-    const line = r.perMoveLine(GATE_OPEN_LINES);
-    return { world: nextWorld, hasWon: true, message: `${GATE_NAME}
-${line}` };
-  };
-
-  // src/core/tiles/onEnterHenge.ts
-  var onEnterHenge = ({ cell, world, pos, stepCount }) => {
-    if (cell.kind !== "henge") return { message: "" };
-    const hengeCell = getCellAt(world, pos);
-    if (!hengeCell || hengeCell.kind !== "henge") return { message: "" };
-    const r = RNG.createTileRandom({ world, stepCount, pos });
-    const name = hengeCell.name || "A Henge";
-    const readyAt = hengeCell.nextReadyStep ?? 0;
-    const isReady = stepCount >= readyAt;
-    const line = isReady ? r.perMoveLine(HENGE_LORE_LINES, { cellId: hengeCell.id }) : r.perMoveLine(HENGE_EMPTY_LINES, { cellId: hengeCell.id });
-    return { message: `${name} Henge
-${line}` };
-  };
-
-  // src/core/tiles/onEnterLocksmith.ts
-  var onEnterLocksmith = ({ cell, world, pos, stepCount, resources }) => {
-    if (cell.kind !== "locksmith") return { message: "" };
-    const r = RNG.createTileRandom({ world, stepCount, pos });
-    if (resources.hasBronzeKey) {
-      const line2 = r.perMoveLine(LOCKSMITH_VISITED_LINES);
-      return { message: `${LOCKSMITH_NAME}
-${line2}` };
-    }
-    if (resources.food >= BRONZE_KEY_FOOD_COST) {
-      const line2 = r.perMoveLine(LOCKSMITH_PURCHASE_LINES);
-      return {
-        resources: {
-          ...resources,
-          food: resources.food - BRONZE_KEY_FOOD_COST,
-          hasBronzeKey: true
-        },
-        foodDeltas: [-BRONZE_KEY_FOOD_COST],
-        message: `${LOCKSMITH_NAME}
-${line2}`
-      };
-    }
-    const line = r.perMoveLine(LOCKSMITH_NO_FOOD_LINES);
-    return { message: `${LOCKSMITH_NAME}
-${line}` };
-  };
-
-  // src/core/signpost.ts
-  function formatNearestPoiSignpostMessage(playerPos, world) {
-    const SIGNPOST_MIN_TARGET_DISTANCE = 2;
-    const POI_KIND_RANK = {
-      gate: 0,
-      gateOpen: 0,
-      locksmith: 1,
-      farm: 2,
-      town: 3,
-      camp: 4,
-      henge: 5
-    };
-    const kindRank = (k) => POI_KIND_RANK[k];
-    function candidateId(x, y) {
-      return y * world.width + x;
-    }
-    const candidates = [];
-    function pushNamedCandidate(kind, id, baseName, suffix, x, y) {
-      const name = `${baseName} ${suffix}`;
-      candidates.push({ kind, id, name, pos: { x, y } });
-    }
-    const cells = world.cells;
-    for (let y = 0; y < cells.length; y++) {
-      const row = cells[y];
-      for (let x = 0; x < row.length; x++) {
-        const cell = row[x];
-        switch (cell.kind) {
-          case "gate":
-            candidates.push({ kind: "gate", id: candidateId(x, y), name: GATE_NAME, pos: { x, y } });
-            break;
-          case "gateOpen":
-            candidates.push({ kind: "gateOpen", id: candidateId(x, y), name: GATE_NAME, pos: { x, y } });
-            break;
-          case "locksmith":
-            candidates.push({ kind: "locksmith", id: candidateId(x, y), name: LOCKSMITH_NAME, pos: { x, y } });
-            break;
-          case "farm":
-            pushNamedCandidate("farm", cell.id, cell.name || "A Farm", "Farm", x, y);
-            break;
-          case "camp":
-            pushNamedCandidate("camp", cell.id, cell.name || "A Camp", "Camp", x, y);
-            break;
-          case "henge":
-            pushNamedCandidate("henge", cell.id, cell.name || "A Henge", "Henge", x, y);
-            break;
-          case "town":
-            pushNamedCandidate("town", cell.id, cell.name || "A Town", "Town", x, y);
-            break;
-        }
-      }
-    }
-    if (candidates.length === 0) return "";
-    function evalCandidate(c) {
-      const dx = torusDelta(playerPos.x, c.pos.x, world.width);
-      const dy = torusDelta(playerPos.y, c.pos.y, world.height);
-      const d = manhattan(dx, dy);
-      const rank = kindRank(c.kind);
-      return { ...c, dx, dy, d, rank };
-    }
-    function isBetter(a, b) {
-      if (a.d !== b.d) return a.d < b.d;
-      if (a.rank !== b.rank) return a.rank < b.rank;
-      return a.id < b.id;
-    }
-    let bestAny = null;
-    let bestFar = null;
-    for (let i = 0; i < candidates.length; i++) {
-      const e = evalCandidate(candidates[i]);
-      if (!bestAny || isBetter(e, bestAny)) bestAny = e;
-      if (e.d > SIGNPOST_MIN_TARGET_DISTANCE) {
-        if (!bestFar || isBetter(e, bestFar)) bestFar = e;
-      }
-    }
-    const chosen = bestFar || bestAny;
-    if (!chosen) return "";
-    const dir = dirLabel(chosen.dx, chosen.dy);
-    return `${chosen.name}
-${dir}, ${chosen.d} leagues away.`;
-  }
-
-  // src/core/tiles/onEnterSignpost.ts
-  var onEnterSignpost = ({ world, pos }) => ({
-    message: formatNearestPoiSignpostMessage(pos, world),
-    knowsPosition: true
-  });
-
-  // src/core/tiles/onEnterTown.ts
-  var onEnterTown = ({ cell, world, pos }) => {
-    if (cell.kind !== "town") return { message: "" };
-    const town = getCellAt(world, pos);
-    if (!town || town.kind !== "town") return { message: "" };
-    const name = town.name || "A Town";
-    const r = RNG.createTileRandom({ world, stepCount: 0, pos });
-    const line = r.stableLine(TOWN_ENTER_LINES, { placeId: town.id });
-    return { message: `${name} Town
-${line}`, knowsPosition: true };
-  };
-
-  // src/core/tiles/registry.ts
-  var onEnterByKind = {
-    camp: onEnterCamp,
-    farm: onEnterFarm,
-    gate: onEnterGate,
-    gateOpen: onEnterGate,
-    henge: onEnterHenge,
-    locksmith: onEnterLocksmith,
-    signpost: onEnterSignpost,
-    town: onEnterTown
   };
   function getOnEnterHandler(kind) {
     return onEnterByKind[kind] || onEnterDefaultTerrain;
@@ -1509,6 +1697,8 @@ ${line}`, knowsPosition: true };
   var LEFT_PANEL_KIND_MAP = "map";
 
   // src/core/reducer.ts
+  var { startEncounterByKind } = MECHANIC_INDEX;
+  var { enterFoodCostByKind } = MECHANIC_INDEX;
   function getLeftPanel(ui) {
     return ui.leftPanel;
   }
@@ -1674,7 +1864,7 @@ ${line}`, knowsPosition: true };
     const nextStepCount = prevState.run.stepCount + 1;
     const prevRes = normalizeResources(world, prevState.resources);
     const prevFood = prevRes.food;
-    const cost = enterFoodCostForKind(cell.kind);
+    const cost = enterFoodCostByKind[cell.kind] ?? FOOD_COST_DEFAULT;
     const foodDeltas = [];
     const armyDeltas = [];
     let food;
@@ -1713,26 +1903,18 @@ ${line}`, knowsPosition: true };
       const destCell = nextWorld.cells[nextPos.y][nextPos.x];
       const destKind = destCell.kind;
       const destCellId = cellIdForPos2(nextWorld, nextPos);
-      let hengeReady = true;
-      if (destKind === "henge") {
-        const hc = destCell;
-        const readyAt = hc.nextReadyStep ?? 0;
-        hengeReady = nextStepCount >= readyAt;
-      }
       const preEncounterMessage = message;
-      if (destKind === "camp") {
-        nextEncounter = { kind: "camp", sourceKind: "camp", sourceCellId: destCellId, restoreMessage: preEncounterMessage };
-        didStartCamp = true;
-      } else if (destKind === "town") {
-        nextEncounter = { kind: "town", sourceKind: "town", sourceCellId: destCellId, restoreMessage: preEncounterMessage };
-        didStartTown = true;
+      const starter = startEncounterByKind[destKind];
+      if (starter) {
+        nextEncounter = starter({ kind: destKind, cellId: destCellId, restoreMessage: preEncounterMessage });
+        didStartCamp = nextEncounter.kind === "camp";
+        didStartTown = nextEncounter.kind === "town";
       } else {
-        const event = rollTileEvent({
+        const event = rollMoveEvent({
           seed: nextWorld.seed,
           stepCount: nextStepCount,
           cellId: destCellId,
-          kind: destKind,
-          hengeReady,
+          cell: destCell,
           hasScout: !!nextResources.hasScout
         });
         if (event && event.kind === "fight") {
@@ -2159,14 +2341,7 @@ ${line}`, knowsPosition: true };
   }
 
   // src/core/rightGrid.ts
-  function spriteIdForTownOffer(o) {
-    if (!o) return null;
-    if (o === "buyFood") return SPRITES.buttons.food;
-    if (o === "buyTroops") return SPRITES.buttons.troop;
-    if (o === "hireScout") return SPRITES.buttons.scout;
-    if (o === "buyRumors") return SPRITES.buttons.rumorTip;
-    return null;
-  }
+  var { rightGridByEncounterKind } = MECHANIC_INDEX;
   function getRightGridCellDef(s, row, col) {
     if (row === 0 && col === 0) return { spriteId: SPRITES.buttons.goal, action: { type: ACTION_SHOW_GOAL } };
     if (row === 2 && col === 0) return { spriteId: SPRITES.buttons.minimap, action: { type: ACTION_TOGGLE_MINIMAP } };
@@ -2175,44 +2350,9 @@ ${line}`, knowsPosition: true };
       return { spriteId: SPRITES.buttons.map, action: { type: ACTION_TOGGLE_MAP } };
     }
     const isRunOver = !!(s.run.isGameOver || s.run.hasWon);
-    if (s.encounter && s.encounter.kind === "combat") {
-      if (row === 1 && col === 0) return { spriteId: SPRITES.buttons.fight, action: { type: ACTION_FIGHT } };
-      if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_RETURN } };
-      if (row === 1 && col === 1) return { spriteId: SPRITES.stats.enemy, action: null };
-      return { action: null };
-    }
-    if (s.encounter && s.encounter.kind === "camp") {
-      if (row === 0 && col === 1) return { action: null };
-      if (row === 1 && col === 0) return { spriteId: SPRITES.buttons.search, action: { type: ACTION_CAMP_SEARCH } };
-      if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_CAMP_LEAVE } };
-      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.campfireIcon, action: null };
-      return { action: null };
-    }
-    if (s.encounter && s.encounter.kind === "town") {
-      let actionForOffer2 = function(o) {
-        if (o === "buyFood") return { type: ACTION_TOWN_BUY_FOOD };
-        if (o === "buyTroops") return { type: ACTION_TOWN_BUY_TROOPS };
-        if (o === "hireScout") return { type: ACTION_TOWN_HIRE_SCOUT };
-        return { type: ACTION_TOWN_BUY_RUMOR };
-      };
-      var actionForOffer = actionForOffer2;
-      const pos = s.player.position;
-      const cell = s.world.cells[pos.y][pos.x];
-      if (cell.kind !== "town") return { action: null };
-      const town = cell;
-      const offerAt = (idx) => {
-        const o = town.offers[idx];
-        if (!o) return { action: null };
-        const spriteId = spriteIdForTownOffer(o);
-        if (spriteId == null) return { action: null };
-        return { spriteId, action: actionForOffer2(o) };
-      };
-      if (row === 0 && col === 1) return offerAt(0);
-      if (row === 1 && col === 0) return offerAt(1);
-      if (row === 2 && col === 1) return offerAt(2);
-      if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_TOWN_LEAVE } };
-      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.marketStall, action: null };
-      return { action: null };
+    if (s.encounter) {
+      const p = rightGridByEncounterKind[s.encounter.kind];
+      return p ? p(s, row, col) : { action: null };
     }
     if (row === 0 && col === 1) return { tilePreview: { kind: "relativeToPlayer", dx: 0, dy: -1 }, action: isRunOver ? null : { type: ACTION_MOVE, dx: 0, dy: -1 } };
     if (row === 1 && col === 0) return { tilePreview: { kind: "relativeToPlayer", dx: -1, dy: 0 }, action: isRunOver ? null : { type: ACTION_MOVE, dx: -1, dy: 0 } };
@@ -2276,10 +2416,8 @@ ${line}`, knowsPosition: true };
   }
 
   // src/core/gameMap.ts
-  function labelForKind(kind) {
-    return GAME_MAP_LABEL_BY_KIND[kind] ?? null;
-  }
   function computeGameMapView(s) {
+    const { mapLabelByKind } = MECHANIC_INDEX;
     const showPlayer = !!s.run.knowsPosition;
     const markers = [];
     const seen = /* @__PURE__ */ new Set();
@@ -2289,6 +2427,7 @@ ${line}`, knowsPosition: true };
       seen.add(k);
       markers.push({ pos, label, isMapped });
     }
+    const candidates = [];
     const path = s.run.path ?? [];
     if (s.run.knowsPosition) {
       if (s.resources.hasScout) {
@@ -2296,33 +2435,28 @@ ${line}`, knowsPosition: true };
           for (let x = 0; x < s.world.width; x++) {
             const kind = s.world.cells[y][x].kind;
             if (!SCOUT_GLOBAL_REVEAL_KINDS.includes(kind)) continue;
-            const label = labelForKind(kind);
-            if (label) push({ x, y }, label, true);
+            candidates.push({ pos: { x, y }, isMapped: true });
           }
         }
       }
       for (let i = 0; i < path.length; i++) {
         const step = path[i];
         if (!step.isMapped) continue;
-        const p = step.pos;
-        const kind = s.world.cells[p.y][p.x].kind;
-        const label = labelForKind(kind);
-        if (!label) continue;
-        if (s.resources.hasScout && (label === "G" || label === "L")) push(p, label, true);
-        else if (!s.resources.hasScout) push(p, label, true);
-        else if (label === "F" || label === "C" || label === "H") push(p, label, true);
-        else if (label === "T") push(p, label, true);
+        candidates.push({ pos: step.pos, isMapped: true });
       }
     } else {
       const start = s.run.lostBufferStartIndex ?? path.length;
       for (let i = Math.max(0, start); i < path.length; i++) {
         const step = path[i];
-        const p = step.pos;
-        const kind = s.world.cells[p.y][p.x].kind;
-        const label = labelForKind(kind);
-        if (!label) continue;
-        push(p, label, step.isMapped);
+        candidates.push({ pos: step.pos, isMapped: step.isMapped });
       }
+    }
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i];
+      const kind = s.world.cells[c.pos.y][c.pos.x].kind;
+      const label = mapLabelByKind[kind];
+      if (!label) continue;
+      push(c.pos, label, c.isMapped);
     }
     return { markers, showPlayer };
   }
@@ -2442,36 +2576,14 @@ ${line}`, knowsPosition: true };
   }
   function spriteIdForModeCrossCell(s, mode, row, col) {
     if (mode === "blank") return null;
-    if (mode === "combat") {
-      if (row === 1 && col === 0) return SPRITES.buttons.fight;
-      if (row === 1 && col === 2) return SPRITES.buttons.return;
-      if (row === 1 && col === 1) return SPRITES.stats.enemy;
-      return null;
+    const pos = s.player.position;
+    const sourceKind = s.world.cells[pos.y]?.[pos.x]?.kind ?? "grass";
+    const s2 = mode === "overworld" ? { ...s, encounter: null } : mode === "camp" ? { ...s, encounter: { kind: "camp", sourceKind: "camp", sourceCellId: -1, restoreMessage: "" } } : mode === "town" ? { ...s, encounter: { kind: "town", sourceKind: "town", sourceCellId: -1, restoreMessage: "" } } : { ...s, encounter: { kind: "combat", enemyArmySize: 0, sourceKind, sourceCellId: -1, restoreMessage: "" } };
+    const def = getRightGridCellDef(s2, row, col);
+    if (def.spriteId != null) return def.spriteId;
+    if (def.tilePreview && def.tilePreview.kind === "relativeToPlayer") {
+      return getSpriteIdAt(s.world, pos.x + def.tilePreview.dx, pos.y + def.tilePreview.dy);
     }
-    if (mode === "camp") {
-      if (row === 0 && col === 1) return null;
-      if (row === 1 && col === 0) return SPRITES.buttons.search;
-      if (row === 1 && col === 2) return SPRITES.buttons.return;
-      if (row === 1 && col === 1) return SPRITES.cosmetics.campfireIcon;
-      return null;
-    }
-    if (mode === "town") {
-      const p2 = s.player.position;
-      const here = s.world.cells[p2.y][p2.x];
-      if (here.kind !== "town") return null;
-      if (row === 0 && col === 1) return spriteIdForTownOffer(here.offers[0]);
-      if (row === 1 && col === 0) return spriteIdForTownOffer(here.offers[1]);
-      if (row === 2 && col === 1) return spriteIdForTownOffer(here.offers[2]);
-      if (row === 1 && col === 2) return SPRITES.buttons.return;
-      if (row === 1 && col === 1) return SPRITES.cosmetics.marketStall;
-      return null;
-    }
-    const p = s.player.position;
-    if (row === 0 && col === 1) return getSpriteIdAt(s.world, p.x, p.y - 1);
-    if (row === 1 && col === 0) return getSpriteIdAt(s.world, p.x - 1, p.y);
-    if (row === 2 && col === 1) return getSpriteIdAt(s.world, p.x, p.y + 1);
-    if (row === 1 && col === 2) return getSpriteIdAt(s.world, p.x + 1, p.y);
-    if (row === 1 && col === 1) return getSpriteIdAt(s.world, p.x, p.y);
     return null;
   }
   function previewSpriteIdForCell(s, row, col) {

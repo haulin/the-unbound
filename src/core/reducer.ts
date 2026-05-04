@@ -27,18 +27,19 @@ import {
   LOST_FLAVOR_LINES,
   MAP_HINT_MESSAGE,
   MOVE_SLIDE_FRAMES,
-  enterFoodCostForKind,
+  FOOD_COST_DEFAULT,
 } from './constants'
 import { SPRITES } from './spriteIds'
 import { reduceCampAction } from './camp'
 import { cellIdForPos, resolveFightRound, spawnEnemyArmy } from './combat'
 import { reduceTownAction } from './town'
-import { rollTileEvent } from './tileEvents'
+import { rollMoveEvent } from './mechanics/moveEvents'
 import { pickTeleportDestination } from './teleport'
 import { RNG } from './rng'
 import { generateWorld } from './world'
 import { setCellAt } from './cells'
-import { getOnEnterHandler } from './tiles/registry'
+import { getOnEnterHandler } from './mechanics/onEnter'
+import { MECHANIC_INDEX } from './mechanics'
 import {
   LEFT_PANEL_KIND_AUTO,
   LEFT_PANEL_KIND_MAP,
@@ -58,6 +59,9 @@ import {
   type World,
 } from './types'
 import { enqueueAnim } from './uiAnim'
+
+const { startEncounterByKind } = MECHANIC_INDEX
+const { enterFoodCostByKind } = MECHANIC_INDEX
 
 export function getLeftPanel(ui: Ui): LeftPanel {
   return ui.leftPanel
@@ -252,7 +256,7 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
 
   const prevRes = normalizeResources(world, prevState.resources)
   const prevFood = prevRes.food
-  const cost = enterFoodCostForKind(cell.kind)
+  const cost = enterFoodCostByKind[cell.kind] ?? FOOD_COST_DEFAULT
 
   const foodDeltas: number[] = []
   const armyDeltas: number[] = []
@@ -298,29 +302,20 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
     const destKind = destCell.kind
     const destCellId = cellIdForPos(nextWorld, nextPos)
 
-    let hengeReady = true
-    if (destKind === 'henge') {
-      const hc = destCell as HengeCell
-      const readyAt = hc.nextReadyStep ?? 0
-      hengeReady = nextStepCount >= readyAt
-    }
-
     // Capture the tile message before we override it with encounter flavor (we want to restore this on victory/return).
     const preEncounterMessage = message
 
-    if (destKind === 'camp') {
-      nextEncounter = { kind: 'camp', sourceKind: 'camp', sourceCellId: destCellId, restoreMessage: preEncounterMessage }
-      didStartCamp = true
-    } else if (destKind === 'town') {
-      nextEncounter = { kind: 'town', sourceKind: 'town', sourceCellId: destCellId, restoreMessage: preEncounterMessage }
-      didStartTown = true
+    const starter = startEncounterByKind[destKind]
+    if (starter) {
+      nextEncounter = starter({ kind: destKind, cellId: destCellId, restoreMessage: preEncounterMessage })
+      didStartCamp = nextEncounter.kind === 'camp'
+      didStartTown = nextEncounter.kind === 'town'
     } else {
-      const event = rollTileEvent({
+      const event = rollMoveEvent({
         seed: nextWorld.seed,
         stepCount: nextStepCount,
         cellId: destCellId,
-        kind: destKind,
-        hengeReady,
+        cell: destCell,
         hasScout: !!nextResources.hasScout,
       })
 

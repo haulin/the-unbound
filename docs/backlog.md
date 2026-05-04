@@ -5,10 +5,13 @@
 - Farms become modal encounters: Buy Food (cheap, gold) / Buy Beast (one per run, gold) / Leave
 - Food carry limit, 2 per troop, tame beast possession adds +50
 - Farms sell food cheaper than towns, guaranteed stock, no cooldown on purchase, sells tame beast
-- Camps reworked: Search (food + troops, cooldown) / Local Map (fixed price, fixed radius, buyer beware) / Leave
-- Locksmith becomes modal: Pay Gold / Give food / Leave (Offer Troops deferred)
-- Lake: fishing gives 2-3 food on visit, cooldown
+- Locksmith becomes modal: Pay Gold / Give food / Leave
 - Rainbow's end: gives gold on visit (both ends), one-time per run or cooldown
+- Lake: fishing gives 2-3 food on visit, cooldown
+- for everything we should audit lore.ts and make sure to update lines to reflect new mechanics.
+
+Part2:
+- Camps reworked: Search (food + troops, cooldown) / Local Map (fixed price, fixed radius, buyer beware) / Leave
 - Henge fights scale harder (enemy = player×2..player×3 (min 10)), reward 10..25 gold+food
 - Swamp upside: small chance of rare herb (food bonus or combat buff) or gold from a corpse
 - Mountains upside: small chance of cave loot (gold or food cache)
@@ -16,7 +19,7 @@
 
 **v0.5 — Random Encounters & World Texture**
 - Random encounter pool on any tile (5-6 types): loot find / lone soldier joins / cursed tile / abandoned supplies / fellow traveller with rumor / something negative TBD
-- Camps re-orient position (consistent with farms/signposts/towns)
+- In swamps you can find a healer (picking herbs) that can join your party and prevent random deaths
 - Multiple flavor text variations per tile type (deterministic rotation by seed+step)
 - Contextual first-visit lore for every mechanic introduced so far
 
@@ -99,6 +102,7 @@ This file captures ideas discussed during design, kept out of the current phase'
 - Balance pass: town prices, scout cost, combat gold drops.
 - Town offer UI: decide whether to show quantity, price, or both (e.g. `3/5`), and whether bundle sizes should vary per offer/town.
 - Farms selling food (cheaper than towns).
+- buying scout shows animation - switch to show map, reveal tiles, hide map (if it was hidden)
 
 ## Tavern / rumors (deferred)
 

@@ -4,11 +4,12 @@ import {
   LOCKSMITH_NO_FOOD_LINES,
   LOCKSMITH_PURCHASE_LINES,
   LOCKSMITH_VISITED_LINES,
-} from '../constants'
-import { RNG } from '../rng'
-import type { TileEnterHandler } from './types'
+} from '../../constants'
+import { RNG } from '../../rng'
+import type { TileEnterHandler } from '../types'
+import type { MechanicDef } from '../types'
 
-export const onEnterLocksmith: TileEnterHandler = ({ cell, world, pos, stepCount, resources }) => {
+const onEnterLocksmith: TileEnterHandler = ({ cell, world, pos, stepCount, resources }) => {
   if (cell.kind !== 'locksmith') return { message: '' }
 
   const r = RNG.createTileRandom({ world, stepCount, pos })
@@ -35,3 +36,9 @@ export const onEnterLocksmith: TileEnterHandler = ({ cell, world, pos, stepCount
   return { message: `${LOCKSMITH_NAME}\n${line}` }
 }
 
+export const locksmithMechanic: MechanicDef = {
+  id: 'locksmith',
+  kinds: ['locksmith'],
+  mapLabel: 'L',
+  onEnter: onEnterLocksmith,
+}

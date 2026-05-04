@@ -1,9 +1,10 @@
-import { HENGE_EMPTY_LINES, HENGE_LORE_LINES } from '../constants'
-import { getCellAt } from '../cells'
-import { RNG } from '../rng'
-import type { TileEnterHandler } from './types'
+import { HENGE_EMPTY_LINES, HENGE_LORE_LINES } from '../../constants'
+import { getCellAt } from '../../cells'
+import { RNG } from '../../rng'
+import type { MechanicDef } from '../types'
+import type { TileEnterHandler } from '../types'
 
-export const onEnterHenge: TileEnterHandler = ({ cell, world, pos, stepCount }) => {
+const onEnterHenge: TileEnterHandler = ({ cell, world, pos, stepCount }) => {
   if (cell.kind !== 'henge') return { message: '' }
 
   const hengeCell = getCellAt(world, pos)
@@ -21,3 +22,10 @@ export const onEnterHenge: TileEnterHandler = ({ cell, world, pos, stepCount }) 
   return { message: `${name} Henge\n${line}` }
 }
 
+export const hengeMechanic: MechanicDef = {
+  id: 'henge',
+  kinds: ['henge'],
+  mapLabel: 'H',
+  moveEventPolicyByKind: { henge: { ambushPercent: 100, lostPercent: 0 } },
+  onEnter: onEnterHenge,
+}

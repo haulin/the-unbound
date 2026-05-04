@@ -1,14 +1,15 @@
-import { RNG } from '../rng'
+import { RNG } from '../../rng'
 import {
   FARM_COOLDOWN_MOVES,
   FARM_HARVEST_LINES,
   FARM_REVISIT_LINES,
-} from '../constants'
-import { getCellAt, setCellAt } from '../cells'
-import type { TileEnterHandler } from './types'
-import type { FarmCell } from '../types'
+} from '../../constants'
+import { getCellAt, setCellAt } from '../../cells'
+import type { FarmCell } from '../../types'
+import type { MechanicDef } from '../types'
+import type { TileEnterHandler } from '../types'
 
-export const onEnterFarm: TileEnterHandler = ({ cell, world, pos, stepCount, resources }) => {
+const onEnterFarm: TileEnterHandler = ({ cell, world, pos, stepCount, resources }) => {
   if (cell.kind !== 'farm') return { message: '' }
 
   const farmCell = getCellAt(world, pos)
@@ -45,3 +46,9 @@ export const onEnterFarm: TileEnterHandler = ({ cell, world, pos, stepCount, res
   }
 }
 
+export const farmMechanic: MechanicDef = {
+  id: 'farm',
+  kinds: ['farm'],
+  mapLabel: 'F',
+  onEnter: onEnterFarm,
+}

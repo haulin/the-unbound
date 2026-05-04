@@ -1,9 +1,10 @@
-import { GATE_LOCKED_LINES, GATE_NAME, GATE_OPEN_LINES } from '../constants'
-import { setCellAt } from '../cells'
-import { RNG } from '../rng'
-import type { TileEnterHandler } from './types'
+import { GATE_LOCKED_LINES, GATE_NAME, GATE_OPEN_LINES } from '../../constants'
+import { setCellAt } from '../../cells'
+import { RNG } from '../../rng'
+import type { TileEnterHandler } from '../types'
+import type { MechanicDef } from '../types'
 
-export const onEnterGate: TileEnterHandler = ({ cell, world, pos, stepCount, resources }) => {
+const onEnterGate: TileEnterHandler = ({ cell, world, pos, stepCount, resources }) => {
   if (cell.kind !== 'gate' && cell.kind !== 'gateOpen') return { message: '' }
 
   const r = RNG.createTileRandom({ world, stepCount, pos })
@@ -18,3 +19,9 @@ export const onEnterGate: TileEnterHandler = ({ cell, world, pos, stepCount, res
   return { world: nextWorld, hasWon: true, message: `${GATE_NAME}\n${line}` }
 }
 
+export const gateMechanic: MechanicDef = {
+  id: 'gate',
+  kinds: ['gate', 'gateOpen'],
+  mapLabel: 'G',
+  onEnter: onEnterGate,
+}

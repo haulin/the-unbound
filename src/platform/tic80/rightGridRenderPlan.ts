@@ -2,7 +2,7 @@ import {
   ENABLE_ANIMATIONS,
   GRID_TRANSITION_STEP_FRAMES,
 } from '../../core/constants'
-import { getRightGridCellDef, spriteIdForTownOffer } from '../../core/rightGrid'
+import { getRightGridCellDef } from '../../core/rightGrid'
 import { getSpriteIdAt } from '../../core/world'
 import type { GridTransitionAnim, MoveSlideAnim, State } from '../../core/types'
 import { SPRITES } from '../../core/spriteIds'
@@ -44,42 +44,24 @@ function crossRevealIndex(row: number, col: number): number {
 
 function spriteIdForModeCrossCell(s: State, mode: 'blank' | 'overworld' | 'combat' | 'camp' | 'town', row: number, col: number): number | null {
   if (mode === 'blank') return null
-  if (mode === 'combat') {
-    // Combat layout: W=fight, E=return, C=enemy, N/S empty.
-    if (row === 1 && col === 0) return SPRITES.buttons.fight
-    if (row === 1 && col === 2) return SPRITES.buttons.return
-    if (row === 1 && col === 1) return SPRITES.stats.enemy
-    return null
-  }
-  if (mode === 'camp') {
-    // Camp layout: N=hire, W=search, E=leave, C=camp icon, S empty.
-    // North disabled in v0.3+ (Hire Scout moved to towns).
-    if (row === 0 && col === 1) return null
-    if (row === 1 && col === 0) return SPRITES.buttons.search
-    if (row === 1 && col === 2) return SPRITES.buttons.return
-    if (row === 1 && col === 1) return SPRITES.cosmetics.campfireIcon
-    return null
-  }
-  if (mode === 'town') {
-    const p = s.player.position
-    const here = s.world.cells[p.y]![p.x]!
-    if (here.kind !== 'town') return null
 
-    if (row === 0 && col === 1) return spriteIdForTownOffer(here.offers[0])
-    if (row === 1 && col === 0) return spriteIdForTownOffer(here.offers[1])
-    if (row === 2 && col === 1) return spriteIdForTownOffer(here.offers[2])
-    if (row === 1 && col === 2) return SPRITES.buttons.return
-    if (row === 1 && col === 1) return SPRITES.cosmetics.marketStall
-    return null
-  }
+  const pos = s.player.position
+  const sourceKind = s.world.cells[pos.y]?.[pos.x]?.kind ?? 'grass'
 
-  // Overworld: show tile previews (relative to player).
-  const p = s.player.position
-  if (row === 0 && col === 1) return getSpriteIdAt(s.world, p.x, p.y - 1)
-  if (row === 1 && col === 0) return getSpriteIdAt(s.world, p.x - 1, p.y)
-  if (row === 2 && col === 1) return getSpriteIdAt(s.world, p.x, p.y + 1)
-  if (row === 1 && col === 2) return getSpriteIdAt(s.world, p.x + 1, p.y)
-  if (row === 1 && col === 1) return getSpriteIdAt(s.world, p.x, p.y)
+  const s2: State =
+    mode === 'overworld'
+      ? { ...s, encounter: null }
+      : mode === 'camp'
+        ? { ...s, encounter: { kind: 'camp', sourceKind: 'camp', sourceCellId: -1, restoreMessage: '' } }
+        : mode === 'town'
+          ? { ...s, encounter: { kind: 'town', sourceKind: 'town', sourceCellId: -1, restoreMessage: '' } }
+          : { ...s, encounter: { kind: 'combat', enemyArmySize: 0, sourceKind, sourceCellId: -1, restoreMessage: '' } }
+
+  const def = getRightGridCellDef(s2, row, col)
+  if (def.spriteId != null) return def.spriteId
+  if (def.tilePreview && def.tilePreview.kind === 'relativeToPlayer') {
+    return getSpriteIdAt(s.world, pos.x + def.tilePreview.dx, pos.y + def.tilePreview.dy)
+  }
   return null
 }
 

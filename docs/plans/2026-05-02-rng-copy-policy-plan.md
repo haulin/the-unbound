@@ -2,7 +2,7 @@
 
 This plan deepens the randomness surface so new features stop adding one-off RNG helpers, and so copy/flavor text can be **non-repeating** without making the simulation nondeterministic.
 
-Related architecture direction: `docs/refactor-architecture-overhaul.md` (“mechanic modules + central registry”). This plan is designed to **not** create a “god module” that knows about every `CellKind`. Instead, it creates a deep module whose **interface is policy-shaped** (stable vs per-move vs cursor-advanced), while mechanic modules (e.g. `town.ts`) own where cursors live and which policy they apply.
+Related architecture direction: `docs/refactor-mechanics-encounters-worldgen.md` (“mechanic modules + central registry”). This plan is designed to **not** create a “god module” that knows about every `CellKind`. Instead, it creates a deep module whose **interface is policy-shaped** (stable vs per-move vs cursor-advanced), while mechanic modules (e.g. `town.ts`) own where cursors live and which policy they apply.
 
 ## Problem
 
@@ -70,7 +70,7 @@ Add a small cursor map for no-repeat copy uses:
 - Town entry copy: `stable` (`townId` anchored).
 - Purchase feedback copy: `cursorAdvance` (cursor advanced per successful purchase), with cursor stored on `Run` for cross-town variety.
 
-This keeps the “what does Town do?” logic in the Town mechanic module, aligned with `docs/refactor-architecture-overhaul.md`.
+This keeps the “what does Town do?” logic in the Town mechanic module, aligned with `docs/refactor-mechanics-encounters-worldgen.md`.
 
 ## Implementation steps
 
@@ -128,5 +128,5 @@ Potential file:
 ## Follow-ups (optional, after this plan)
 
 - Migrate other “action feedback” copy (combat exit lines, farm harvest lines) to `copy.cursorAdvance` where repetition is noticeable.
-- After `docs/refactor-architecture-overhaul.md` registry work: allow mechanics to declare which cursor(s) they need, while `copy.ts` remains the single selection policy module.
+- After `docs/refactor-mechanics-encounters-worldgen.md` registry work: allow mechanics to declare which cursor(s) they need, while `copy.ts` remains the single selection policy module.
 

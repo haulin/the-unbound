@@ -1,6 +1,10 @@
 import {
   CAMP_COUNT,
   CAMP_NAME_POOL,
+  ACTION_TOWN_BUY_FOOD,
+  ACTION_TOWN_BUY_RUMOR,
+  ACTION_TOWN_BUY_TROOPS,
+  ACTION_TOWN_HIRE_SCOUT,
   FARM_COUNT,
   FARM_NAME_POOL,
   GATE_LOCKSMITH_MIN_DISTANCE,
@@ -29,7 +33,7 @@ import {
 } from './constants'
 import { manhattan, torusDelta, wrapIndex } from './math'
 import { RNG } from './rng'
-import type { Cell, CellGrid, GeneratedWorld, Vec2, World } from './types'
+import type { Cell, CellGrid, GeneratedWorld, TownOfferKind, Vec2, World } from './types'
 
 function cellId(x: number, y: number): number {
   return y * WORLD_WIDTH + x
@@ -232,7 +236,12 @@ function placeNamedCamps(cells: CellGrid, rngState: number): number {
 }
 
 function placeNamedTowns(cells: CellGrid, rngState: number): number {
-  const baseOffers: Array<'buyFood' | 'buyTroops' | 'hireScout' | 'buyRumors'> = ['buyFood', 'buyTroops', 'hireScout', 'buyRumors']
+  const baseOffers: TownOfferKind[] = [
+    ACTION_TOWN_BUY_FOOD,
+    ACTION_TOWN_BUY_TROOPS,
+    ACTION_TOWN_HIRE_SCOUT,
+    ACTION_TOWN_BUY_RUMOR,
+  ]
   const omitNoScoutIndices = [0, 1, 3] as const // baseOffers indices excluding hireScout
 
   let townIndex = 0

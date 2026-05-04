@@ -83,8 +83,8 @@ describe('town reducer', () => {
 
     const body1 = s1.ui.message.split('\n').slice(1).join('\n')
     const body2 = s2.ui.message.split('\n').slice(1).join('\n')
-    expect((TOWN_BUY_LINES as readonly string[]).includes(body1)).toBe(true)
-    expect((TOWN_BUY_LINES as readonly string[]).includes(body2)).toBe(true)
+    expect(TOWN_BUY_LINES.some((l) => l === body1)).toBe(true)
+    expect(TOWN_BUY_LINES.some((l) => l === body2)).toBe(true)
     expect(body1).not.toBe(body2)
   })
 
@@ -170,7 +170,7 @@ describe('town reducer', () => {
     expect(deltas.some((d) => d.params.delta === -3)).toBe(true)
 
     const body = next.ui.message.split('\n').slice(1).join('\n')
-    expect((TOWN_BUY_LINES as readonly string[]).includes(body)).toBe(true)
+    expect(TOWN_BUY_LINES.some((l) => l === body)).toBe(true)
   })
 })
 
