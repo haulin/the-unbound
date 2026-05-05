@@ -139,7 +139,7 @@ describe('v0.4 POI + terrain payoff acceptance (harness)', () => {
         hasScout: false,
         hasTameBeast: false,
       },
-      encounter: { kind: 'town', sourceKind: 'town', sourceCellId: town.id, restoreMessage: 'x' },
+      encounter: { kind: 'town', sourceCellId: town.id, restoreMessage: 'x' },
     }
     const after = processAction(s0, { type: ACTION_TOWN_BUY_FOOD })!
     expect(after.resources.gold).toBe(99)

@@ -174,28 +174,24 @@ export type CombatEncounter = {
 
 export type CampEncounter = {
   kind: 'camp'
-  sourceKind: 'camp'
   sourceCellId: number
   restoreMessage: string
 }
 
 export type TownEncounter = {
   kind: 'town'
-  sourceKind: 'town'
   sourceCellId: number
   restoreMessage: string
 }
 
 export type FarmEncounter = {
   kind: 'farm'
-  sourceKind: 'farm'
   sourceCellId: number
   restoreMessage: string
 }
 
 export type LocksmithEncounter = {
   kind: 'locksmith'
-  sourceKind: 'locksmith'
   sourceCellId: number
   restoreMessage: string
 }

@@ -4,6 +4,10 @@ export function getCellAt(world: World, pos: Vec2): Cell {
   return world.cells[pos.y]![pos.x]!
 }
 
+export function cellIdForPos(world: { width: number }, pos: Vec2): number {
+  return pos.y * world.width + pos.x
+}
+
 export function setCellAt(world: World, pos: Vec2, nextCell: Cell): World {
   const cells = world.cells
   const row = cells[pos.y]!

@@ -1,27 +1,18 @@
-import type { Cell } from '../types'
 import { RNG } from '../rng'
-import { MECHANIC_INDEX } from './index'
-import type { MoveEvent, MoveEventSource } from './types'
+import type { MoveEvent, MoveEventPolicy, MoveEventSource } from './types'
 
-const { moveEventPolicyByKind } = MECHANIC_INDEX
-
+// Pure helper: rolls a move event for a tile entry given the policy and RNG keys.
+// Caller supplies `source` (echoed on the result so consumers can branch on origin) and
+// the keyed-RNG inputs `{seed, stepCount, cellId}`. No global registry reads, no per-kind
+// special cases — those belong to each mechanic's `onEnterTile`. The henge cooldown, for
+// example, is enforced inside `henge.onEnterTile` before this is called.
 export function rollMoveEvent(args: {
-  seed: number
-  stepCount: number
-  cellId: number
-  cell: Cell
+  policy: MoveEventPolicy
   hasScout: boolean
+  source: MoveEventSource
+  rngKeys: { seed: number; stepCount: number; cellId: number }
 }): MoveEvent | null {
-  const { seed, stepCount, cellId, cell, hasScout } = args
-  const kind = cell.kind
-
-  if (kind === 'henge') {
-    const readyAt = cell.nextReadyStep ?? 0
-    if (stepCount < readyAt) return null
-  }
-
-  const policy = moveEventPolicyByKind[kind]
-  if (!policy) return null
+  const { policy, hasScout, source, rngKeys } = args
 
   const ambushPercent = policy.ambushPercent
   let lostPercent = policy.lostPercent
@@ -31,17 +22,13 @@ export function rollMoveEvent(args: {
 
   if (ambushPercent + lostPercent === 0) return null
 
-  const percentile = RNG.keyedIntExclusive({ seed, stepCount, cellId }, 100)
-  const hazardSource: MoveEventSource | null =
-    kind === 'woods' || kind === 'swamp' || kind === 'mountain' || kind === 'henge' ? kind : null
-  if (!hazardSource) return null
+  const percentile = RNG.keyedIntExclusive(rngKeys, 100)
 
   if (percentile < ambushPercent) {
-    return { kind: 'fight', source: hazardSource }
+    return { kind: 'fight', source }
   }
   if (percentile < ambushPercent + lostPercent) {
-    if (hazardSource === 'mountain' || hazardSource === 'henge') return null
-    return { kind: 'lost', source: hazardSource }
+    return { kind: 'lost', source }
   }
   return null
 }

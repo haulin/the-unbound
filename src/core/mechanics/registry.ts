@@ -3,16 +3,16 @@ import type {
   EncounterKind,
   MechanicDef,
   MoveEventPolicy,
+  OnEnterTile,
+  ReduceEncounterAction,
   RightGridProvider,
-  StartEncounterFn,
-  TileEnterHandler,
 } from './types'
 
 export type MechanicIndex = {
   ownerByKind: Partial<Record<CellKind, string>>
-  onEnterByKind: Partial<Record<CellKind, TileEnterHandler>>
-  startEncounterByKind: Partial<Record<CellKind, StartEncounterFn>>
+  onEnterTileByKind: Partial<Record<CellKind, OnEnterTile>>
   rightGridByEncounterKind: Partial<Record<EncounterKind, RightGridProvider>>
+  reduceEncounterActionByEncounterKind: Partial<Record<EncounterKind, ReduceEncounterAction>>
   mapLabelByKind: Partial<Record<CellKind, string>>
   enterFoodCostByKind: Partial<Record<CellKind, number>>
   moveEventPolicyByKind: Partial<Record<CellKind, MoveEventPolicy>>
@@ -21,12 +21,14 @@ export type MechanicIndex = {
 export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicIndex {
   const seenIds = new Set<string>()
   const ownerByKind: Partial<Record<CellKind, string>> = {}
-  const onEnterByKind: Partial<Record<CellKind, TileEnterHandler>> = {}
-  const startEncounterByKind: Partial<Record<CellKind, StartEncounterFn>> = {}
+  const onEnterTileByKind: Partial<Record<CellKind, OnEnterTile>> = {}
   const rightGridByEncounterKind: Partial<Record<EncounterKind, RightGridProvider>> = {}
+  const reduceEncounterActionByEncounterKind: Partial<Record<EncounterKind, ReduceEncounterAction>> = {}
   const mapLabelByKind: Partial<Record<CellKind, string>> = {}
   const enterFoodCostByKind: Partial<Record<CellKind, number>> = {}
   const moveEventPolicyByKind: Partial<Record<CellKind, MoveEventPolicy>> = {}
+
+  const seenEncounterKinds = new Set<EncounterKind>()
 
   for (let i = 0; i < mechanics.length; i++) {
     const m = mechanics[i]!
@@ -36,15 +38,21 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
     }
     seenIds.add(m.id)
 
-    const encounterKind = m.rightGridEncounterKind
-    const provider = m.rightGrid
-    if ((encounterKind && !provider) || (!encounterKind && provider)) {
-      throw new Error(`Mechanic ${m.id} must set both rightGridEncounterKind and rightGrid`)
+    // encounterKind keys both rightGrid lookup and reduceEncounterAction dispatch.
+    // rightGrid / reduceEncounterAction without encounterKind have no lookup key — reject.
+    if (m.rightGrid && !m.encounterKind) {
+      throw new Error(`Mechanic ${m.id} sets rightGrid without encounterKind`)
     }
-    if (encounterKind && provider) {
-      const prev = rightGridByEncounterKind[encounterKind]
-      if (prev) throw new Error(`Duplicate rightGridEncounterKind: ${encounterKind}`)
-      rightGridByEncounterKind[encounterKind] = provider
+    if (m.reduceEncounterAction && !m.encounterKind) {
+      throw new Error(`Mechanic ${m.id} sets reduceEncounterAction without encounterKind`)
+    }
+    if (m.encounterKind) {
+      if (seenEncounterKinds.has(m.encounterKind)) {
+        throw new Error(`Duplicate encounterKind: ${m.encounterKind}`)
+      }
+      seenEncounterKinds.add(m.encounterKind)
+      if (m.rightGrid) rightGridByEncounterKind[m.encounterKind] = m.rightGrid
+      if (m.reduceEncounterAction) reduceEncounterActionByEncounterKind[m.encounterKind] = m.reduceEncounterAction
     }
 
     const costByKind = m.enterFoodCostByKind
@@ -90,8 +98,7 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
         throw new Error(`Duplicate kind ownership: ${kind} claimed by ${prevOwner} and ${m.id}`)
       }
       ownerByKind[kind] = m.id
-      if (m.onEnter) onEnterByKind[kind] = m.onEnter
-      if (m.startEncounter) startEncounterByKind[kind] = m.startEncounter
+      if (m.onEnterTile) onEnterTileByKind[kind] = m.onEnterTile
       if (m.mapLabel != null) mapLabelByKind[kind] = m.mapLabel
       const cost = costByKind?.[kind]
       if (cost != null) enterFoodCostByKind[kind] = cost
@@ -102,9 +109,9 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
 
   return {
     ownerByKind,
-    onEnterByKind,
-    startEncounterByKind,
+    onEnterTileByKind,
     rightGridByEncounterKind,
+    reduceEncounterActionByEncounterKind,
     mapLabelByKind,
     enterFoodCostByKind,
     moveEventPolicyByKind,

@@ -55,10 +55,10 @@ function spriteIdForModeCrossCell(
 
   const s2: State = (() => {
     if (mode === 'overworld') return { ...s, encounter: null }
-    if (mode === 'camp') return { ...s, encounter: { kind: 'camp', sourceKind: 'camp', sourceCellId: -1, restoreMessage: '' } }
-    if (mode === 'town') return { ...s, encounter: { kind: 'town', sourceKind: 'town', sourceCellId: -1, restoreMessage: '' } }
-    if (mode === 'farm') return { ...s, encounter: { kind: 'farm', sourceKind: 'farm', sourceCellId: -1, restoreMessage: '' } }
-    if (mode === 'locksmith') return { ...s, encounter: { kind: 'locksmith', sourceKind: 'locksmith', sourceCellId: -1, restoreMessage: '' } }
+    if (mode === 'camp') return { ...s, encounter: { kind: 'camp', sourceCellId: -1, restoreMessage: '' } }
+    if (mode === 'town') return { ...s, encounter: { kind: 'town', sourceCellId: -1, restoreMessage: '' } }
+    if (mode === 'farm') return { ...s, encounter: { kind: 'farm', sourceCellId: -1, restoreMessage: '' } }
+    if (mode === 'locksmith') return { ...s, encounter: { kind: 'locksmith', sourceCellId: -1, restoreMessage: '' } }
     return { ...s, encounter: { kind: 'combat', enemyArmySize: 0, sourceKind, sourceCellId: -1, restoreMessage: '' } }
   })()
 

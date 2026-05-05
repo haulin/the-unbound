@@ -52,7 +52,7 @@ function makeState(seed = 7): State {
     player: { position: { x: 1, y: 1 } },
     run: { stepCount: 10, hasWon: false, isGameOver: false, knowsPosition: true, path: [], lostBufferStartIndex: null },
     resources: { food: 0, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
-    encounter: { kind: 'town', sourceKind: 'town', sourceCellId: 4, restoreMessage: 'restored' },
+    encounter: { kind: 'town', sourceCellId: 4, restoreMessage: 'restored' },
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
 }

@@ -7,10 +7,10 @@ import {
   ACTION_RESTART,
   CAMP_COOLDOWN_MOVES,
   CAMP_FOOD_GAIN,
-  GAME_OVER_LINES,
   ENABLE_ANIMATIONS,
   INITIAL_FOOD,
 } from '../../src/core/constants'
+import { gameOverMessage as expectedGameOverLine } from '../../src/core/gameOver'
 import type { DeltaAnim, State, World } from '../../src/core/types'
 
 function makeWorld(): World {
@@ -45,13 +45,6 @@ function makeState(): State {
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
-}
-
-function expectedGameOverLine(seed: number, stepCount: number) {
-  const k = ((seed | 0) + (stepCount | 0)) | 0
-  const m = GAME_OVER_LINES.length
-  const idx = ((k % m) + m) % m
-  return GAME_OVER_LINES[idx] || ''
 }
 
 describe('army + camps + game over', () => {

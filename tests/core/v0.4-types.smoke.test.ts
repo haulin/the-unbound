@@ -18,12 +18,12 @@ describe('v0.4 types smoke', () => {
   })
 
   it('FarmEncounter shape', () => {
-    const e: Encounter = { kind: 'farm', sourceKind: 'farm', sourceCellId: 1, restoreMessage: '' }
+    const e: Encounter = { kind: 'farm', sourceCellId: 1, restoreMessage: '' }
     expect(e.kind).toBe('farm')
   })
 
   it('LocksmithEncounter shape', () => {
-    const e: Encounter = { kind: 'locksmith', sourceKind: 'locksmith', sourceCellId: 1, restoreMessage: '' }
+    const e: Encounter = { kind: 'locksmith', sourceCellId: 1, restoreMessage: '' }
     expect(e.kind).toBe('locksmith')
   })
 

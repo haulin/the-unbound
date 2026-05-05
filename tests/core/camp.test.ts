@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeCampArmyGain } from '../../src/core/camp'
+import { computeCampArmyGain } from '../../src/core/mechanics/defs/camp'
 
 describe('computeCampArmyGain', () => {
   it('is deterministic for the same inputs', () => {

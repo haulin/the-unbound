@@ -2,13 +2,13 @@ import { RAINBOW_END_GOLD_PAYOUT, RAINBOW_END_PAYOUT_LINES, RAINBOW_END_SPENT_LI
 import { getCellAt, setCellAt } from '../../cells'
 import { RNG } from '../../rng'
 import type { RainbowEndCell } from '../../types'
-import type { MechanicDef, TileEnterHandler } from '../types'
+import type { MechanicDef, OnEnterTile } from '../types'
 
-const onEnterRainbowEnd: TileEnterHandler = ({ cell, world, pos, stepCount, resources }) => {
-  if (cell.kind !== 'rainbowEnd') return { message: '' }
+const onEnterRainbowEnd: OnEnterTile = ({ cell, world, pos, stepCount, resources }) => {
+  if (cell.kind !== 'rainbowEnd') return {}
 
   const rainbowEndCell = getCellAt(world, pos)
-  if (!rainbowEndCell || rainbowEndCell.kind !== 'rainbowEnd') return { message: '' }
+  if (!rainbowEndCell || rainbowEndCell.kind !== 'rainbowEnd') return {}
 
   const tileRand = RNG.createTileRandom({ world, stepCount, pos })
 
@@ -30,5 +30,5 @@ export const rainbowEndMechanic: MechanicDef = {
   id: 'rainbowEnd',
   kinds: ['rainbowEnd'],
   mapLabel: 'R',
-  onEnter: onEnterRainbowEnd,
+  onEnterTile: onEnterRainbowEnd,
 }

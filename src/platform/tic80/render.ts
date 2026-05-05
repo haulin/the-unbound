@@ -8,7 +8,7 @@ import {
   LOST_COORD_LABEL,
 } from '../../core/constants'
 import { SPRITES } from '../../core/spriteIds'
-import { computeCampPreviewModel } from '../../core/camp'
+import { computeCampPreviewModel } from '../../core/mechanics/defs/camp'
 import { computeGameMapView } from '../../core/gameMap'
 import { getSpriteIdAt } from '../../core/world'
 import { torusDelta } from '../../core/math'
@@ -229,7 +229,7 @@ function drawLeftPanel(s: State) {
       drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
 
       const preview = computeCampPreviewModel(s)
-      if (preview) {
+      {
         type Line = { spriteId: number; text: string; color: number }
         const lines: Line[] = []
         if (preview.foodGain > 0) {

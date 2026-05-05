@@ -164,3 +164,15 @@ And the “what does this thing do?” behavior should be concentrated in:
 
 - `src/core/mechanics/defs/*.ts`
 
+---
+
+## Stage B precursor: render-side coupling
+
+Stage A landed encounter action handling in defs, but several modules still hardcode mechanic names. Tracked here so the Stage B work picks them up:
+
+- **`src/platform/tic80/render.ts`** has five `encounterKind === '...'` branches (combat / camp / town / farm / locksmith) for the left-panel preview plate. Each is a `{ spriteId, text, color }` list with the same plate chrome. Mechanics should expose a preview-plate model from their def — e.g. `previewPlate?: (s: State) => readonly { spriteId: number; text: string; color: number }[] | null` — and render becomes a single loop. Same applies to the import of `computeCampPreviewModel` at line 11.
+- **`src/core/signpost.ts`** hardcodes a `PoiKind` union and `POI_KIND_RANK` map. PoI mechanics should contribute (kind, rank, name-getter) tuples, ranked deterministically.
+- **`src/core/world.ts`** still names mechanics in worldgen (placement, naming, offer initialization). This is the bulk of Stage B.
+- **`src/platform/tic80/rightGridRenderPlan.ts`** still enumerates encounter kinds when synthesizing modal-mode states for grid-transition previews. Each mechanic could expose a "synthetic encounter for preview" factory, and the renderer would just iterate `MECHANIC_INDEX.encounterKinds`.
+- **`src/core/types.ts`** keeps `sourceKind` only on `CombatEncounter` (where it's legitimately variable: woods/swamp/mountain/henge). Non-combat encounters dropped the field — `kind` already determines everything.
+

@@ -1,43 +1,39 @@
 import { describe, expect, it } from 'vitest'
 import { buildMechanicIndex } from '../../src/core/mechanics/registry'
-import type { MechanicDef } from '../../src/core/mechanics/types'
-import type { StartEncounterFn } from '../../src/core/mechanics/types'
-import type { RightGridProvider } from '../../src/core/mechanics/types'
-import type { TileEnterHandler } from '../../src/core/mechanics/types'
+import type {
+  MechanicDef,
+  OnEnterTile,
+  ReduceEncounterAction,
+  RightGridProvider,
+} from '../../src/core/mechanics/types'
 import type { CellKind } from '../../src/core/types'
 
-function mech(
-  id: string,
-  kinds: readonly CellKind[],
-  onEnter?: TileEnterHandler,
-  startEncounter?: StartEncounterFn,
-): MechanicDef {
+function mech(id: string, kinds: readonly CellKind[], onEnterTile?: OnEnterTile): MechanicDef {
   return {
     id,
     kinds,
-    ...(onEnter ? { onEnter } : {}),
-    ...(startEncounter ? { startEncounter } : {}),
+    ...(onEnterTile ? { onEnterTile } : {}),
   }
 }
 
 describe('mechanics registry', () => {
-  const onEnterGate: TileEnterHandler = () => ({ message: '' })
+  const onEnterGate: OnEnterTile = () => ({ message: '' })
 
   it('throws if two mechanics share the same id', () => {
     const mechanics = [mech('dup', ['gate'], onEnterGate), mech('dup', ['locksmith'], onEnterGate)]
     expect(() => buildMechanicIndex(mechanics)).toThrow(/duplicate mechanic id/i)
   })
 
-  it('throws if two mechanics claim the same kind (even if one has no onEnter)', () => {
+  it('throws if two mechanics claim the same kind (even if one has no onEnterTile)', () => {
     const mechanics = [mech('a', ['gate']), mech('b', ['gate'], onEnterGate)]
     expect(() => buildMechanicIndex(mechanics)).toThrow(/duplicate kind ownership/i)
   })
 
-  it('indexes onEnter handlers by kind (including multi-kind ownership)', () => {
+  it('indexes onEnterTile handlers by kind (including multi-kind ownership)', () => {
     const mechanics = [mech('gate', ['gate', 'gateOpen'], onEnterGate)]
     const idx = buildMechanicIndex(mechanics)
-    expect(idx.onEnterByKind.gate).toBe(onEnterGate)
-    expect(idx.onEnterByKind.gateOpen).toBe(onEnterGate)
+    expect(idx.onEnterTileByKind.gate).toBe(onEnterGate)
+    expect(idx.onEnterTileByKind.gateOpen).toBe(onEnterGate)
   })
 
   it('indexes map labels by kind (including multi-kind ownership)', () => {
@@ -76,42 +72,51 @@ describe('mechanics registry', () => {
     expect(() => buildMechanicIndex(mechanics)).toThrow(/moveeventpolicy.*100/i)
   })
 
-  it('indexes startEncounter handlers by kind', () => {
-    const startCamp: StartEncounterFn = ({ cellId, restoreMessage }) => ({
-      kind: 'camp',
-      sourceKind: 'camp',
-      sourceCellId: cellId,
-      restoreMessage,
-    })
-
-    const mechanics = [mech('camp', ['camp'], undefined, startCamp)]
-    const idx = buildMechanicIndex(mechanics)
-    expect(idx.startEncounterByKind.camp).toBe(startCamp)
-  })
-
-  it('indexes rightGrid providers by encounter kind', () => {
+  it('indexes rightGrid providers by encounterKind', () => {
     const p: RightGridProvider = () => ({ action: null })
     const mechanics: MechanicDef[] = [
-      { id: 'camp', kinds: ['camp'], rightGridEncounterKind: 'camp', rightGrid: p },
-      { id: 'combat', kinds: [], rightGridEncounterKind: 'combat', rightGrid: p },
+      { id: 'camp', kinds: ['camp'], encounterKind: 'camp', rightGrid: p },
+      { id: 'combat', kinds: [], encounterKind: 'combat', rightGrid: p },
     ]
     const idx = buildMechanicIndex(mechanics)
     expect(idx.rightGridByEncounterKind.camp).toBe(p)
     expect(idx.rightGridByEncounterKind.combat).toBe(p)
   })
 
-  it('throws if two mechanics claim the same rightGridEncounterKind', () => {
+  it('throws if two mechanics claim the same encounterKind', () => {
     const p: RightGridProvider = () => ({ action: null })
     const mechanics: MechanicDef[] = [
-      { id: 'a', kinds: [], rightGridEncounterKind: 'camp', rightGrid: p },
-      { id: 'b', kinds: [], rightGridEncounterKind: 'camp', rightGrid: p },
+      { id: 'a', kinds: [], encounterKind: 'camp', rightGrid: p },
+      { id: 'b', kinds: [], encounterKind: 'camp', rightGrid: p },
     ]
-    expect(() => buildMechanicIndex(mechanics)).toThrow(/duplicate.*rightgrid/i)
+    expect(() => buildMechanicIndex(mechanics)).toThrow(/duplicate encounterkind/i)
   })
 
-  it('throws if rightGrid and rightGridEncounterKind are not both set', () => {
+  it('throws if rightGrid is set without encounterKind', () => {
     const p: RightGridProvider = () => ({ action: null })
-    expect(() => buildMechanicIndex([{ id: 'a', kinds: [], rightGrid: p }])).toThrow(/rightgrid/i)
-    expect(() => buildMechanicIndex([{ id: 'b', kinds: [], rightGridEncounterKind: 'camp' }])).toThrow(/rightgrid/i)
+    expect(() => buildMechanicIndex([{ id: 'a', kinds: [], rightGrid: p }])).toThrow(
+      /rightgrid without encounterkind/i,
+    )
+  })
+
+  it('allows encounterKind without rightGrid (encounter-only mechanics)', () => {
+    const idx = buildMechanicIndex([{ id: 'a', kinds: [], encounterKind: 'combat' }])
+    expect(idx.rightGridByEncounterKind.combat).toBeUndefined()
+  })
+
+  it('indexes reduceEncounterAction by encounterKind', () => {
+    const reducer: ReduceEncounterAction = (state) => state
+    const mechanics: MechanicDef[] = [
+      { id: 'camp', kinds: ['camp'], encounterKind: 'camp', reduceEncounterAction: reducer },
+    ]
+    const idx = buildMechanicIndex(mechanics)
+    expect(idx.reduceEncounterActionByEncounterKind.camp).toBe(reducer)
+  })
+
+  it('throws if reduceEncounterAction is set without encounterKind', () => {
+    const reducer: ReduceEncounterAction = (state) => state
+    expect(() =>
+      buildMechanicIndex([{ id: 'a', kinds: [], reduceEncounterAction: reducer }]),
+    ).toThrow(/reduceencounteraction without encounterkind/i)
   })
 })

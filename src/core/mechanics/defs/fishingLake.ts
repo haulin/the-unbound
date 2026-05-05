@@ -6,13 +6,13 @@ import {
 } from '../../constants'
 import { getCellAt, setCellAt } from '../../cells'
 import type { FishingLakeCell } from '../../types'
-import type { MechanicDef, TileEnterHandler } from '../types'
+import type { MechanicDef, OnEnterTile } from '../types'
 
-const onEnterFishingLake: TileEnterHandler = ({ cell, world, pos, stepCount, resources }) => {
-  if (cell.kind !== 'fishingLake') return { message: '' }
+const onEnterFishingLake: OnEnterTile = ({ cell, world, pos, stepCount, resources }) => {
+  if (cell.kind !== 'fishingLake') return {}
 
   const lake = getCellAt(world, pos)
-  if (!lake || lake.kind !== 'fishingLake') return { message: '' }
+  if (!lake || lake.kind !== 'fishingLake') return {}
 
   if (stepCount < lake.nextReadyStep) {
     const r = RNG.createTileRandom({ world, stepCount, pos })
@@ -36,7 +36,6 @@ const onEnterFishingLake: TileEnterHandler = ({ cell, world, pos, stepCount, res
       ...resources,
       food: resources.food + gain,
     },
-    foodDeltas: [gain],
     message: line,
   }
 }
@@ -44,5 +43,5 @@ const onEnterFishingLake: TileEnterHandler = ({ cell, world, pos, stepCount, res
 export const fishingLakeMechanic: MechanicDef = {
   id: 'fishingLake',
   kinds: ['fishingLake'],
-  onEnter: onEnterFishingLake,
+  onEnterTile: onEnterFishingLake,
 }

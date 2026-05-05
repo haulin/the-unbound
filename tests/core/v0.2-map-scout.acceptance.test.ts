@@ -15,7 +15,7 @@ import {
   MAP_HINT_MESSAGE,
   SWAMP_LOST_PERCENT,
 } from '../../src/core/constants'
-import { computeCampArmyGain } from '../../src/core/camp'
+import { computeCampArmyGain } from '../../src/core/mechanics/defs/camp'
 import { RNG } from '../../src/core/rng'
 import type { Cell, State, World } from '../../src/core/types'
 

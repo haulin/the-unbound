@@ -1,17 +1,12 @@
-import type { TileEnterHandler } from './types'
-import { MECHANIC_INDEX } from './index'
+import type { TileEnterCtx, TileEnterResult } from './types'
 import { terrainLoreLinesForKind } from '../constants'
 import { RNG } from '../rng'
-import type { CellKind } from '../types'
 
-const { onEnterByKind } = MECHANIC_INDEX
+// Default tile-enter handler used by reduceMove when a cell kind has no registered
+// `onEnterTile` mechanic (plains, water, road, etc.). Always supplies a message.
+type DefaultTileEnterHandler = (ctx: TileEnterCtx) => TileEnterResult & { message: string }
 
-export const onEnterDefaultTerrain: TileEnterHandler = ({ cell, world, pos, stepCount }) => {
+export const onEnterDefaultTerrain: DefaultTileEnterHandler = ({ cell, world, pos, stepCount }) => {
   const r = RNG.createTileRandom({ world, stepCount, pos })
   return { message: r.perMoveLine(terrainLoreLinesForKind(cell.kind)) }
 }
-
-export function getOnEnterHandler(kind: CellKind): TileEnterHandler {
-  return onEnterByKind[kind] || onEnterDefaultTerrain
-}
-

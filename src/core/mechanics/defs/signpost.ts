@@ -1,8 +1,7 @@
 import { formatNearestPoiSignpostMessage } from '../../signpost'
-import type { MechanicDef } from '../types'
-import type { TileEnterHandler } from '../types'
+import type { MechanicDef, OnEnterTile } from '../types'
 
-const onEnterSignpost: TileEnterHandler = ({ world, pos }) => ({
+const onEnterSignpost: OnEnterTile = ({ world, pos }) => ({
   message: formatNearestPoiSignpostMessage(pos, world),
   knowsPosition: true,
 })
@@ -10,5 +9,5 @@ const onEnterSignpost: TileEnterHandler = ({ world, pos }) => ({
 export const signpostMechanic: MechanicDef = {
   id: 'signpost',
   kinds: ['signpost'],
-  onEnter: onEnterSignpost,
+  onEnterTile: onEnterSignpost,
 }

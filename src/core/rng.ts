@@ -1,3 +1,4 @@
+import { cellIdForPos } from './cells'
 import type { Run, State, Vec2, World } from './types'
 
 // ----------------------------
@@ -130,10 +131,6 @@ function cursorAdvance(args: {
 // ----------------------------
 // State-aware facade (ergonomics)
 // ----------------------------
-
-function cellIdForPos(world: { width: number }, pos: Vec2): number {
-  return pos.y * world.width + pos.x
-}
 
 function getCopyCursors(run: Run): Record<string, number> {
   return run.copyCursors ?? {}

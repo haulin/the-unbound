@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
-import { ACTION_MOVE, ACTION_TOWN_LEAVE, ENABLE_ANIMATIONS } from '../../src/core/constants'
+import { ACTION_MOVE, ACTION_TOWN_LEAVE, ENABLE_ANIMATIONS, MOVE_SLIDE_FRAMES } from '../../src/core/constants'
 import type { Cell, GridTransitionAnim, State, World } from '../../src/core/types'
 
 function grass(): Cell {
@@ -85,7 +85,12 @@ describe('v0.3 gold+towns acceptance', () => {
 
     if (ENABLE_ANIMATIONS) {
       const trans = onto.ui.anim.active.filter((a): a is GridTransitionAnim => a.kind === 'gridTransition')
-      expect(trans.some((a) => a.params.from === 'overworld' && a.params.to === 'town')).toBe(true)
+      const enter = trans.find((a) => a.params.from === 'overworld' && a.params.to === 'town')
+      expect(enter).toBeDefined()
+      // Encounter grid transition fires AFTER the move-slide reveal completes (one MOVE_SLIDE_FRAMES
+      // delay from the action's startFrame). Locking this in so a future regression that double-counts
+      // the offset (e.g. via afterFrames) trips here.
+      expect(enter!.startFrame).toBe(MOVE_SLIDE_FRAMES)
     }
 
     const left = processAction(onto, { type: ACTION_TOWN_LEAVE })!
