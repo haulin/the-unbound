@@ -3,19 +3,37 @@
 UI update intermezzo:
 - donkey overlaps steps stat. Need to reshuffle UI again.
 
-**v0.5 — Camps, Terrain Upsides & Henge Scaling**
+**v0.5 — The Wyrm**
+
+Main-arc obstacle that gives a run its middle act. Lives in a cave in the mountains; bleeds when bested; the Locksmith needs the blood as the quench for the bronze key.
+
+- Lair PoI: cave-tile sprite; worldgen places it by replacing a mountain tile in a mountain cluster (once per map).
+- Wyrm encounter: combat with action buttons — Fight / Pay (bribe in gold to draw blood without combat) / Flee.
+- Non-lethal framing: combat ends when blood is drawn; the wyrm crawls back to recover. No death animation needed.
+- The Blood: new inventory state, like the bronze key. UI indicator alongside the key icon.
+- Pay button pattern debuts here in combat.
+- Fights rework - more enemies should yield bigger rewards, winning against 2x armies is sometimes impossible. Maybe introduce a combo breaker where player lands a guaraneed hit after missing 3-4x in a row.
+- The fight algo is a bit weird. Long streaks of hit or miss.
+- Locksmith change: additive — requires Blood + existing gold/food payment. Without Blood, no modal opens; tile shows inline flavor only (uses the planned "skip modal if nothing to do" pattern from Ideas).
+- Signpost wiring: Lair becomes a valid signpost target alongside Locksmith and Gate.
+- Barkeep tips: `wyrm` category added to existing town tip pool; `goal` category extended with quench/wyrm hints.
+- First-visit Lair lore.
+- Lore writing: `WYRM_*` line pools, `LAIR_*` pool, `LOCKSMITH_NO_BLOOD_LINES`, `LOCKSMITH_BLOOD_READY_LINES`, and updated `LOCKSMITH_PURCHASE_LINES` with quench beats.
+- Audit `lore.ts` mechanics index against final implementation.
+
+**v0.6 — Camps, Towns, Terrain & Henge Scaling**
+
 - Camps reworked: Search (food + troops, cooldown) / Local Map (fixed price, fixed radius, buyer beware) / Leave
 - Buy map features - add Cs, Fs, Ts, Rs, L/G for gold.
-- Fights rework - more enemies should yield bigger rewards, winning against 2x armies is sometimes impossible. Maybe introduce a combo breaker where player lands a guaraneed hit after missing 3-4x in a row.
+- Rich enemies drop more loot
 - Henge fights scale harder (enemy = player×2..player×3 (min 10)), reward 10..25 gold+food
-- Maybe recruit button in fights that allows to pay gold for remaining troops - 1/1, 2/4, 3/9, 4/16, etc
+- Maybe recruit button in fights that allows to pay gold for remaining troops - 1/1, 2/4, 3/9, 4/16, etc (reuses Wyrm's Pay pattern)
 - Swamp upside: small chance of rare herb (food bonus or combat buff) or gold from a corpse
 - Mountains upside: small chance of cave loot (gold or food cache)
-- Mountains/swamps can cluster: if we increase their food cost, they should also carry “opportunity” (bonus events/loot/higher encounter odds) so they feel like risk/reward.
 
 - for everything we should audit lore.ts and make sure to update lines to reflect new mechanics.
 
-**v0.6 — Random Encounters & World Texture**
+**v0.7 — Random Encounters & World Texture**
 - Random encounter pool on any tile (5-6 types): loot find / lone soldier joins / cursed tile / traps / abandoned supplies / fellow traveller with rumor / something negative TBD
 - In swamps you can find a healer (picking herbs) that can join your party and prevent random deaths
 - Multiple flavor text variations per tile type (deterministic rotation by seed+step)
@@ -23,23 +41,17 @@ UI update intermezzo:
 
 Polish for demo:
 - Balance pass: town prices, scout cost, combat gold drops...
+- Wyrm balance: combat tuning, Blood/payment economy.
 - Hide debug stuff, pick seed for new game randomly
 - title screen, about screen, back to menu, resume
 - animations for left panel
+- more exciting win / lose
 
-
-
-**v0.7 — Taverns**
+**v0.8 — Taverns** (demo release milestone)
 - Tavern PoI (named, standalone, one or two per map)
-- Buy rumors: reveals one named PoI location for gold (locksmith, gate, random landmark)
+- Buy rumors: reveals one named PoI location for gold (locksmith, gate, lair, random landmark)
 - Gambling mini-game (bet gold, contextual buttons, slight house edge)
 - Tavern flavor text pool (warmer, unreliable narrator register)
-
-**v0.8 — Sanctuary & Special Items**
-- Sanctuary PoI (named, rare — one per map)
-- Pegasus: buy for gold, one-use fast travel to any visited tile
-- Tame Beast moves here from farms if beast-on-farm feels narratively weak in playtests
-- Sanctuary flavor text pool (strange, feral register)
 
 **v0.9 — Second Gate (Silver)**
 - Silver keyholder, silver gate, silver border
@@ -78,16 +90,29 @@ This file captures ideas discussed during design, kept out of the current phase'
 - Reach three gates with three keys to win.
 - Replay of the steps at game end.
 - Event spawn probabilities influenced by player stats and time-since-visit (e.g., when poor, more likely to find a chest).
+- Pegasus / fast-travel: bought somewhere for gold, one-use jump to any visited tile. Unsolved: destination selection UI within the 4-button constraint. Was a v0.8 milestone item, deferred until the UI question is answered.
+- Multi-criteria gate test for silver/gold gates: "the gate measures you." Bronze accepts the key alone; silver might accept key OR (key + army threshold); gold asks everything (key AND army AND gold AND something else). Gives runs alternate paths and reasons to over-build a stat.
+- Dynamic `GOAL_NARRATIVE` that rewrites itself as the player learns: prologue → "the forge has heat enough but lacks the quench" → "the smith is waiting" → "only the gate remains." Held back from demo so first-time players can discover the arc; revisit when most players have multiple runs under their belt.
+- Cross-run memory: persistent flags for "you bled the Wyrm in a prior run" and similar achievements. Lets returning players skip rediscovery and explore other corners of the world. Tone already supports it (lore says "this time might be different"); scope is large.
+- Ordinary key as a learnable mistake: let the Locksmith forge a key without the Blood; the gate refuses it; player learns by failure. Brutal for first-timers, interesting for hard mode / repeat players.
 
 ## Ideas
-- The fight algo is a bit weird. Long streaks of hit or miss.
 - when map is toggled on we should highlight the button more - white border maybe
+- disabled buttons rendered with a checkerboard overlay?
 - skip modal if nothing to do (not enough money or cooldown - camp/farm/town)
 - maybe adjust worldgen as it feels like swamps & mountains are too common
 - Consider making roads cost food only ~50% of the time (mechanics/balance change; would require tests + tuning).
-- Collectibles to find.
+- Collectibles to find. Maybe just getting one of each creatures (healer/scout/beast) - shows on home page instead of question marks.
 - buying scout shows animation - switch to show map, reveal tiles, hide map (if it was hidden)
 - active item that allows you to auto-win a fight or land a hit at least
+- passive item no food consumed for 10 steps
+- bank gives interest on deposits
+- an item that gives more gold from fights / selling
+- orchard get 5 free food
+- plant a tree to pick 5 free food every cooldown
+- morale modifying battle odds, +2, +5, +10% either way (curse could lower it, praying at altar could clear a curse)
+- every 28 days a plague comes that kills half your army
+- different types of enemies (magic/strength) or different loot drops
 
 ## Tech
 - Animation scheduling: consider extracting reducer-side animation enqueueing into a dedicated pure helper once iteration stabilizes.

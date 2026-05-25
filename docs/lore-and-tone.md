@@ -12,7 +12,9 @@ What lies beyond the gate is not known. The game does not answer this. Character
 
 **Tone register:** folk mythology, not high fantasy. The world is worn and practical and slightly strange. Place names sound like they were given by farmers — *The Old Insistence*, *Ember Cross*, *The Stemming* — and have outlasted their original meaning. Nobody speaks in proclamations. The gate does not glow with divine light. It is just a gate that was not there yesterday.
 
-**The Locksmith of the Unbound** is the figure who can make the key. They are not a villain or a guardian in any heroic sense. They will make it for something — food, gold. They made keys before. Most people who leave the world don't make it to the gate, or make it there unprepared, or lose the key, or turn back. The Locksmith isn't selective — they'll forge for anyone who can pay. You're just the current one. Their price is fair.
+**The Locksmith of the Unbound** is the figure who can make the key. They are not a villain or a guardian in any heroic sense. They will make it for something — food, gold, and what the forge cannot supply on its own. They made keys before. Most people who leave the world don't make it to the gate, or make it there unprepared, or lose the key, or turn back. The Locksmith isn't selective — they'll forge for anyone who can pay and bring what's needed. You're just the current one. Their price is fair.
+
+**The Wyrm in the high country** has been there since before the Unbound was named. It sleeps in stone, in a cave you would not enter unprepared. People who climb up to it mostly do not climb back. Those who do carry a vial of its blood. The Locksmith needs that blood. Ordinary keys have been tried — folk have shaped them, paid for them, carried them to the gate. The gate does not turn. The rumor, as old as the road, says it is the quench that makes the difference: the kiln has heat enough; what the bronze needs is the dragon.
 
 **What the player is:** not a hero. Not chosen. Just someone who figured out the world loops and decided that was unacceptable. The world has seen this before. It will see it again. This time might be different.
 

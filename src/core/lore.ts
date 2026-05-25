@@ -12,8 +12,9 @@ Mechanics index (keep this list current):
   - Food carry cap: 2 per soldier (+50 if you have a tame beast). Excess food gains clamp to the cap.
   - Scout
     - Halves woods/swamp lost chance (floor).
-    - Map reveal: when oriented, Scout reveals farms/camps/henges globally; gate/locksmith remain gated by mapping.
-  - Bronze key - allows to open Gate, can be only obtained from Locksmith.
+    - Map reveal: when oriented, Scout reveals farms/camps/henges globally; gate/locksmith/lair remain gated by mapping.
+  - Bronze key - opens the Gate; forged only by the Locksmith.
+  - The Blood - drawn from the Wyrm; consumed by the Locksmith as the quench.
   - Tame beast - one per run, increases food carry cap by +50.
 
 - Navigation
@@ -28,7 +29,13 @@ Mechanics index (keep this list current):
   - Farms: modal encounter; buy food (gold), buy tame beast (gold, one per run), or leave.
   - Camps: modal encounter; Search grants deterministic reinforcements when ready; Hire Scout costs food; Leave exits.
   - Henges: combat encounter when ready; cooldown; henge-specific encounter line.
-  - Gate / Locksmith: locksmith is modal (pay gold or food) and is skipped if you already have the key; gate opens only with key.
+  - Gate / Locksmith
+    - Locksmith modal: requires the Blood + pay-gold-or-food; skipped if you have the key.
+    - Without the Blood: no modal opens; tile shows inline flavor only.
+    - Gate opens only with the key.
+  - Wyrm Lair
+    - PoI placed on a mountain tile; modal combat.
+    - Buttons: Fight (draws Blood on win; wyrm survives) / Pay (gold bribe for Blood) / Flee.
   - Fishing lakes: placed PoIs; grant 1-3 food when ready; cooldown 3; do not appear on the map.
   - Rainbow's End: placed PoIs; grant +30 gold once per end (then spent).
   - Woods / Mountains: ambush chance
@@ -65,6 +72,7 @@ export const BARKEEP_TIPS = {
   lostAndOrientation: [
     "Woods and swamps can pull you off course.",
     "When lost, find a signpost, farm, or town to get your bearings again.",
+    "What's nice about the Unbound is that everything is at most 10 leagues away.",
   ],
   map: [
     "The map shows landmarks, not terrain.",
@@ -76,7 +84,16 @@ export const BARKEEP_TIPS = {
   ],
   goal: [
     "Someone saw the Locksmith three nights ago.",
-  ]
+    "The Locksmith won't forge without the quench. Bring blood.",
+    "The dragon in the high country bleeds, if you can reach it.",
+  ],
+  wyrm: [
+    "There's a dragon up in the high passes. Old as the stones.",
+    "Don't go to the wyrm alone. Even with men, it's a near thing.",
+    "You don't have to kill it. Just enough to draw the blood. It heals.",
+    "Gold works on the wyrm too, they say. If you've got a lot of it.",
+    "The cave with the long wind - that's where it sleeps.",
+  ],
 } as const;
 
 // ----------------------------
@@ -97,6 +114,8 @@ export const LOCKSMITH_PURCHASE_LINES = [
   "You feed the fire. They finish the key.",
   "A small hammer-song. A key, still warm.",
   "They take what you offer and give you what you came for.",
+  "The blade plunges into the vial. The hiss is brief. The key is bronze and done.",
+  "The quench is over before you can blink. The key cools in their palm.",
 ] as const;
 
 export const LOCKSMITH_ENTER_LINES = [
@@ -114,6 +133,62 @@ export const LOCKSMITH_NO_FOOD_LINES = [
   "Come back with enough. The fire needs feeding first.",
   "Others have paid for this before you. Most of them got further than you'd think.",
 ];
+
+export const LOCKSMITH_NO_BLOOD_LINES = [
+  "The forge has heat enough. What it lacks is the quench.",
+  "\"Bring me what the kiln cannot make. Then we'll talk.\"",
+  "The smith glances at your hands. Empty. They go back to their work.",
+  "\"No blood, no bronze. Not the kind that opens what you want opened.\"",
+] as const;
+
+export const LOCKSMITH_BLOOD_READY_LINES = [
+  "The smith sees the vial. They nod once. The forge is ready.",
+  "\"You found it, then.\" The kiln is already lit.",
+  "They take the vial without comment. The hammer is in their hand.",
+] as const;
+
+// ----------------------------
+// The Wyrm / The Lair
+// ----------------------------
+export const WYRM_NAME = 'The Wyrm';
+
+export const LAIR_NAME_POOL = [
+  "The Long Wound",
+  "Snake's Roost",
+  "The Coiled Hall",
+  "Wyrm-Crag",
+  "The Sleeping Stone",
+  "The Hollow",
+] as const;
+
+export const LAIR_FIRST_VISIT_LINES = [
+  "A cave mouth that does not echo. Something inside is breathing slowly.",
+  "The stone here is warm. Wind comes out of the dark in long, slow exhales.",
+  "You smell iron and old smoke. The cave goes back further than it should.",
+] as const;
+
+export const WYRM_ENCOUNTER_LINES = [
+  "It uncoils. It takes its time.",
+  "The dark moves. Then the dark has wings.",
+  "It was awake the whole time. It just hadn't moved yet.",
+] as const;
+
+export const WYRM_VICTORY_LINES = [
+  "It bleeds. You take what you came for. It crawls deeper into the stone.",
+  "Enough. You fill the vial. The wyrm withdraws, slow and unkilled.",
+  "It does not die. It does not need to. You have the quench.",
+] as const;
+
+export const WYRM_PAYOFF_LINES = [
+  "Gold for the right to bleed it. A strange trade. It accepts.",
+  "You pay. It permits the cut. The vial fills.",
+  "The coin disappears into the stone. The wyrm is patient with paying men.",
+] as const;
+
+export const WYRM_FLEE_LINES = [
+  "You leave the way you came. It does not pursue. It does not need to.",
+  "The cave releases you. The Locksmith is no closer.",
+] as const;
 
 // ----------------------------
 // Terrain lore

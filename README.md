@@ -4,7 +4,7 @@ The Unbound is an in-progress project. This repository currently contains a smal
 
 ## North Star
 
-The Unbound is a minimalist retro fantasy resource management game. You are lost on a toroidal world — walk far enough in any direction and you return to where you started — and the only way out is through a gate guarded by forces you must overcome by strength, gold, or cunning. Gather your army, learn the land, find the three gates, and leave.
+The Unbound is a minimalist retro fantasy roguelike of exploration and resource management. You are lost on a toroidal world — walk far enough in any direction and you return to where you started — and the only way out is through a gate guarded by forces you must overcome by strength, gold, or cunning. Gather your army, learn the land, find the three gates, and leave.
 
 ## Run
 
