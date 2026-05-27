@@ -8,8 +8,8 @@ import {
 import { cellIdForPos, getCellAt } from '../../cells'
 import { foodCarryCap, FOOD_CARRY_FULL_MESSAGE, resourcesWithClampedFoodIfNeeded } from '../../foodCarry'
 import {
-  FARM_BEAST_ALREADY_LINES,
-  FARM_BUY_BEAST_LINES,
+  MULE_ALREADY_LINES,
+  MULE_BUY_LINES,
   FARM_BUY_FOOD_LINES,
   FARM_ENTER_LINES,
 } from '../../lore'
@@ -105,7 +105,7 @@ function reduceFarmBuyBeast(prevState: State, farm: FarmCell): State {
   const rnd = RNG.createRunCopyRandom(prevState)
 
   if (prevState.resources.hasTameBeast) {
-    return setEncounterMessage(prevState, prefix, rnd.perMoveLine(FARM_BEAST_ALREADY_LINES, { cellId: farm.id }))
+    return setEncounterMessage(prevState, prefix, rnd.perMoveLine(MULE_ALREADY_LINES, { cellId: farm.id }))
   }
 
   const result = buy(prevState.resources, { gold: farm.beastGoldCost, gain: { hasTameBeast: true } })
@@ -113,7 +113,7 @@ function reduceFarmBuyBeast(prevState: State, farm: FarmCell): State {
 
   return applyDeltas(prevState, {
     resources: result.resources,
-    message: `${prefix}\n${rnd.perMoveLine(FARM_BUY_BEAST_LINES, { cellId: farm.id })}`,
+    message: `${prefix}\n${rnd.perMoveLine(MULE_BUY_LINES, { cellId: farm.id })}`,
     deltas: result.deltas,
   })
 }

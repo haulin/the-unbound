@@ -9,13 +9,19 @@ Mechanics index (keep this list current):
 - Resources
   - Army: combat unit and HP; hits 0 = game over.
   - Food: depletes 1/move, 2 on mountains/swamps; hits 0 reduces army.
-  - Food carry cap: 2 per soldier (+50 if you have a tame beast). Excess food gains clamp to the cap.
-  - Scout
-    - Halves woods/swamp lost chance (floor).
-    - Map reveal: when oriented, Scout reveals farms/camps/henges globally; gate/locksmith/lair remain gated by mapping.
+  - Food carry cap: 2 per soldier (the Mule slot raises this by +50). Excess food gains clamp to the cap.
   - Bronze key - opens the Gate; forged only by the Locksmith.
   - The Blood - drawn from the Wyrm; consumed by the Locksmith as the quench.
-  - Tame beast - one per run, increases food carry cap by +50.
+
+- Slots
+  - Up to 3 held at once, from a roster of 7. Bought at PoIs, sold at The Crossing for half price.
+  - Mule (animal) — +50 food carry cap; -1 food per Camp Search. Cannot coexist with Boar.
+  - Boar (animal) — opening volley kills ~25% of enemy army at combat start. Cannot coexist with Mule.
+  - Scout (person) — halves woods/swamp lost chance; when oriented, reveals farms/camps/henges globally on the map (gate/locksmith/lair remain gated by mapping).
+  - Healer (person) — revives 1 wounded per combat; costs -1 gold per Town visit.
+  - Captain (person, banner-bearer) — +10% combat odds; +X% ambush in woods and mountains.
+  - Fisherman (person) — double lake yields; +1 troop loss per flee.
+  - Magpie (animal) — ~30% refund of 1 on any payment (Wyrm bribe included; Crossing sales excluded — those are refunds, not payments). Higher buy price.
 
 - Navigation
   - In-game map
@@ -26,8 +32,9 @@ Mechanics index (keep this list current):
 
 - Encounters / POIs
   - Combat: fight/flee; deterministic encounter flavor + exit lines.
-  - Farms: modal encounter; buy food (gold), buy tame beast (gold, one per run), or leave.
-  - Camps: modal encounter; Search grants deterministic reinforcements when ready; Hire Scout costs food; Leave exits.
+  - Farms: modal encounter; buy food, hire one slot (varies by farm — Mule, Boar, or Magpie), leave.
+  - Camps: modal encounter; Search (deterministic reinforcements when ready); hire one slot (varies by camp — Scout or Captain); leave.
+  - Towns: modal encounter; buy food, hire one slot (varies by town — Scout, Healer, or Fisherman), leave. Tavern rumors land later (see backlog).
   - Henges: combat encounter when ready; cooldown; henge-specific encounter line.
   - Gate / Locksmith
     - Locksmith modal: requires the Blood + pay-gold-or-food; skipped if you have the key.
@@ -36,6 +43,7 @@ Mechanics index (keep this list current):
   - Wyrm Lair
     - PoI placed on a mountain tile; modal combat.
     - Buttons: Fight (draws Blood on win; wyrm survives) / Pay (gold bribe for Blood) / Flee.
+  - The Crossing: sell-only PoI. Buttons show each held slot; tapping sells that slot for half its purchase price. 1–2 per map.
   - Fishing lakes: placed PoIs; grant 1-3 food when ready; cooldown 3; do not appear on the map.
   - Rainbow's End: placed PoIs; grant +30 gold once per end (then spent).
   - Woods / Mountains: ambush chance
@@ -81,6 +89,7 @@ export const BARKEEP_TIPS = {
   scout: [
     "A Scout halves your odds of getting lost in woods and swamps.",
     "When you're oriented, a Scout points out farms, camps, and henges.",
+    "A scout can be hired in a Town - or, if you're lucky, around a Camp's fire.",
   ],
   goal: [
     "Someone saw the Locksmith three nights ago.",
@@ -93,6 +102,33 @@ export const BARKEEP_TIPS = {
     "You don't have to kill it. Just enough to draw the blood. It heals.",
     "Gold works on the wyrm too, they say. If you've got a lot of it.",
     "The cave with the long wind - that's where it sleeps.",
+  ],
+  mule: [
+    "A mule carries fifty more rations, but it'll take some of yours at every camp.",
+    "Sell a tired mule at a Crossing if you can. Half what you paid is fair.",
+  ],
+  healer: [
+    "A hedge-healer can pull a soldier back from a bad day. She'll empty your purse, slowly.",
+    "Some towns have one. She'll cost you a coin every time you stop in - bandages, herbs, the salve that smells of iron.",
+  ],
+  boar: [
+    "A trained boar does one thing well, and at the start of a fight. Don't expect it twice in a day.",
+    "If you've a mule, a boar won't sit beside it. Pick one.",
+  ],
+  captain: [
+    "A banner makes the men fight straighter. It also makes them seen. Mind your woods and mountains.",
+    "If you carry the colours, expect company on bad roads.",
+  ],
+  fisherman: [
+    "A fisherman doubles what a lake gives you. He's heavy gear though. You'll feel it if you run.",
+  ],
+  magpie: [
+    "A magpie palms a coin out of any honest trade. Roughly one in three. Pays for itself if you trade enough.",
+    "Don't ask the farmer where she got it. She doesn't know either.",
+  ],
+  crossing: [
+    "Carrying too many companions? A Crossing will take one off your hands. Half what you paid is the going rate.",
+    "Drovers at a Crossing buy from anyone. Beasts, banners, even people with somewhere else to be.",
   ],
 } as const;
 
@@ -236,7 +272,7 @@ export const FARM_NAME_POOL = [
 
 export const CAMP_NAME_POOL = [
   "The Wayrest",
-  "Ember Cross",
+  "Ember Watch",
   "The Muster",
   "Cold Haven",
   "Ashford",
@@ -250,7 +286,7 @@ export const HENGE_NAME_POOL = [
   "Crows' Argument",
   "The Recurring",
   "Patient Circle",
-  "Weather Cross",
+  "Weather Stones",
 ] as const;
 
 export const TOWN_NAME_POOL = [
@@ -259,6 +295,16 @@ export const TOWN_NAME_POOL = [
   "Ember Crossroads",
   "The Long Return",
   "Market of Ash",
+] as const;
+
+export const CROSSING_NAME_POOL = [
+  "Salt",
+  "Crow's",
+  "Brass",
+  "Three-Lane",
+  "Big Oak",
+  "Stoneford",
+  "Pilgrim's",
 ] as const;
 
 export const GATE_NAME = 'The Gate'
@@ -276,12 +322,12 @@ export const FARM_HARVEST_LINES = [
 ] as const;
 
 export const FARM_ENTER_LINES = [
-  "The barn still trades - food for coin, beasts for travelers with purse enough.",
-  "Stalls line the yard: rations, and a pensmith's fee for a steady companion.",
+  "The barn still trades - food for coin, and whatever the farmer has at hand for those with the purse for it.",
+  "Stalls line the yard: rations, and a price scratched beside something else.",
   "Someone left this place open. Stock and prices are scratched on the door.",
 ] as const;
 
-export const FARM_BEAST_ALREADY_LINES = [
+export const MULE_ALREADY_LINES = [
   "You already have a beast at heel. Another would be trouble.",
   "One is enough - the pen is closed to you.",
   "Your pack-beast is already yours. No second sale today.",
@@ -293,7 +339,7 @@ export const FARM_BUY_FOOD_LINES = [
   "The trade is quick; hunger won't be, if you ration well.",
 ] as const;
 
-export const FARM_BUY_BEAST_LINES = [
+export const MULE_BUY_LINES = [
   "Coins pass; a horned head lowers, then follows.",
   "The handler knots the lead - yours now, for better or worse.",
   "Lean muscle, patient eyes. It will carry more than you alone.",
@@ -390,6 +436,133 @@ export const TOWN_SCOUT_ALREADY_HAVE_LINES = [
 ] as const;
 
 // Town rumors are built in `town.ts` from `BARKEEP_TIPS` (plus extra hints).
+
+// ----------------------------
+// Companion slots
+// ----------------------------
+// Each slot has BUY (hired/bought at a source PoI), ALREADY (refused on duplicate),
+// and SELL (at The Crossing) lines. Mechanic-side flavor (what the slot does on
+// trigger) lives in BUY lines and BARKEEP_TIPS - we don't fire a separate line
+// pool on every event tick; the sprite-flash carries the moment-to-moment feedback.
+
+export const MULE_SELL_LINES = [
+  "A drover at the Crossing takes the lead-rope without surprise. The mule does not look back.",
+  "Coins back into your purse. The mule joins another company that needed one.",
+  "It walks off as it walked on - patient, unconcerned. A road is a road.",
+] as const;
+
+export const CAMP_SCOUT_HIRE_LINES = [
+  "He spits in the fire. \"Aye. I know these woods. Pay's pay.\"",
+  "She looks you over, then your soldiers. Decides you'll do. Takes her share of the rations.",
+] as const;
+
+export const CAMP_SCOUT_ALREADY_LINES = [
+  "Your scout shakes their head at the man by the fire. One pair of eyes is enough for this road.",
+  "The men around the fire glance at your scout. They go back to their drinking.",
+] as const;
+
+export const SCOUT_SELL_LINES = [
+  "She points down a road you didn't notice was there. \"That way's mine.\" She doesn't wave.",
+  "He hefts his pay, nods, and is gone before you've folded your map.",
+] as const;
+
+export const HEALER_BUY_LINES = [
+  "She brings her own bag. Wax stopper, dark glass, dried things you don't recognize.",
+  "A hedge-healer. The hands are stained with old work. She names her price; you pay it.",
+] as const;
+
+export const HEALER_ALREADY_LINES = [
+  "Your healer is enough. The town's herbwife nods to her and goes back inside.",
+  "One healer can handle what your road throws at her. No need for two.",
+] as const;
+
+export const HEALER_SELL_LINES = [
+  "She goes back to her village. Her bag is heavier than when you found her.",
+  "A farmer's wife needs her more than you do. The trade is quiet.",
+] as const;
+
+export const BOAR_BUY_LINES = [
+  "The handler unties the rope. The boar follows, low and patient. Tusks the colour of old bone.",
+  "\"She'll do once, hard, at the start of any fight. Then sleep the rest off.\" You pay.",
+] as const;
+
+export const BOAR_ALREADY_LINES = [
+  "One boar's enough. The handler latches the pen back up.",
+  "Your beast is already keen on the road ahead. No second sale.",
+] as const;
+
+export const BOAR_SELL_LINES = [
+  "A farrier at the Crossing takes the lead. He'll feed her well; he wants what she's good for.",
+  "Coins back. The boar grunts once at her new handler and follows him without looking at you.",
+] as const;
+
+export const BOAR_MULE_REFUSED_LINES = [
+  "The handler shakes her head. \"You've a mule already. The boar would gore it before morning.\"",
+  "\"Mule and boar don't share a road. Pick one.\" The pen stays latched.",
+] as const;
+
+export const MULE_BOAR_REFUSED_LINES = [
+  "The farmer looks past you at the boar. \"My mule will not share a road with that. Pick one.\"",
+  "\"Boar at heel? Then no mule from me. Pens stay shut for mixed company.\"",
+] as const;
+
+export const CAPTAIN_BUY_LINES = [
+  "A banner-bearer. The flag is patched in three colours, all of them wrong. The men straighten anyway.",
+  "He takes your coin and shoulders the pole. \"Carry it high and the company carries itself. Carry it through woods and the woods know.\"",
+] as const;
+
+export const CAPTAIN_ALREADY_LINES = [
+  "Your standard already flies. Another would only confuse the line.",
+  "One banner per company. The man waves you off without rancour.",
+] as const;
+
+export const CAPTAIN_SELL_LINES = [
+  "He furls the flag, takes his pay, walks off whistling. The company feels lighter and quieter at once.",
+  "A new captain takes the pole at the Crossing. Your soldiers murmur once and then are quiet.",
+] as const;
+
+export const FISHERMAN_BUY_LINES = [
+  "Rod over one shoulder. A wide hat that has seen more weather than most men.",
+  "He squints at you, then at the road. \"Where there's water, there's two suppers if I'm with you.\"",
+] as const;
+
+export const FISHERMAN_ALREADY_LINES = [
+  "Your fisherman is already in the company. The man on the bench gives him a nod and lets it be.",
+  "One rod's enough on most roads. The trade does not happen.",
+] as const;
+
+export const FISHERMAN_SELL_LINES = [
+  "He shoulders his rod and his gear and is gone toward whatever lake you weren't going to.",
+  "The Crossing takes him cheerfully. Someone needed a fisherman; you needed coin.",
+] as const;
+
+export const MAGPIE_BUY_LINES = [
+  "The farmer wraps her in cloth. She is heavier than she looks. One coin disappears as you reach for the door.",
+  "\"She'll find what falls off other men's tables.\" The price is steep; you pay it anyway.",
+] as const;
+
+export const MAGPIE_ALREADY_LINES = [
+  "Your magpie watches the farmer's birds and chitters. No second sale today.",
+  "One magpie is enough trouble. The pen stays closed.",
+] as const;
+
+export const MAGPIE_SELL_LINES = [
+  "A tinker at the Crossing takes her without asking. She rides on his hat as he walks off.",
+  "Coins back. She blinks once, twice, and is gone with someone else's company.",
+] as const;
+
+// ----------------------------
+// The Crossing
+// ----------------------------
+export const CROSSING_ENTER_LINES = [
+  "Three roads meet under an oak that has seen more travellers than it can count. Drovers, factors, smiths - someone is always buying.",
+  "The Crossing trades in what walks. A company arrives heavy; it leaves lighter. Coin moves the other way.",
+] as const;
+
+export const CROSSING_EMPTY_LINES = [
+  "You have nothing to leave behind. The Crossing watches you pass.",
+  "A drover lifts his hat to you. \"Light company. Nothing to trade, then?\" He returns to his fire.",
+] as const;
 
 // ----------------------------
 // Lost + combat + game over

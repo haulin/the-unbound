@@ -95,7 +95,7 @@ describe('v0.1 lost acceptance', () => {
 
   // S5
   it('camps and henges do not orient', () => {
-    const sCamp = makeState(blankWorld({ center: { kind: 'camp', id: 12, name: 'Ember Cross', nextReadyStep: 0 } }))
+    const sCamp = makeState(blankWorld({ center: { kind: 'camp', id: 12, name: 'Ember Watch', nextReadyStep: 0 } }))
     expect(processAction(sCamp, { type: ACTION_MOVE, dx: 0, dy: 1 })!.run.knowsPosition).toBe(false)
     // Henge starts combat; we still expect knowsPosition to remain false.
     const sHenge = makeState(blankWorld({ center: { kind: 'henge', id: 12, name: 'The Mending', nextReadyStep: 0 } }))

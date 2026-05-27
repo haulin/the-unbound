@@ -31,7 +31,7 @@ function makeWorld(seed: number, campNextReadyStep = 0): World {
     mapGenAlgorithm: 'TEST',
     cells: [
       [grass(), grass(), grass()],
-      [grass(), { kind: 'camp', id: 4, name: 'Ember Cross', nextReadyStep: campNextReadyStep }, grass()],
+      [grass(), { kind: 'camp', id: 4, name: 'Ember Watch', nextReadyStep: campNextReadyStep }, grass()],
       [grass(), grass(), grass()],
     ],
     rngState: 123,
@@ -117,14 +117,14 @@ describe('v0.2 map+scout acceptance', () => {
     expect(after.resources.food).toBe(onto.resources.food + CAMP_FOOD_GAIN)
     expect(after.resources.armySize).toBe(onto.resources.armySize + armyGain)
     expect(after.ui.message).toBe(
-      `Ember Cross Camp\n${RNG.createTileRandom({ world: onto.world, stepCount, pos: { x: 1, y: 1 } }).perMoveLine(CAMP_RECRUIT_LINES, { cellId: 4 })}`,
+      `Ember Watch Camp\n${RNG.createTileRandom({ world: onto.world, stepCount, pos: { x: 1, y: 1 } }).perMoveLine(CAMP_RECRUIT_LINES, { cellId: 4 })}`,
     )
 
     const second = processAction(after, { type: ACTION_CAMP_SEARCH })!
     expect(second.resources.food).toBe(after.resources.food)
     expect(second.resources.armySize).toBe(after.resources.armySize)
     expect(second.ui.message).toBe(
-      `Ember Cross Camp\n${RNG.createTileRandom({ world: onto.world, stepCount, pos: { x: 1, y: 1 } }).perMoveLine(CAMP_EMPTY_LINES, { cellId: 4 })}`,
+      `Ember Watch Camp\n${RNG.createTileRandom({ world: onto.world, stepCount, pos: { x: 1, y: 1 } }).perMoveLine(CAMP_EMPTY_LINES, { cellId: 4 })}`,
     )
 
     const campCell = second.world.cells[1]![1]!

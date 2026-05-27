@@ -12,7 +12,7 @@ function makeWorld(): World {
     mapGenAlgorithm: 'TEST',
     cells: [
       [grass(), grass(), grass()],
-      [grass(), { kind: 'camp', id: 4, name: 'Ember Cross', nextReadyStep: 0 }, grass()],
+      [grass(), { kind: 'camp', id: 4, name: 'Ember Watch', nextReadyStep: 0 }, grass()],
       [grass(), grass(), grass()],
     ],
     rngState: 1,

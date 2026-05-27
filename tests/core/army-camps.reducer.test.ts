@@ -21,7 +21,7 @@ function makeWorld(): World {
     mapGenAlgorithm: 'TEST',
     cells: [
       [{ kind: 'grass' }, { kind: 'grass' }, { kind: 'grass' }],
-      [{ kind: 'grass' }, { kind: 'camp', id: 4, name: 'Ember Cross', nextReadyStep: 0 }, { kind: 'grass' }],
+      [{ kind: 'grass' }, { kind: 'camp', id: 4, name: 'Ember Watch', nextReadyStep: 0 }, { kind: 'grass' }],
       [{ kind: 'grass' }, { kind: 'grass' }, { kind: 'grass' }],
     ],
     rngState: 123,

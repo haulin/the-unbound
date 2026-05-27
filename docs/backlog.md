@@ -30,12 +30,14 @@ Main-arc obstacle that gives a run its middle act. Lives in a cave in the mounta
 - Maybe recruit button in fights that allows to pay gold for remaining troops - 1/1, 2/4, 3/9, 4/16, etc (reuses Wyrm's Pay pattern)
 - Swamp upside: small chance of rare herb (food bonus or combat buff) or gold from a corpse
 - Mountains upside: small chance of cave loot (gold or food cache)
+- Slot system infrastructure (groundwork for later slot work): generalize the existing single-hire pattern at Camps/Towns into a per-PoI specialty (one of a small pool, fixed at worldgen by seed). Farms get the same pattern. Modal stays 3 buttons + Leave. See `docs/2026-05-27-slot-system-design.md`.
+- Scout becomes a Camp specialty (in addition to Towns) via the new pool pattern. Scout already exists; this just adds the Camp variant of the hire flow. Lore lines for `CAMP_SCOUT_HIRE_LINES` / `CAMP_SCOUT_ALREADY_LINES` already in `lore.ts`.
 
 - for everything we should audit lore.ts and make sure to update lines to reflect new mechanics.
 
 **v0.7 — Random Encounters & World Texture**
 - Random encounter pool on any tile (5-6 types): loot find / lone soldier joins / cursed tile / traps / abandoned supplies / fellow traveller with rumor / something negative TBD
-- In swamps you can find a healer (picking herbs) that can join your party and prevent random deaths
+- Healer specialty hire added to Town pool (replaces the original swamp-healer concept). P5 revive 1 wounded per combat + N9 -1 gold per Town visit (maintenance). Existing sprite. New lore pool `HEALER_*`. See `docs/2026-05-27-slot-system-design.md`.
 - Multiple flavor text variations per tile type (deterministic rotation by seed+step)
 - Contextual first-visit lore for every mechanic introduced so far
 
@@ -47,25 +49,42 @@ Polish for demo:
 - animations for left panel
 - more exciting win / lose
 
-**v0.8 — Taverns** (demo release milestone)
+**v0.8 — Slot System: Trading & Farm Animals**
+
+See `docs/2026-05-27-slot-system-design.md` for the full design.
+
+- The Crossing PoI: new sell-only PoI. Buttons show held slots' sprites; tapping sells that slot for half its purchase price. Instance name pool: Salt Crossing, Crow's, Brass, Three-Lane, Big Oak, Stoneford, Pilgrim's. Worldgen: 1–2 per map.
+- Sprite-flash animation primitive: pulse slot icon when event-triggered effect fires. Shared by all slots with event-driven P or N.
+- Boar specialty added to Farm pool. P3' opening volley (~25% of enemy army at combat start) + N15 bidirectional Mule exclusion. New 16×16 sprite (low body, bristled back, tusks). Lore lines for `BOAR_*` and `*_REFUSED_LINES` already in `lore.ts`.
+- Mule update (paired with Boar): wire Mule end of the bidirectional exclusion. Mule N1 (-1 food per Camp Search) gets the sprite-flash treatment in passing.
+
+**v0.9 — Slot System: People & Economy**
+
+- Captain specialty added to Camp pool. P4 +10% combat odds + N7 +ambush% in woods/mountains. New 16×16 sprite (head + shoulders + flag-on-pole). New lore pool `CAPTAIN_*`.
+- Fisherman specialty added to Town pool. P8 double lake yields + N8 +1 troop loss per flee. New 16×16 sprite (rod-on-shoulder). New lore pool `FISHERMAN_*`.
+- Magpie specialty added to Farm pool. P probabilistic 30% refund on folk payments (Town food, Camp/Town hires, Locksmith fee); shows original price, gold check against original, refund visible. No demo negative; balanced by probability + higher purchase price. New 16×16 bird sprite. New lore pool `MAGPIE_*`.
+- Final slot-system audit against `docs/slot-system.md` (pairing rules, P+P slot exemptions, ledger consistency).
+
+**v0.10 — Taverns** (demo release milestone)
 - Tavern PoI (named, standalone, one or two per map)
 - Buy rumors: reveals one named PoI location for gold (locksmith, gate, lair, random landmark)
 - Gambling mini-game (bet gold, contextual buttons, slight house edge)
 - Tavern flavor text pool (warmer, unreliable narrator register)
+- Tavern rumors may reveal which Town carries which specialty hire (Scout / Healer / Fisherman).
 
-**v0.9 — Second Gate (Silver)**
+**v0.11 — Second Gate (Silver)**
 - Silver keyholder, silver gate, silver border
 - Map size increases (10×10)
-- Scout / beast / pegasus carry over between gates
+- Slot system carries over between gates (all seven slots persist).
 - Balance pass across full run arc: food, gold, army, run length
 
-**v0.10 — Polish & Teaching**
+**v0.12 — Polish & Teaching**
 - Game over messages per cause (starvation, combat, fleeing with 1 troop)
 - Win messages per gate tier
 - Full flavor text audit — tone consistency, missing tile types, first-visit teaching lines
 - Sprite audit and bank reshuffle if needed
 
-**v0.11 — Third Gate & Release Candidate**
+**v0.13 — Third Gate & Release Candidate**
 - Gold gate, gold border
 - Epic map size (15×15)
 - Full balance pass
@@ -95,6 +114,21 @@ This file captures ideas discussed during design, kept out of the current phase'
 - Dynamic `GOAL_NARRATIVE` that rewrites itself as the player learns: prologue → "the forge has heat enough but lacks the quench" → "the smith is waiting" → "only the gate remains." Held back from demo so first-time players can discover the arc; revisit when most players have multiple runs under their belt.
 - Cross-run memory: persistent flags for "you bled the Wyrm in a prior run" and similar achievements. Lets returning players skip rediscovery and explore other corners of the world. Tone already supports it (lore says "this time might be different"); scope is large.
 - Ordinary key as a learnable mistake: let the Locksmith forge a key without the Blood; the gate refuses it; player learns by failure. Brutal for first-timers, interesting for hard mode / repeat players.
+
+## Slot system — deferred (post-demo)
+
+See `docs/2026-05-27-slot-system-design.md` for the demo roster.
+
+- Magpie negative: tavern-noticed-theft combat trigger — depends on taverns and gambling landing.
+- Human Haggler (peddler / chapman) as a person-flavored economy slot alongside Magpie.
+- Bear at a Menagerie PoI as a third animal slot.
+- The Menagerie PoI itself, revived if a third+ exotic animal joins the roster.
+- Boat-lake PoI as a parallel source for the Fisherman.
+- Elephant Captain as animal fallback if the banner sprite proves too tight.
+- Magpie's original gambling positive — revisit when gambling lands.
+- Goblin slot — depends on whether goblins land as combat enemies or a people.
+- Crossing as bi-directional bazaar (buy + sell at the same PoI).
+- Rainbow's-End variant of the terrain-restriction negative — interesting only if a slot needs a specific cost.
 
 ## Ideas
 - when map is toggled on we should highlight the button more - white border maybe
@@ -151,6 +185,8 @@ Swamps are pure-risk (lost only). If playtest shows swamps are universally avoid
 - Encounter open: each `onEnterTile` for an encounter mechanic re-checks `cell.kind` and re-fetches the cell via `getCellAt`. The dispatcher already narrows `cell.kind`; the second guard is dead defensive code. Drop after a sweep.
 
 ## Companions as quest rewards (deferred)
+
+Note: the demo-tier slot system (see `docs/2026-05-27-slot-system-design.md`) covers the *PoI-bought companion* layer. This quest-reward concept is a *late-game evolution* — find named companions through scaling quests in later gates rather than buying them at PoIs. Keep deferred until the core loop validates across three gates.
 
 Instead of or alongside keys, each gate world contains a named companion who has been trapped longer than you. Finding and convincing them to join requires a meaningful quest (cost scales with gate tier). Each companion removes a persistent friction from the game:
 
