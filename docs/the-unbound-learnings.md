@@ -26,7 +26,10 @@ Prefer adding/changing gameplay behavior by editing a mechanic module and regist
 
 - **Where**: `src/core/mechanics/defs/*` + registry in `src/core/mechanics/index.ts`
 - **Why**: reduces “sprinkled logic” and makes extensions mostly “add module + register”.
-- **More**: `docs/plans/2026-05-04-mechanic-modules-registry-design.md` and `docs/refactor-mechanics-encounters-worldgen.md`
+- **Top-level hooks** (all optional): `onEnterTile`, `poiSignpost`, `placeWorld`, plus declarative fields `kinds`, `mapLabel`, `enterFoodCostByKind`, `moveEventPolicyByKind`. Hook signatures live in `src/core/mechanics/types.ts`.
+- **Encounter hooks** (all optional, nested under `encounter: { kind, ... }`): `reduceAction`, `rightGrid`, `previewPlate`, `previewEncounter`. The nested shape means the type system enforces "any encounter hook can only exist alongside `kind`" — no runtime cross-field validation needed.
+- **MECHANICS array order = worldgen order**: `world.ts` iterates the `MECHANICS` array and calls each `placeWorld` in order, threading `rngState`. Reorder with intent — the determinism golden in `tests/core/world.determinism.test.ts` will catch unintended RNG-shape changes.
+- **More**: `docs/plans/2026-05-04-mechanic-modules-registry-design.md`
 
 ### RNG discipline: don’t perturb simulation for flavor
 

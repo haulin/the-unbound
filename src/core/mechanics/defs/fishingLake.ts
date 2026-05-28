@@ -2,11 +2,13 @@ import { RNG } from '../../rng'
 import {
   FISHING_LAKE_COOLDOWN_LINES,
   FISHING_LAKE_COOLDOWN_MOVES,
+  FISHING_LAKE_COUNT,
   FISHING_LAKE_READY_LINES,
 } from '../../constants'
 import { getCellAt, setCellAt } from '../../cells'
+import { cellId, isTerrainCell, placeFeature } from '../../worldgen'
 import type { FishingLakeCell } from '../../types'
-import type { MechanicDef, OnEnterTile } from '../types'
+import type { MechanicDef, OnEnterTile, PlaceWorldProvider } from '../types'
 
 const onEnterFishingLake: OnEnterTile = ({ cell, world, pos, stepCount, resources }) => {
   if (cell.kind !== 'fishingLake') return {}
@@ -40,8 +42,18 @@ const onEnterFishingLake: OnEnterTile = ({ cell, world, pos, stepCount, resource
   }
 }
 
+const placeFishingLakes: PlaceWorldProvider = ({ cells, rngState }) => {
+  const res = placeFeature(cells, rngState, {
+    count: FISHING_LAKE_COUNT,
+    canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+    buildCell: ({ x, y }) => ({ kind: 'fishingLake', id: cellId(x, y), nextReadyStep: 0 }),
+  })
+  return { rngState: res.rngState }
+}
+
 export const fishingLakeMechanic: MechanicDef = {
   id: 'fishingLake',
   kinds: ['fishingLake'],
   onEnterTile: onEnterFishingLake,
+  placeWorld: placeFishingLakes,
 }

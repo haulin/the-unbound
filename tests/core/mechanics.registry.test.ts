@@ -72,51 +72,37 @@ describe('mechanics registry', () => {
     expect(() => buildMechanicIndex(mechanics)).toThrow(/moveeventpolicy.*100/i)
   })
 
-  it('indexes rightGrid providers by encounterKind', () => {
+  it('indexes rightGrid providers by encounter kind', () => {
     const p: RightGridProvider = () => ({ action: null })
     const mechanics: MechanicDef[] = [
-      { id: 'camp', kinds: ['camp'], encounterKind: 'camp', rightGrid: p },
-      { id: 'combat', kinds: [], encounterKind: 'combat', rightGrid: p },
+      { id: 'camp', kinds: ['camp'], encounter: { kind: 'camp', rightGrid: p } },
+      { id: 'combat', kinds: [], encounter: { kind: 'combat', rightGrid: p } },
     ]
     const idx = buildMechanicIndex(mechanics)
     expect(idx.rightGridByEncounterKind.camp).toBe(p)
     expect(idx.rightGridByEncounterKind.combat).toBe(p)
   })
 
-  it('throws if two mechanics claim the same encounterKind', () => {
+  it('throws if two mechanics claim the same encounter kind', () => {
     const p: RightGridProvider = () => ({ action: null })
     const mechanics: MechanicDef[] = [
-      { id: 'a', kinds: [], encounterKind: 'camp', rightGrid: p },
-      { id: 'b', kinds: [], encounterKind: 'camp', rightGrid: p },
+      { id: 'a', kinds: [], encounter: { kind: 'camp', rightGrid: p } },
+      { id: 'b', kinds: [], encounter: { kind: 'camp', rightGrid: p } },
     ]
     expect(() => buildMechanicIndex(mechanics)).toThrow(/duplicate encounterkind/i)
   })
 
-  it('throws if rightGrid is set without encounterKind', () => {
-    const p: RightGridProvider = () => ({ action: null })
-    expect(() => buildMechanicIndex([{ id: 'a', kinds: [], rightGrid: p }])).toThrow(
-      /rightgrid without encounterkind/i,
-    )
-  })
-
-  it('allows encounterKind without rightGrid (encounter-only mechanics)', () => {
-    const idx = buildMechanicIndex([{ id: 'a', kinds: [], encounterKind: 'combat' }])
+  it('allows encounter kind without rightGrid (encounter-only mechanics)', () => {
+    const idx = buildMechanicIndex([{ id: 'a', kinds: [], encounter: { kind: 'combat' } }])
     expect(idx.rightGridByEncounterKind.combat).toBeUndefined()
   })
 
-  it('indexes reduceEncounterAction by encounterKind', () => {
+  it('indexes reduceAction by encounter kind', () => {
     const reducer: ReduceEncounterAction = (state) => state
     const mechanics: MechanicDef[] = [
-      { id: 'camp', kinds: ['camp'], encounterKind: 'camp', reduceEncounterAction: reducer },
+      { id: 'camp', kinds: ['camp'], encounter: { kind: 'camp', reduceAction: reducer } },
     ]
     const idx = buildMechanicIndex(mechanics)
     expect(idx.reduceEncounterActionByEncounterKind.camp).toBe(reducer)
-  })
-
-  it('throws if reduceEncounterAction is set without encounterKind', () => {
-    const reducer: ReduceEncounterAction = (state) => state
-    expect(() =>
-      buildMechanicIndex([{ id: 'a', kinds: [], reduceEncounterAction: reducer }]),
-    ).toThrow(/reduceencounteraction without encounterkind/i)
   })
 })

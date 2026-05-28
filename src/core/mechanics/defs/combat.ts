@@ -13,9 +13,15 @@ import { resourcesWithClampedFoodIfNeeded } from '../../foodCarry'
 import { gameOverMessage } from '../../gameOver'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
-import type { Action, CellKind, CombatEncounter, Encounter, Resources, State, Ui, Vec2, World } from '../../types'
+import type { Action, CombatEncounter, Encounter, Resources, State, Ui, Vec2, World } from '../../types'
 import { enqueueDeltas, enqueueGridTransition } from '../../uiAnim'
-import type { MechanicDef, ReduceEncounterAction, RightGridProvider, TileEnterResult } from '../types'
+import type {
+  MechanicDef,
+  PreviewPlateProvider,
+  ReduceEncounterAction,
+  RightGridProvider,
+  TileEnterResult,
+} from '../types'
 
 // ---- Pure combat math -------------------------------------------------------------
 
@@ -58,6 +64,16 @@ const combatRightGrid: RightGridProvider = (_s, row, col) => {
   if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_RETURN } }
   if (row === 1 && col === 1) return { spriteId: SPRITES.stats.enemy, action: null }
   return { action: null }
+}
+
+// Combat preview plate is the static enemy-army count. The animated +/- popups
+// are regular `enqueueDeltas({ target: 'enemyArmy', ... })` calls — same path as
+// food/gold/army — rendered by the platform's shared `drawDeltaOverlays` anchored
+// to the plate's first-line icon.
+const combatPreviewPlate: PreviewPlateProvider = (s) => {
+  const enc = s.encounter as CombatEncounter | null
+  if (!enc) return null
+  return [{ spriteId: SPRITES.stats.enemy, text: `${enc.enemyArmySize}` }]
 }
 
 const reduceCombatAction: ReduceEncounterAction = (prevState: State, action: Action): State | null => {
@@ -208,7 +224,6 @@ export function startCombatEncounter(args: {
   world: World
   pos: Vec2
   playerArmy: number
-  sourceKind: CellKind
   encounterMessage: string
   restoreMessage: string
 }): TileEnterResult & { world: World; encounter: CombatEncounter } {
@@ -217,7 +232,6 @@ export function startCombatEncounter(args: {
   const encounter: CombatEncounter = {
     kind: 'combat',
     enemyArmySize: spawned.enemyArmy,
-    sourceKind: args.sourceKind,
     sourceCellId: cellIdForPos(nextWorld, args.pos),
     restoreMessage: args.restoreMessage,
   }
@@ -232,7 +246,16 @@ export function startCombatEncounter(args: {
 export const combatMechanic: MechanicDef = {
   id: 'combat',
   kinds: [],
-  encounterKind: 'combat',
-  rightGrid: combatRightGrid,
-  reduceEncounterAction: reduceCombatAction,
+  encounter: {
+    kind: 'combat',
+    rightGrid: combatRightGrid,
+    reduceAction: reduceCombatAction,
+    previewPlate: combatPreviewPlate,
+    previewEncounter: (): CombatEncounter => ({
+      kind: 'combat',
+      enemyArmySize: 0,
+      sourceCellId: -1,
+      restoreMessage: '',
+    }),
+  },
 }

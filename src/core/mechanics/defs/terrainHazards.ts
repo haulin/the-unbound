@@ -56,7 +56,6 @@ const onEnterTerrainHazards: OnEnterTile = ({ cell, world, pos, stepCount, resou
       world,
       pos,
       playerArmy: resources.armySize,
-      sourceKind: kind,
       encounterMessage,
       restoreMessage: tileMessage,
     })

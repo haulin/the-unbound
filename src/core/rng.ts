@@ -59,13 +59,8 @@ function pickIntExclusive(state: PickState, maxExclusive: number): number {
 }
 
 function pickIntInRange(state: PickState, minInclusive: number, maxInclusive: number): number {
-  const a = Number.isFinite(minInclusive) ? Math.trunc(minInclusive) : 0
-  const b = Number.isFinite(maxInclusive) ? Math.trunc(maxInclusive) : 0
-  const lo = Math.min(a, b)
-  const hi = Math.max(a, b)
-  const span = hi - lo + 1
-  if (span <= 1) return lo
-  return lo + pickIntExclusive(state, span)
+  const span = maxInclusive - minInclusive + 1
+  return minInclusive + pickIntExclusive(state, span)
 }
 
 function pickFromPool<T>(state: PickState, pool: readonly T[]): T | undefined {
@@ -189,12 +184,19 @@ function createRunCopyRandom(state: State) {
 function createStreamRandom(rngState: number) {
   let rng = rngState
 
+  const intExclusive = (maxExclusive: number) => {
+    const r = randInt(rng, maxExclusive)
+    rng = r.rngState
+    return r.value
+  }
+
   return {
-    intExclusive: (maxExclusive: number) => {
-      const r = randInt(rng, maxExclusive)
-      rng = r.rngState
-      return r.value
-    },
+    intExclusive,
+    // Inclusive on both ends. Callers pass ordered (min ≤ max) constants;
+    // we don't normalize because the only places this is used pair compile-
+    // time literals like FOO_MIN/FOO_MAX.
+    intInRange: (minInclusive: number, maxInclusive: number) =>
+      minInclusive + intExclusive(maxInclusive - minInclusive + 1),
     get rngState() {
       return rng
     },

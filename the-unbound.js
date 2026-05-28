@@ -27,7 +27,8 @@
     ],
     lostAndOrientation: [
       "Woods and swamps can pull you off course.",
-      "When lost, find a signpost, farm, or town to get your bearings again."
+      "When lost, find a signpost, farm, or town to get your bearings again.",
+      "What's nice about the Unbound is that everything is at most 10 leagues away."
     ],
     map: [
       "The map shows landmarks, not terrain.",
@@ -35,10 +36,47 @@
     ],
     scout: [
       "A Scout halves your odds of getting lost in woods and swamps.",
-      "When you're oriented, a Scout points out farms, camps, and henges."
+      "When you're oriented, a Scout points out farms, camps, and henges.",
+      "A scout can be hired in a Town - or, if you're lucky, around a Camp's fire."
     ],
     goal: [
-      "Someone saw the Locksmith three nights ago."
+      "Someone saw the Locksmith three nights ago.",
+      "The Locksmith won't forge without the quench. Bring blood.",
+      "The dragon in the high country bleeds, if you can reach it."
+    ],
+    wyrm: [
+      "There's a dragon up in the high passes. Old as the stones.",
+      "Don't go to the wyrm alone. Even with men, it's a near thing.",
+      "You don't have to kill it. Just enough to draw the blood. It heals.",
+      "Gold works on the wyrm too, they say. If you've got a lot of it.",
+      "The cave with the long wind - that's where it sleeps."
+    ],
+    mule: [
+      "A mule carries fifty more rations, but it'll take some of yours at every camp.",
+      "Sell a tired mule at a Crossing if you can. Half what you paid is fair."
+    ],
+    healer: [
+      "A hedge-healer can pull a soldier back from a bad day. She'll empty your purse, slowly.",
+      "Some towns have one. She'll cost you a coin every time you stop in - bandages, herbs, the salve that smells of iron."
+    ],
+    boar: [
+      "A trained boar does one thing well, and at the start of a fight. Don't expect it twice in a day.",
+      "If you've a mule, a boar won't sit beside it. Pick one."
+    ],
+    captain: [
+      "A banner makes the men fight straighter. It also makes them seen. Mind your woods and mountains.",
+      "If you carry the colours, expect company on bad roads."
+    ],
+    fisherman: [
+      "A fisherman doubles what a lake gives you. He's heavy gear though. You'll feel it if you run."
+    ],
+    magpie: [
+      "A magpie palms a coin out of any honest trade. Roughly one in three. Pays for itself if you trade enough.",
+      "Don't ask the farmer where she got it. She doesn't know either."
+    ],
+    crossing: [
+      "Carrying too many companions? A Crossing will take one off your hands. Half what you paid is the going rate.",
+      "Drovers at a Crossing buy from anyone. Beasts, banners, even people with somewhere else to be."
     ]
   };
   var GATE_LOCKED_LINES = [
@@ -53,7 +91,9 @@
   var LOCKSMITH_PURCHASE_LINES = [
     "You feed the fire. They finish the key.",
     "A small hammer-song. A key, still warm.",
-    "They take what you offer and give you what you came for."
+    "They take what you offer and give you what you came for.",
+    "The blade plunges into the vial. The hiss is brief. The key is bronze and done.",
+    "The quench is over before you can blink. The key cools in their palm."
   ];
   var LOCKSMITH_ENTER_LINES = [
     "The forge offers a key - for a price.",
@@ -106,7 +146,7 @@
   ];
   var CAMP_NAME_POOL = [
     "The Wayrest",
-    "Ember Cross",
+    "Ember Watch",
     "The Muster",
     "Cold Haven",
     "Ashford",
@@ -119,7 +159,7 @@
     "Crows' Argument",
     "The Recurring",
     "Patient Circle",
-    "Weather Cross"
+    "Weather Stones"
   ];
   var TOWN_NAME_POOL = [
     "Stonebridge",
@@ -131,11 +171,11 @@
   var GATE_NAME = "The Gate";
   var LOCKSMITH_NAME = "Locksmith of the Unbound";
   var FARM_ENTER_LINES = [
-    "The barn still trades - food for coin, beasts for travelers with purse enough.",
-    "Stalls line the yard: rations, and a pensmith's fee for a steady companion.",
+    "The barn still trades - food for coin, and whatever the farmer has at hand for those with the purse for it.",
+    "Stalls line the yard: rations, and a price scratched beside something else.",
     "Someone left this place open. Stock and prices are scratched on the door."
   ];
-  var FARM_BEAST_ALREADY_LINES = [
+  var MULE_ALREADY_LINES = [
     "You already have a beast at heel. Another would be trouble.",
     "One is enough - the pen is closed to you.",
     "Your pack-beast is already yours. No second sale today."
@@ -145,7 +185,7 @@
     "Fair weight on the scale - you count every parcel twice.",
     "The trade is quick; hunger won't be, if you ration well."
   ];
-  var FARM_BUY_BEAST_LINES = [
+  var MULE_BUY_LINES = [
     "Coins pass; a horned head lowers, then follows.",
     "The handler knots the lead - yours now, for better or worse.",
     "Lean muscle, patient eyes. It will carry more than you alone."
@@ -506,6 +546,15 @@
     nextCells[pos.y] = nextRow;
     return { ...world, cells: nextCells };
   }
+  function findCellByKind(cells, kind) {
+    for (let y = 0; y < cells.length; y++) {
+      const row = cells[y];
+      for (let x = 0; x < row.length; x++) {
+        if (row[x].kind === kind) return { x, y };
+      }
+    }
+    return null;
+  }
 
   // src/core/rng.ts
   function xorshift32(x) {
@@ -552,13 +601,8 @@
     return u32(h) % m;
   }
   function pickIntInRange(state2, minInclusive, maxInclusive) {
-    const a = Number.isFinite(minInclusive) ? Math.trunc(minInclusive) : 0;
-    const b = Number.isFinite(maxInclusive) ? Math.trunc(maxInclusive) : 0;
-    const lo = Math.min(a, b);
-    const hi = Math.max(a, b);
-    const span = hi - lo + 1;
-    if (span <= 1) return lo;
-    return lo + pickIntExclusive(state2, span);
+    const span = maxInclusive - minInclusive + 1;
+    return minInclusive + pickIntExclusive(state2, span);
   }
   function pickFromPool(state2, pool) {
     if (!pool.length) return void 0;
@@ -635,12 +679,17 @@
   }
   function createStreamRandom(rngState) {
     let rng = rngState;
+    const intExclusive = (maxExclusive) => {
+      const r = randInt(rng, maxExclusive);
+      rng = r.rngState;
+      return r.value;
+    };
     return {
-      intExclusive: (maxExclusive) => {
-        const r = randInt(rng, maxExclusive);
-        rng = r.rngState;
-        return r.value;
-      },
+      intExclusive,
+      // Inclusive on both ends. Callers pass ordered (min ≤ max) constants;
+      // we don't normalize because the only places this is used pair compile-
+      // time literals like FOO_MIN/FOO_MAX.
+      intInRange: (minInclusive, maxInclusive) => minInclusive + intExclusive(maxInclusive - minInclusive + 1),
       get rngState() {
         return rng;
       }
@@ -696,13 +745,102 @@
     return s;
   }
 
-  // src/core/world.ts
-  function cellId(x, y) {
-    return y * WORLD_WIDTH + x;
+  // src/core/mechanics/registry.ts
+  function buildMechanicIndex(mechanics) {
+    const seenIds = /* @__PURE__ */ new Set();
+    const ownerByKind = {};
+    const onEnterTileByKind2 = {};
+    const rightGridByEncounterKind2 = {};
+    const reduceEncounterActionByEncounterKind2 = {};
+    const previewPlateByEncounterKind = {};
+    const previewEncounterByEncounterKind = {};
+    const poiSignpostByKind = {};
+    const mapLabelByKind = {};
+    const enterFoodCostByKind2 = {};
+    const moveEventPolicyByKind = {};
+    const seenEncounterKinds = /* @__PURE__ */ new Set();
+    for (let i = 0; i < mechanics.length; i++) {
+      const m = mechanics[i];
+      if (seenIds.has(m.id)) {
+        throw new Error(`Duplicate mechanic id: ${m.id}`);
+      }
+      seenIds.add(m.id);
+      if (m.encounter) {
+        const ek = m.encounter.kind;
+        if (seenEncounterKinds.has(ek)) {
+          throw new Error(`Duplicate encounterKind: ${ek}`);
+        }
+        seenEncounterKinds.add(ek);
+        if (m.encounter.rightGrid) rightGridByEncounterKind2[ek] = m.encounter.rightGrid;
+        if (m.encounter.reduceAction) reduceEncounterActionByEncounterKind2[ek] = m.encounter.reduceAction;
+        if (m.encounter.previewPlate) previewPlateByEncounterKind[ek] = m.encounter.previewPlate;
+        if (m.encounter.previewEncounter) previewEncounterByEncounterKind[ek] = m.encounter.previewEncounter;
+      }
+      const costByKind = m.enterFoodCostByKind;
+      if (costByKind) {
+        for (const kindKey of Object.keys(costByKind)) {
+          if (!m.kinds.includes(kindKey)) {
+            throw new Error(`Mechanic ${m.id} sets enterFoodCostByKind for ${kindKey} but does not claim that kind`);
+          }
+          const cost = costByKind[kindKey];
+          if (cost < 0) {
+            throw new Error(`enterFoodCostByKind for ${kindKey} must be >= 0`);
+          }
+        }
+      }
+      const policyByKind = m.moveEventPolicyByKind;
+      if (policyByKind) {
+        for (const kindKey of Object.keys(policyByKind)) {
+          if (!m.kinds.includes(kindKey)) {
+            throw new Error(`Mechanic ${m.id} sets moveEventPolicyByKind for ${kindKey} but does not claim that kind`);
+          }
+          const policy = policyByKind[kindKey];
+          const ambushPercent = policy.ambushPercent;
+          const lostPercent = policy.lostPercent;
+          if (ambushPercent < 0 || lostPercent < 0 || ambushPercent > 100 || lostPercent > 100 || ambushPercent + lostPercent > 100) {
+            throw new Error(
+              `MoveEventPolicy for ${kindKey} must have ambushPercent and lostPercent in [0, 100] with sum <= 100`
+            );
+          }
+        }
+      }
+      for (let k = 0; k < m.kinds.length; k++) {
+        const kind = m.kinds[k];
+        const prevOwner = ownerByKind[kind];
+        if (prevOwner) {
+          throw new Error(`Duplicate kind ownership: ${kind} claimed by ${prevOwner} and ${m.id}`);
+        }
+        ownerByKind[kind] = m.id;
+        if (m.onEnterTile) onEnterTileByKind2[kind] = m.onEnterTile;
+        if (m.mapLabel != null) mapLabelByKind[kind] = m.mapLabel;
+        if (m.poiSignpost) poiSignpostByKind[kind] = m.poiSignpost;
+        const cost = costByKind?.[kind];
+        if (cost != null) enterFoodCostByKind2[kind] = cost;
+        const policy = policyByKind?.[kind];
+        if (policy) moveEventPolicyByKind[kind] = policy;
+      }
+    }
+    return {
+      ownerByKind,
+      onEnterTileByKind: onEnterTileByKind2,
+      rightGridByEncounterKind: rightGridByEncounterKind2,
+      reduceEncounterActionByEncounterKind: reduceEncounterActionByEncounterKind2,
+      previewPlateByEncounterKind,
+      previewEncounterByEncounterKind,
+      poiSignpostByKind,
+      mapLabelByKind,
+      enterFoodCostByKind: enterFoodCostByKind2,
+      moveEventPolicyByKind
+    };
   }
+
+  // src/core/worldgen.ts
   var TERRAIN_KIND_SET = new Set(TERRAIN_KINDS);
   function isTerrainCell(cell) {
     return TERRAIN_KIND_SET.has(cell.kind);
+  }
+  function cellId(x, y) {
+    return cellIdForPos({ width: WORLD_WIDTH }, { x, y });
   }
   function torusManhattanDistance(a, b) {
     const dx = torusDelta(a.x, b.x, WORLD_WIDTH);
@@ -716,109 +854,20 @@
   function placeFeature(cells, rngState, opts) {
     const placed = [];
     const rng = RNG.createStreamRandom(rngState);
+    const minD = opts.awayFrom ? clampMinTorusDistance(opts.awayFrom.minDistance) : 0;
     while (placed.length < opts.count) {
       const v = rng.intExclusive(WORLD_WIDTH * WORLD_HEIGHT);
       const x = v % WORLD_WIDTH;
       const y = Math.floor(v / WORLD_WIDTH);
       const here = cells[y][x];
       if (!opts.canPlaceAt(x, y, here)) continue;
+      if (opts.awayFrom && torusManhattanDistance({ x, y }, opts.awayFrom.pos) < minD) continue;
       cells[y][x] = opts.buildCell({ x, y, rng });
       placed.push({ x, y });
     }
     return { placed, rngState: rng.rngState };
   }
-  function boxBlurIntGridWrap(grid, w, h) {
-    const out = [];
-    for (let y = 0; y < h; y++) {
-      const row = [];
-      for (let x = 0; x < w; x++) {
-        let sum = 0;
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const nx = wrapIndex(x + dx, w);
-            const ny = wrapIndex(y + dy, h);
-            sum += grid[ny][nx];
-          }
-        }
-        row.push(Math.floor(sum / 9));
-      }
-      out.push(row);
-    }
-    return out;
-  }
-  function generateBaseTerrainCells(rngState) {
-    const vals = [];
-    const rng = RNG.createStreamRandom(rngState);
-    for (let y = 0; y < WORLD_HEIGHT; y++) {
-      const row = [];
-      for (let x = 0; x < WORLD_WIDTH; x++) {
-        row.push(rng.intExclusive(NOISE_VALUE_MAX));
-      }
-      vals.push(row);
-    }
-    let V = vals;
-    for (let p = 0; p < NOISE_SMOOTH_PASSES; p++) {
-      V = boxBlurIntGridWrap(V, WORLD_WIDTH, WORLD_HEIGHT);
-    }
-    let minV = V[0][0];
-    let maxV = V[0][0];
-    for (let y = 0; y < WORLD_HEIGHT; y++) {
-      for (let x = 0; x < WORLD_WIDTH; x++) {
-        const v = V[y][x];
-        if (v < minV) minV = v;
-        if (v > maxV) maxV = v;
-      }
-    }
-    const span = maxV - minV || 1;
-    const kindByBucket = TERRAIN_KINDS;
-    const bucketCount = kindByBucket.length;
-    const cells = [];
-    for (let y = 0; y < WORLD_HEIGHT; y++) {
-      const row = [];
-      for (let x = 0; x < WORLD_WIDTH; x++) {
-        let bucket = Math.floor(bucketCount * (V[y][x] - minV) / span);
-        if (bucket < 0) bucket = 0;
-        if (bucket >= bucketCount) bucket = bucketCount - 1;
-        row.push({ kind: kindByBucket[bucket] });
-      }
-      cells.push(row);
-    }
-    return { cells, rngState: rng.rngState };
-  }
-  function placeGate(cells, rngState) {
-    const res = placeFeature(cells, rngState, {
-      count: 1,
-      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
-      buildCell: () => ({ kind: "gate" })
-    });
-    return { gatePos: res.placed[0], rngState: res.rngState };
-  }
-  function placeLocksmith(cells, rngState, gatePos) {
-    const minD = clampMinTorusDistance(GATE_LOCKSMITH_MIN_DISTANCE);
-    const res = placeFeature(cells, rngState, {
-      count: 1,
-      canPlaceAt: (x, y, here) => isTerrainCell(here) && torusManhattanDistance({ x, y }, gatePos) >= minD,
-      buildCell: () => ({ kind: "locksmith" })
-    });
-    return { locksmithPos: res.placed[0], rngState: res.rngState };
-  }
   function placeNamedFeature(cells, rngState, opts) {
-    const remainingNames = [...opts.namePool];
-    const res = placeFeature(cells, rngState, {
-      count: opts.count,
-      canPlaceAt: opts.canPlaceAt,
-      buildCell: ({ x, y, rng }) => {
-        let name = opts.fallbackName;
-        if (remainingNames.length > 0) {
-          const idx = rng.intExclusive(remainingNames.length);
-          name = remainingNames.splice(idx, 1)[0] || opts.fallbackName;
-        }
-        return opts.buildCell(x, y, name);
-      }
-    });
-    return res.rngState;
-  }
-  function placeNamedFeatureRng(cells, rngState, opts) {
     const remainingNames = [...opts.namePool];
     const res = placeFeature(cells, rngState, {
       count: opts.count,
@@ -834,169 +883,39 @@
     });
     return res.rngState;
   }
-  function placeNamedFarms(cells, rngState) {
-    return placeNamedFeatureRng(cells, rngState, {
-      count: FARM_COUNT,
-      namePool: FARM_NAME_POOL,
-      fallbackName: "A Farm",
-      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
-      buildCell: ({ x, y, name, rng }) => {
-        const lo = Math.min(FARM_BEAST_GOLD_MIN, FARM_BEAST_GOLD_MAX);
-        const hi = Math.max(FARM_BEAST_GOLD_MIN, FARM_BEAST_GOLD_MAX);
-        const beastGoldCost = lo + rng.intExclusive(hi - lo + 1);
-        return {
-          kind: "farm",
-          id: cellId(x, y),
-          name,
-          beastGoldCost
-        };
-      }
-    });
-  }
-  function placeFishingLakes(cells, rngState) {
-    const res = placeFeature(cells, rngState, {
-      count: FISHING_LAKE_COUNT,
-      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
-      buildCell: ({ x, y }) => ({ kind: "fishingLake", id: cellId(x, y), nextReadyStep: 0 })
-    });
-    return res.rngState;
-  }
-  function placeRainbowEnds(cells, rngState) {
-    const first = placeFeature(cells, rngState, {
-      count: 1,
-      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
-      buildCell: ({ x, y }) => ({ kind: "rainbowEnd", id: cellId(x, y), hasPaidOut: false })
-    });
-    rngState = first.rngState;
-    const firstPos = first.placed[0];
-    const minD = clampMinTorusDistance(RAINBOW_END_MIN_DISTANCE);
-    const second = placeFeature(cells, rngState, {
-      count: 1,
-      canPlaceAt: (x, y, here) => isTerrainCell(here) && torusManhattanDistance({ x, y }, firstPos) >= minD,
-      buildCell: ({ x, y }) => ({ kind: "rainbowEnd", id: cellId(x, y), hasPaidOut: false })
-    });
-    return second.rngState;
-  }
-  function placeNamedCamps(cells, rngState) {
-    return placeNamedFeature(cells, rngState, {
-      count: CAMP_COUNT,
-      namePool: CAMP_NAME_POOL,
-      fallbackName: "A Camp",
-      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
-      buildCell: (x, y, name) => ({ kind: "camp", id: cellId(x, y), name, nextReadyStep: 0 })
-    });
-  }
-  function placeNamedTowns(cells, rngState) {
-    const baseOffers = [
-      ACTION_TOWN_BUY_FOOD,
-      ACTION_TOWN_BUY_TROOPS,
-      ACTION_TOWN_HIRE_SCOUT,
-      ACTION_TOWN_BUY_RUMOR
-    ];
-    const omitNoScoutIndices = [0, 1, 3];
-    let townIndex = 0;
-    return placeNamedFeatureRng(cells, rngState, {
-      count: TOWN_COUNT,
-      namePool: TOWN_NAME_POOL,
-      fallbackName: "A Town",
-      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
-      buildCell: ({ x, y, name, rng }) => {
-        let omitIdx;
-        if (townIndex === 0) {
-          const idx = rng.intExclusive(omitNoScoutIndices.length);
-          omitIdx = omitNoScoutIndices[idx];
-        } else {
-          omitIdx = rng.intExclusive(baseOffers.length);
-        }
-        const offers = baseOffers.filter((_k, idx) => idx !== omitIdx);
-        const loFood = Math.min(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX);
-        const hiFood = Math.max(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX);
-        const foodGold = loFood + rng.intExclusive(hiFood - loFood + 1);
-        const loTroops = Math.min(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX);
-        const hiTroops = Math.max(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX);
-        const troopsGold = loTroops + rng.intExclusive(hiTroops - loTroops + 1);
-        const loScout = Math.min(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX);
-        const hiScout = Math.max(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX);
-        const scoutGold = loScout + rng.intExclusive(hiScout - loScout + 1);
-        const loRumor = Math.min(TOWN_PRICE_RUMOR_MIN, TOWN_PRICE_RUMOR_MAX);
-        const hiRumor = Math.max(TOWN_PRICE_RUMOR_MIN, TOWN_PRICE_RUMOR_MAX);
-        const rumorGold = loRumor + rng.intExclusive(hiRumor - loRumor + 1);
-        const cell = {
-          kind: "town",
-          id: cellId(x, y),
-          name,
-          offers,
-          prices: { foodGold, troopsGold, scoutGold, rumorGold },
-          bundles: { food: TOWN_FOOD_BUNDLE, troops: TOWN_TROOPS_BUNDLE }
-        };
-        townIndex++;
-        return cell;
-      }
-    });
-  }
-  function placeHenges(cells, rngState) {
-    return placeNamedFeature(cells, rngState, {
-      count: HENGE_COUNT,
-      namePool: HENGE_NAME_POOL,
-      fallbackName: "A Henge",
-      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
-      buildCell: (x, y, name) => ({ kind: "henge", id: cellId(x, y), name, nextReadyStep: 0 })
-    });
-  }
-  function placeSignposts(cells, rngState) {
-    const res = placeFeature(cells, rngState, {
-      count: SIGNPOST_COUNT,
-      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
-      buildCell: () => ({ kind: "signpost" })
-    });
-    return res.rngState;
-  }
-  function pickStart({ rngState }) {
-    const rng = RNG.createStreamRandom(rngState);
-    const v = rng.intExclusive(WORLD_WIDTH * WORLD_HEIGHT);
-    const x = v % WORLD_WIDTH;
-    const y = Math.floor(v / WORLD_WIDTH);
-    return { startPosition: { x, y }, rngState: rng.rngState };
-  }
-  function getSpriteIdAt(world, x, y) {
-    const tx = wrapIndex(x, world.width);
-    const ty = wrapIndex(y, world.height);
-    const cell = world.cells[ty][tx];
-    return spriteIdForKind(cell.kind);
-  }
-  function generateWorld(seed) {
-    let rngState = RNG.createStreamRandomFromSeed(seed).rngState;
-    const base = generateBaseTerrainCells(rngState);
-    rngState = base.rngState;
-    const cells = base.cells;
-    const gate = placeGate(cells, rngState);
-    rngState = gate.rngState;
-    const locksmith = placeLocksmith(cells, rngState, gate.gatePos);
-    rngState = locksmith.rngState;
-    rngState = placeNamedFarms(cells, rngState);
-    rngState = placeNamedCamps(cells, rngState);
-    rngState = placeNamedTowns(cells, rngState);
-    rngState = placeHenges(cells, rngState);
-    rngState = placeSignposts(cells, rngState);
-    rngState = placeFishingLakes(cells, rngState);
-    rngState = placeRainbowEnds(cells, rngState);
-    const startPick = pickStart({ rngState });
-    rngState = startPick.rngState;
-    const world = {
-      seed,
-      width: WORLD_WIDTH,
-      height: WORLD_HEIGHT,
-      mapGenAlgorithm: MAP_GEN_ALGORITHM,
-      cells,
-      rngState
-    };
-    return { world, startPosition: startPick.startPosition };
-  }
 
-  // src/core/mechanics/onEnter.ts
-  var onEnterDefaultTerrain = ({ cell, world, pos, stepCount }) => {
+  // src/core/mechanics/defs/gate.ts
+  var onEnterGate = ({ cell, world, pos, stepCount, resources }) => {
+    if (cell.kind !== "gate" && cell.kind !== "gateOpen") return {};
     const r = RNG.createTileRandom({ world, stepCount, pos });
-    return { message: r.perMoveLine(terrainLoreLinesForKind(cell.kind)) };
+    if (!resources.hasBronzeKey) {
+      const line2 = r.perMoveLine(GATE_LOCKED_LINES);
+      return { message: `${GATE_NAME}
+${line2}` };
+    }
+    const nextWorld = cell.kind === "gateOpen" ? world : setCellAt(world, pos, { kind: "gateOpen" });
+    const line = r.perMoveLine(GATE_OPEN_LINES);
+    return { world: nextWorld, hasWon: true, message: `${GATE_NAME}
+${line}` };
+  };
+  var placeGate = ({ cells, rngState }) => {
+    const res = placeFeature(cells, rngState, {
+      count: 1,
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: () => ({ kind: "gate" })
+    });
+    return { rngState: res.rngState };
+  };
+  var gateMechanic = {
+    id: "gate",
+    kinds: ["gate", "gateOpen"],
+    mapLabel: "G",
+    onEnterTile: onEnterGate,
+    poiSignpost: {
+      rank: 0,
+      name: () => GATE_NAME
+    },
+    placeWorld: placeGate
   };
 
   // src/core/uiAnim.ts
@@ -1110,112 +1029,6 @@ ${line}` } };
     return next;
   }
 
-  // src/core/mechanics/registry.ts
-  function buildMechanicIndex(mechanics) {
-    const seenIds = /* @__PURE__ */ new Set();
-    const ownerByKind = {};
-    const onEnterTileByKind2 = {};
-    const rightGridByEncounterKind2 = {};
-    const reduceEncounterActionByEncounterKind2 = {};
-    const mapLabelByKind = {};
-    const enterFoodCostByKind2 = {};
-    const moveEventPolicyByKind = {};
-    const seenEncounterKinds = /* @__PURE__ */ new Set();
-    for (let i = 0; i < mechanics.length; i++) {
-      const m = mechanics[i];
-      if (seenIds.has(m.id)) {
-        throw new Error(`Duplicate mechanic id: ${m.id}`);
-      }
-      seenIds.add(m.id);
-      if (m.rightGrid && !m.encounterKind) {
-        throw new Error(`Mechanic ${m.id} sets rightGrid without encounterKind`);
-      }
-      if (m.reduceEncounterAction && !m.encounterKind) {
-        throw new Error(`Mechanic ${m.id} sets reduceEncounterAction without encounterKind`);
-      }
-      if (m.encounterKind) {
-        if (seenEncounterKinds.has(m.encounterKind)) {
-          throw new Error(`Duplicate encounterKind: ${m.encounterKind}`);
-        }
-        seenEncounterKinds.add(m.encounterKind);
-        if (m.rightGrid) rightGridByEncounterKind2[m.encounterKind] = m.rightGrid;
-        if (m.reduceEncounterAction) reduceEncounterActionByEncounterKind2[m.encounterKind] = m.reduceEncounterAction;
-      }
-      const costByKind = m.enterFoodCostByKind;
-      if (costByKind) {
-        for (const kindKey of Object.keys(costByKind)) {
-          if (!m.kinds.includes(kindKey)) {
-            throw new Error(`Mechanic ${m.id} sets enterFoodCostByKind for ${kindKey} but does not claim that kind`);
-          }
-          const cost = costByKind[kindKey];
-          if (cost < 0) {
-            throw new Error(`enterFoodCostByKind for ${kindKey} must be >= 0`);
-          }
-        }
-      }
-      const policyByKind = m.moveEventPolicyByKind;
-      if (policyByKind) {
-        for (const kindKey of Object.keys(policyByKind)) {
-          if (!m.kinds.includes(kindKey)) {
-            throw new Error(`Mechanic ${m.id} sets moveEventPolicyByKind for ${kindKey} but does not claim that kind`);
-          }
-          const policy = policyByKind[kindKey];
-          const ambushPercent = policy.ambushPercent;
-          const lostPercent = policy.lostPercent;
-          if (ambushPercent < 0 || lostPercent < 0 || ambushPercent > 100 || lostPercent > 100 || ambushPercent + lostPercent > 100) {
-            throw new Error(
-              `MoveEventPolicy for ${kindKey} must have ambushPercent and lostPercent in [0, 100] with sum <= 100`
-            );
-          }
-        }
-      }
-      for (let k = 0; k < m.kinds.length; k++) {
-        const kind = m.kinds[k];
-        const prevOwner = ownerByKind[kind];
-        if (prevOwner) {
-          throw new Error(`Duplicate kind ownership: ${kind} claimed by ${prevOwner} and ${m.id}`);
-        }
-        ownerByKind[kind] = m.id;
-        if (m.onEnterTile) onEnterTileByKind2[kind] = m.onEnterTile;
-        if (m.mapLabel != null) mapLabelByKind[kind] = m.mapLabel;
-        const cost = costByKind?.[kind];
-        if (cost != null) enterFoodCostByKind2[kind] = cost;
-        const policy = policyByKind?.[kind];
-        if (policy) moveEventPolicyByKind[kind] = policy;
-      }
-    }
-    return {
-      ownerByKind,
-      onEnterTileByKind: onEnterTileByKind2,
-      rightGridByEncounterKind: rightGridByEncounterKind2,
-      reduceEncounterActionByEncounterKind: reduceEncounterActionByEncounterKind2,
-      mapLabelByKind,
-      enterFoodCostByKind: enterFoodCostByKind2,
-      moveEventPolicyByKind
-    };
-  }
-
-  // src/core/mechanics/defs/gate.ts
-  var onEnterGate = ({ cell, world, pos, stepCount, resources }) => {
-    if (cell.kind !== "gate" && cell.kind !== "gateOpen") return {};
-    const r = RNG.createTileRandom({ world, stepCount, pos });
-    if (!resources.hasBronzeKey) {
-      const line2 = r.perMoveLine(GATE_LOCKED_LINES);
-      return { message: `${GATE_NAME}
-${line2}` };
-    }
-    const nextWorld = cell.kind === "gateOpen" ? world : setCellAt(world, pos, { kind: "gateOpen" });
-    const line = r.perMoveLine(GATE_OPEN_LINES);
-    return { world: nextWorld, hasWon: true, message: `${GATE_NAME}
-${line}` };
-  };
-  var gateMechanic = {
-    id: "gate",
-    kinds: ["gate", "gateOpen"],
-    mapLabel: "G",
-    onEnterTile: onEnterGate
-  };
-
   // src/core/mechanics/defs/locksmith.ts
   var onEnterLocksmith = ({ cell, world, pos, stepCount, resources }) => {
     if (cell.kind !== "locksmith") return {};
@@ -1264,6 +1077,24 @@ ${rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)}`,
       deltas: result.deltas
     });
   }
+  var placeLocksmith = ({ cells, rngState }) => {
+    const gatePos = findCellByKind(cells, "gate");
+    if (!gatePos) throw new Error("placeLocksmith: gate must be placed before locksmith");
+    const res = placeFeature(cells, rngState, {
+      count: 1,
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      awayFrom: { pos: gatePos, minDistance: GATE_LOCKSMITH_MIN_DISTANCE },
+      buildCell: () => ({ kind: "locksmith" })
+    });
+    return { rngState: res.rngState };
+  };
+  var locksmithPreviewPlate = () => {
+    const lines = [
+      { spriteId: SPRITES.stats.gold, text: `-${LOCKSMITH_KEY_GOLD_COST}` },
+      { spriteId: SPRITES.stats.food, text: `-${LOCKSMITH_KEY_FOOD_COST}` }
+    ];
+    return lines;
+  };
   function reduceLocksmithPayFood(prevState) {
     const rnd = RNG.createRunCopyRandom(prevState);
     const result = buy(prevState.resources, { food: LOCKSMITH_KEY_FOOD_COST, gain: { hasBronzeKey: true } });
@@ -1282,95 +1113,68 @@ ${rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)}`,
     kinds: ["locksmith"],
     mapLabel: "L",
     onEnterTile: onEnterLocksmith,
-    encounterKind: "locksmith",
-    reduceEncounterAction: reduceLocksmithAction,
-    rightGrid: (_s, row, col) => {
-      if (row === 0 && col === 1)
-        return { spriteId: SPRITES.buttons.gold, action: { type: ACTION_LOCKSMITH_PAY_GOLD } };
-      if (row === 1 && col === 0)
-        return { spriteId: SPRITES.buttons.food, action: { type: ACTION_LOCKSMITH_PAY_FOOD } };
-      if (row === 1 && col === 2)
-        return { spriteId: SPRITES.buttons.return, action: { type: ACTION_LOCKSMITH_LEAVE } };
-      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.locksmithKiln, action: null };
-      return { action: null };
+    poiSignpost: {
+      rank: 10,
+      name: () => LOCKSMITH_NAME
+    },
+    placeWorld: placeLocksmith,
+    encounter: {
+      kind: "locksmith",
+      reduceAction: reduceLocksmithAction,
+      previewPlate: locksmithPreviewPlate,
+      previewEncounter: () => ({ kind: "locksmith", sourceCellId: -1, restoreMessage: "" }),
+      rightGrid: (_s, row, col) => {
+        if (row === 0 && col === 1)
+          return { spriteId: SPRITES.buttons.gold, action: { type: ACTION_LOCKSMITH_PAY_GOLD } };
+        if (row === 1 && col === 0)
+          return { spriteId: SPRITES.buttons.food, action: { type: ACTION_LOCKSMITH_PAY_FOOD } };
+        if (row === 1 && col === 2)
+          return { spriteId: SPRITES.buttons.return, action: { type: ACTION_LOCKSMITH_LEAVE } };
+        if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.locksmithKiln, action: null };
+        return { action: null };
+      }
     }
   };
 
   // src/core/signpost.ts
+  var SIGNPOST_MIN_TARGET_DISTANCE = 2;
   function formatNearestPoiSignpostMessage(playerPos, world) {
-    const SIGNPOST_MIN_TARGET_DISTANCE = 2;
-    const POI_KIND_RANK = {
-      gate: 0,
-      gateOpen: 0,
-      locksmith: 1,
-      farm: 2,
-      town: 3,
-      camp: 4,
-      henge: 5
-    };
-    const kindRank = (k) => POI_KIND_RANK[k];
-    function candidateId(x, y) {
-      return y * world.width + x;
-    }
-    const candidates = [];
-    function pushNamedCandidate(kind, id, baseName, suffix, x, y) {
-      const name = `${baseName} ${suffix}`;
-      candidates.push({ kind, id, name, pos: { x, y } });
-    }
     const cells = world.cells;
+    const poiSignpostByKind = MECHANIC_INDEX.poiSignpostByKind;
+    const candidates = [];
     for (let y = 0; y < cells.length; y++) {
       const row = cells[y];
       for (let x = 0; x < row.length; x++) {
         const cell = row[x];
-        switch (cell.kind) {
-          case "gate":
-            candidates.push({ kind: "gate", id: candidateId(x, y), name: GATE_NAME, pos: { x, y } });
-            break;
-          case "gateOpen":
-            candidates.push({ kind: "gateOpen", id: candidateId(x, y), name: GATE_NAME, pos: { x, y } });
-            break;
-          case "locksmith":
-            candidates.push({ kind: "locksmith", id: candidateId(x, y), name: LOCKSMITH_NAME, pos: { x, y } });
-            break;
-          case "farm":
-            pushNamedCandidate("farm", cell.id, cell.name || "A Farm", "Farm", x, y);
-            break;
-          case "camp":
-            pushNamedCandidate("camp", cell.id, cell.name || "A Camp", "Camp", x, y);
-            break;
-          case "henge":
-            pushNamedCandidate("henge", cell.id, cell.name || "A Henge", "Henge", x, y);
-            break;
-          case "town":
-            pushNamedCandidate("town", cell.id, cell.name || "A Town", "Town", x, y);
-            break;
-        }
+        const contribution = poiSignpostByKind[cell.kind];
+        if (!contribution) continue;
+        candidates.push({
+          rank: contribution.rank,
+          cellSerial: y * world.width + x,
+          name: contribution.name(cell),
+          pos: { x, y }
+        });
       }
     }
     if (candidates.length === 0) return "";
     function evalCandidate(c) {
       const dx = torusDelta(playerPos.x, c.pos.x, world.width);
       const dy = torusDelta(playerPos.y, c.pos.y, world.height);
-      const d = manhattan(dx, dy);
-      const rank = kindRank(c.kind);
-      return { ...c, dx, dy, d, rank };
+      return { ...c, dx, dy, d: manhattan(dx, dy) };
     }
     function isBetter(a, b) {
       if (a.d !== b.d) return a.d < b.d;
       if (a.rank !== b.rank) return a.rank < b.rank;
-      return a.id < b.id;
+      return a.cellSerial < b.cellSerial;
     }
     let bestAny = null;
     let bestFar = null;
     for (let i = 0; i < candidates.length; i++) {
       const e = evalCandidate(candidates[i]);
       if (!bestAny || isBetter(e, bestAny)) bestAny = e;
-      if (e.d > SIGNPOST_MIN_TARGET_DISTANCE) {
-        if (!bestFar || isBetter(e, bestFar)) bestFar = e;
-      }
+      if (e.d > SIGNPOST_MIN_TARGET_DISTANCE && (!bestFar || isBetter(e, bestFar))) bestFar = e;
     }
     const chosen = bestFar || bestAny;
-    if (!chosen) return "";
     const dir = dirLabel(chosen.dx, chosen.dy);
     return `${chosen.name}
 ${dir}, ${chosen.d} leagues away.`;
@@ -1381,10 +1185,19 @@ ${dir}, ${chosen.d} leagues away.`;
     message: formatNearestPoiSignpostMessage(pos, world),
     knowsPosition: true
   });
+  var placeSignposts = ({ cells, rngState }) => {
+    const res = placeFeature(cells, rngState, {
+      count: SIGNPOST_COUNT,
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: () => ({ kind: "signpost" })
+    });
+    return { rngState: res.rngState };
+  };
   var signpostMechanic = {
     id: "signpost",
     kinds: ["signpost"],
-    onEnterTile: onEnterSignpost
+    onEnterTile: onEnterSignpost,
+    placeWorld: placeSignposts
   };
 
   // src/core/foodCarry.ts
@@ -1460,18 +1273,40 @@ ${pick.line}`,
       deltas
     });
   }
+  var placeNamedFarms = ({ cells, rngState }) => {
+    const next = placeNamedFeature(cells, rngState, {
+      count: FARM_COUNT,
+      namePool: FARM_NAME_POOL,
+      fallbackName: "A Farm",
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: ({ x, y, name, rng }) => {
+        const beastGoldCost = rng.intInRange(FARM_BEAST_GOLD_MIN, FARM_BEAST_GOLD_MAX);
+        return { kind: "farm", id: cellId(x, y), name, beastGoldCost };
+      }
+    });
+    return { rngState: next };
+  };
+  var farmPreviewPlate = (s) => {
+    const here = getCellAt(s.world, s.player.position);
+    if (!here || here.kind !== "farm") return null;
+    const lines = [
+      { spriteId: SPRITES.stats.food, text: `-${FARM_BUY_FOOD_GOLD_COST}` },
+      { spriteId: SPRITES.cosmetics.beastIllustration, text: `-${here.beastGoldCost}` }
+    ];
+    return lines;
+  };
   function reduceFarmBuyBeast(prevState, farm) {
     const prefix = farmPrefix(farm);
     const rnd = RNG.createRunCopyRandom(prevState);
     if (prevState.resources.hasTameBeast) {
-      return setEncounterMessage(prevState, prefix, rnd.perMoveLine(FARM_BEAST_ALREADY_LINES, { cellId: farm.id }));
+      return setEncounterMessage(prevState, prefix, rnd.perMoveLine(MULE_ALREADY_LINES, { cellId: farm.id }));
     }
     const result = buy(prevState.resources, { gold: farm.beastGoldCost, gain: { hasTameBeast: true } });
     if (result.outcome === "noFunds") return noGoldResponse(prevState, prefix, farm.id);
     return applyDeltas(prevState, {
       resources: result.resources,
       message: `${prefix}
-${rnd.perMoveLine(FARM_BUY_BEAST_LINES, { cellId: farm.id })}`,
+${rnd.perMoveLine(MULE_BUY_LINES, { cellId: farm.id })}`,
       deltas: result.deltas
     });
   }
@@ -1480,17 +1315,26 @@ ${rnd.perMoveLine(FARM_BUY_BEAST_LINES, { cellId: farm.id })}`,
     kinds: ["farm"],
     mapLabel: "F",
     onEnterTile: onEnterFarm,
-    encounterKind: "farm",
-    reduceEncounterAction: reduceFarmAction,
-    rightGrid: (_s, row, col) => {
-      if (row === 0 && col === 1)
-        return { spriteId: SPRITES.buttons.food, action: { type: ACTION_FARM_BUY_FOOD } };
-      if (row === 1 && col === 0)
-        return { spriteId: SPRITES.buttons.beast, action: { type: ACTION_FARM_BUY_BEAST } };
-      if (row === 1 && col === 2)
-        return { spriteId: SPRITES.buttons.return, action: { type: ACTION_FARM_LEAVE } };
-      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.farmBarn, action: null };
-      return { action: null };
+    poiSignpost: {
+      rank: 20,
+      name: (cell) => `${cell.name || "A Farm"} Farm`
+    },
+    placeWorld: placeNamedFarms,
+    encounter: {
+      kind: "farm",
+      reduceAction: reduceFarmAction,
+      previewPlate: farmPreviewPlate,
+      previewEncounter: () => ({ kind: "farm", sourceCellId: -1, restoreMessage: "" }),
+      rightGrid: (_s, row, col) => {
+        if (row === 0 && col === 1)
+          return { spriteId: SPRITES.buttons.food, action: { type: ACTION_FARM_BUY_FOOD } };
+        if (row === 1 && col === 0)
+          return { spriteId: SPRITES.buttons.beast, action: { type: ACTION_FARM_BUY_BEAST } };
+        if (row === 1 && col === 2)
+          return { spriteId: SPRITES.buttons.return, action: { type: ACTION_FARM_LEAVE } };
+        if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.farmBarn, action: null };
+        return { action: null };
+      }
     }
   };
 
@@ -1498,17 +1342,26 @@ ${rnd.perMoveLine(FARM_BUY_BEAST_LINES, { cellId: farm.id })}`,
   function computeCampArmyGain(args) {
     return RNG.keyedIntInRange({ seed: args.seed, stepCount: args.stepCount, cellId: args.campId }, 1, 2);
   }
-  function computeCampPreviewModel(s) {
+  var placeNamedCamps = ({ cells, rngState }) => {
+    const next = placeNamedFeature(cells, rngState, {
+      count: CAMP_COUNT,
+      namePool: CAMP_NAME_POOL,
+      fallbackName: "A Camp",
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: ({ x, y, name }) => ({ kind: "camp", id: cellId(x, y), name, nextReadyStep: 0 })
+    });
+    return { rngState: next };
+  };
+  var campPreviewPlate = (s) => {
     const camp = getCellAt(s.world, s.player.position);
-    const campName = camp.name || "A Camp";
     const stepCount = s.run.stepCount;
-    const readyAt = camp.nextReadyStep ?? 0;
-    const isReady = stepCount >= readyAt;
-    const foodGain = isReady ? CAMP_FOOD_GAIN : 0;
-    const armyGain = isReady ? computeCampArmyGain({ seed: s.world.seed, campId: camp.id, stepCount }) : 0;
-    const scoutFoodCost = null;
-    return { campName, foodGain, armyGain, scoutFoodCost };
-  }
+    if (stepCount < (camp.nextReadyStep ?? 0)) return null;
+    const armyGain = computeCampArmyGain({ seed: s.world.seed, campId: camp.id, stepCount });
+    return [
+      { spriteId: SPRITES.stats.food, text: `+${CAMP_FOOD_GAIN}` },
+      { spriteId: SPRITES.stats.troop, text: `+${armyGain}` }
+    ];
+  };
   var onEnterCamp = ({ cell, world, pos }) => {
     if (cell.kind !== "camp") return {};
     const camp = getCellAt(world, pos);
@@ -1571,14 +1424,23 @@ ${line}`,
     kinds: ["camp"],
     mapLabel: "C",
     onEnterTile: onEnterCamp,
-    encounterKind: "camp",
-    reduceEncounterAction: reduceCampAction,
-    rightGrid: (_s, row, col) => {
-      if (row === 0 && col === 1) return { action: null };
-      if (row === 1 && col === 0) return { spriteId: SPRITES.buttons.search, action: { type: ACTION_CAMP_SEARCH } };
-      if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_CAMP_LEAVE } };
-      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.campfireIcon, action: null };
-      return { action: null };
+    poiSignpost: {
+      rank: 40,
+      name: (cell) => `${cell.name || "A Camp"} Camp`
+    },
+    placeWorld: placeNamedCamps,
+    encounter: {
+      kind: "camp",
+      reduceAction: reduceCampAction,
+      previewPlate: campPreviewPlate,
+      previewEncounter: () => ({ kind: "camp", sourceCellId: -1, restoreMessage: "" }),
+      rightGrid: (_s, row, col) => {
+        if (row === 0 && col === 1) return { action: null };
+        if (row === 1 && col === 0) return { spriteId: SPRITES.buttons.search, action: { type: ACTION_CAMP_SEARCH } };
+        if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_CAMP_LEAVE } };
+        if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.campfireIcon, action: null };
+        return { action: null };
+      }
     }
   };
 
@@ -1626,6 +1488,11 @@ ${line}`,
     if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_RETURN } };
     if (row === 1 && col === 1) return { spriteId: SPRITES.stats.enemy, action: null };
     return { action: null };
+  };
+  var combatPreviewPlate = (s) => {
+    const enc = s.encounter;
+    if (!enc) return null;
+    return [{ spriteId: SPRITES.stats.enemy, text: `${enc.enemyArmySize}` }];
   };
   var reduceCombatAction = (prevState, action) => {
     if (action.type !== ACTION_FIGHT && action.type !== ACTION_RETURN) return null;
@@ -1747,7 +1614,6 @@ ${line}`,
     const encounter = {
       kind: "combat",
       enemyArmySize: spawned.enemyArmy,
-      sourceKind: args.sourceKind,
       sourceCellId: cellIdForPos(nextWorld, args.pos),
       restoreMessage: args.restoreMessage
     };
@@ -1761,9 +1627,18 @@ ${line}`,
   var combatMechanic = {
     id: "combat",
     kinds: [],
-    encounterKind: "combat",
-    rightGrid: combatRightGrid,
-    reduceEncounterAction: reduceCombatAction
+    encounter: {
+      kind: "combat",
+      rightGrid: combatRightGrid,
+      reduceAction: reduceCombatAction,
+      previewPlate: combatPreviewPlate,
+      previewEncounter: () => ({
+        kind: "combat",
+        enemyArmySize: 0,
+        sourceCellId: -1,
+        restoreMessage: ""
+      })
+    }
   };
 
   // src/core/mechanics/defs/henge.ts
@@ -1798,19 +1673,33 @@ ${r.perMoveLine(HENGE_LORE_LINES, { cellId: hengeCell.id })}`;
       world,
       pos,
       playerArmy: resources.armySize,
-      sourceKind: "henge",
       encounterMessage: HENGE_ENCOUNTER_LINE,
       restoreMessage: tileMessage
     });
     const nextHenge = { ...hengeCell, nextReadyStep: stepCount + HENGE_COOLDOWN_MOVES };
     return { ...result, world: setCellAt(result.world, pos, nextHenge) };
   };
+  var placeHenges = ({ cells, rngState }) => {
+    const next = placeNamedFeature(cells, rngState, {
+      count: HENGE_COUNT,
+      namePool: HENGE_NAME_POOL,
+      fallbackName: "A Henge",
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: ({ x, y, name }) => ({ kind: "henge", id: cellId(x, y), name, nextReadyStep: 0 })
+    });
+    return { rngState: next };
+  };
   var hengeMechanic = {
     id: "henge",
     kinds: ["henge"],
     mapLabel: "H",
     moveEventPolicyByKind: { henge: { ambushPercent: 100, lostPercent: 0 } },
-    onEnterTile: onEnterHenge
+    onEnterTile: onEnterHenge,
+    poiSignpost: {
+      rank: 50,
+      name: (cell) => `${cell.name || "A Henge"} Henge`
+    },
+    placeWorld: placeHenges
   };
 
   // src/core/mechanics/defs/town.ts
@@ -1910,6 +1799,60 @@ ${rnd.perMoveLine(TOWN_SCOUT_HIRE_LINES, { cellId: town.id })}`,
       deltas: result.deltas
     });
   }
+  var placeNamedTowns = ({ cells, rngState }) => {
+    const baseOffers = [
+      ACTION_TOWN_BUY_FOOD,
+      ACTION_TOWN_BUY_TROOPS,
+      ACTION_TOWN_HIRE_SCOUT,
+      ACTION_TOWN_BUY_RUMOR
+    ];
+    const omitNoScoutIndices = [0, 1, 3];
+    let townIndex = 0;
+    const next = placeNamedFeature(cells, rngState, {
+      count: TOWN_COUNT,
+      namePool: TOWN_NAME_POOL,
+      fallbackName: "A Town",
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: ({ x, y, name, rng }) => {
+        let omitIdx;
+        if (townIndex === 0) {
+          const idx = rng.intExclusive(omitNoScoutIndices.length);
+          omitIdx = omitNoScoutIndices[idx];
+        } else {
+          omitIdx = rng.intExclusive(baseOffers.length);
+        }
+        const offers = baseOffers.filter((_k, idx) => idx !== omitIdx);
+        const foodGold = rng.intInRange(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX);
+        const troopsGold = rng.intInRange(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX);
+        const scoutGold = rng.intInRange(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX);
+        const rumorGold = rng.intInRange(TOWN_PRICE_RUMOR_MIN, TOWN_PRICE_RUMOR_MAX);
+        const cell = {
+          kind: "town",
+          id: cellId(x, y),
+          name,
+          offers,
+          prices: { foodGold, troopsGold, scoutGold, rumorGold },
+          bundles: { food: TOWN_FOOD_BUNDLE, troops: TOWN_TROOPS_BUNDLE }
+        };
+        townIndex++;
+        return cell;
+      }
+    });
+    return { rngState: next };
+  };
+  var townPreviewPlate = (s) => {
+    const here = getCellAt(s.world, s.player.position);
+    if (!here || here.kind !== "town") return null;
+    const lines = [];
+    for (let i = 0; i < here.offers.length; i++) {
+      const o = here.offers[i];
+      if (o === "buyFood") lines.push({ spriteId: SPRITES.stats.food, text: `-${here.prices.foodGold}` });
+      else if (o === "buyTroops") lines.push({ spriteId: SPRITES.stats.troop, text: `-${here.prices.troopsGold}` });
+      else if (o === "hireScout") lines.push({ spriteId: SPRITES.stats.scout, text: `-${here.prices.scoutGold}` });
+      else if (o === "buyRumors") lines.push({ spriteId: SPRITES.cosmetics.rumorIllustration, text: `-${here.prices.rumorGold}` });
+    }
+    return lines.length ? lines : null;
+  };
   function reduceTownBuyRumor(prevState, town) {
     const prefix = townPrefix(town);
     const result = buy(prevState.resources, { gold: town.prices.rumorGold, gain: {} });
@@ -1929,31 +1872,40 @@ ${pick.line}`,
     kinds: ["town"],
     mapLabel: "T",
     onEnterTile: onEnterTown,
-    encounterKind: "town",
-    reduceEncounterAction: reduceTownAction,
-    rightGrid: (s, row, col) => {
-      const town = getCellAt(s.world, s.player.position);
-      function spriteIdForOffer(o) {
-        if (!o) return null;
-        if (o === "buyFood") return SPRITES.buttons.food;
-        if (o === "buyTroops") return SPRITES.buttons.troop;
-        if (o === "hireScout") return SPRITES.buttons.scout;
-        if (o === "buyRumors") return SPRITES.buttons.rumorTip;
-        return null;
+    poiSignpost: {
+      rank: 30,
+      name: (cell) => `${cell.name || "A Town"} Town`
+    },
+    placeWorld: placeNamedTowns,
+    encounter: {
+      kind: "town",
+      reduceAction: reduceTownAction,
+      previewPlate: townPreviewPlate,
+      previewEncounter: () => ({ kind: "town", sourceCellId: -1, restoreMessage: "" }),
+      rightGrid: (s, row, col) => {
+        const town = getCellAt(s.world, s.player.position);
+        function spriteIdForOffer(o) {
+          if (!o) return null;
+          if (o === "buyFood") return SPRITES.buttons.food;
+          if (o === "buyTroops") return SPRITES.buttons.troop;
+          if (o === "hireScout") return SPRITES.buttons.scout;
+          if (o === "buyRumors") return SPRITES.buttons.rumorTip;
+          return null;
+        }
+        const offerAt = (idx) => {
+          const o = town.offers[idx];
+          if (!o) return { action: null };
+          const spriteId = spriteIdForOffer(o);
+          if (spriteId == null) return { action: null };
+          return { spriteId, action: { type: o } };
+        };
+        if (row === 0 && col === 1) return offerAt(0);
+        if (row === 1 && col === 0) return offerAt(1);
+        if (row === 2 && col === 1) return offerAt(2);
+        if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_TOWN_LEAVE } };
+        if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.marketStall, action: null };
+        return { action: null };
       }
-      const offerAt = (idx) => {
-        const o = town.offers[idx];
-        if (!o) return { action: null };
-        const spriteId = spriteIdForOffer(o);
-        if (spriteId == null) return { action: null };
-        return { spriteId, action: { type: o } };
-      };
-      if (row === 0 && col === 1) return offerAt(0);
-      if (row === 1 && col === 0) return offerAt(1);
-      if (row === 2 && col === 1) return offerAt(2);
-      if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_TOWN_LEAVE } };
-      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.marketStall, action: null };
-      return { action: null };
     }
   };
 
@@ -2026,7 +1978,6 @@ ${pick.line}`,
         world,
         pos,
         playerArmy: resources.armySize,
-        sourceKind: kind,
         encounterMessage,
         restoreMessage: tileMessage
       });
@@ -2081,10 +2032,19 @@ ${pick.line}`,
       message: line
     };
   };
+  var placeFishingLakes = ({ cells, rngState }) => {
+    const res = placeFeature(cells, rngState, {
+      count: FISHING_LAKE_COUNT,
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: ({ x, y }) => ({ kind: "fishingLake", id: cellId(x, y), nextReadyStep: 0 })
+    });
+    return { rngState: res.rngState };
+  };
   var fishingLakeMechanic = {
     id: "fishingLake",
     kinds: ["fishingLake"],
-    onEnterTile: onEnterFishingLake
+    onEnterTile: onEnterFishingLake,
+    placeWorld: placeFishingLakes
   };
 
   // src/core/mechanics/defs/rainbowEnd.ts
@@ -2104,28 +2064,144 @@ ${pick.line}`,
       message: tileRand.perMoveLine(RAINBOW_END_PAYOUT_LINES, { cellId: rainbowEndCell.id })
     };
   };
+  var placeRainbowEnds = ({ cells, rngState }) => {
+    const first = placeFeature(cells, rngState, {
+      count: 1,
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: ({ x, y }) => ({ kind: "rainbowEnd", id: cellId(x, y), hasPaidOut: false })
+    });
+    const second = placeFeature(cells, first.rngState, {
+      count: 1,
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      awayFrom: { pos: first.placed[0], minDistance: RAINBOW_END_MIN_DISTANCE },
+      buildCell: ({ x, y }) => ({ kind: "rainbowEnd", id: cellId(x, y), hasPaidOut: false })
+    });
+    return { rngState: second.rngState };
+  };
   var rainbowEndMechanic = {
     id: "rainbowEnd",
     kinds: ["rainbowEnd"],
     mapLabel: "R",
-    onEnterTile: onEnterRainbowEnd
+    onEnterTile: onEnterRainbowEnd,
+    placeWorld: placeRainbowEnds
   };
 
   // src/core/mechanics/index.ts
   var MECHANICS = [
     gateMechanic,
     locksmithMechanic,
-    signpostMechanic,
     farmMechanic,
     campMechanic,
-    hengeMechanic,
     townMechanic,
-    terrainHazardsMechanic,
-    combatMechanic,
+    hengeMechanic,
+    signpostMechanic,
     fishingLakeMechanic,
-    rainbowEndMechanic
+    rainbowEndMechanic,
+    terrainHazardsMechanic,
+    combatMechanic
   ];
   var MECHANIC_INDEX = buildMechanicIndex(MECHANICS);
+
+  // src/core/world.ts
+  function boxBlurIntGridWrap(grid, w, h) {
+    const out = [];
+    for (let y = 0; y < h; y++) {
+      const row = [];
+      for (let x = 0; x < w; x++) {
+        let sum = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = wrapIndex(x + dx, w);
+            const ny = wrapIndex(y + dy, h);
+            sum += grid[ny][nx];
+          }
+        }
+        row.push(Math.floor(sum / 9));
+      }
+      out.push(row);
+    }
+    return out;
+  }
+  function generateBaseTerrainCells(rngState) {
+    const vals = [];
+    const rng = RNG.createStreamRandom(rngState);
+    for (let y = 0; y < WORLD_HEIGHT; y++) {
+      const row = [];
+      for (let x = 0; x < WORLD_WIDTH; x++) {
+        row.push(rng.intExclusive(NOISE_VALUE_MAX));
+      }
+      vals.push(row);
+    }
+    let V = vals;
+    for (let p = 0; p < NOISE_SMOOTH_PASSES; p++) {
+      V = boxBlurIntGridWrap(V, WORLD_WIDTH, WORLD_HEIGHT);
+    }
+    let minV = V[0][0];
+    let maxV = V[0][0];
+    for (let y = 0; y < WORLD_HEIGHT; y++) {
+      for (let x = 0; x < WORLD_WIDTH; x++) {
+        const v = V[y][x];
+        if (v < minV) minV = v;
+        if (v > maxV) maxV = v;
+      }
+    }
+    const span = maxV - minV || 1;
+    const kindByBucket = TERRAIN_KINDS;
+    const bucketCount = kindByBucket.length;
+    const cells = [];
+    for (let y = 0; y < WORLD_HEIGHT; y++) {
+      const row = [];
+      for (let x = 0; x < WORLD_WIDTH; x++) {
+        let bucket = Math.floor(bucketCount * (V[y][x] - minV) / span);
+        if (bucket < 0) bucket = 0;
+        if (bucket >= bucketCount) bucket = bucketCount - 1;
+        row.push({ kind: kindByBucket[bucket] });
+      }
+      cells.push(row);
+    }
+    return { cells, rngState: rng.rngState };
+  }
+  function pickStart({ rngState }) {
+    const rng = RNG.createStreamRandom(rngState);
+    const v = rng.intExclusive(WORLD_WIDTH * WORLD_HEIGHT);
+    const x = v % WORLD_WIDTH;
+    const y = Math.floor(v / WORLD_WIDTH);
+    return { startPosition: { x, y }, rngState: rng.rngState };
+  }
+  function getSpriteIdAt(world, x, y) {
+    const tx = wrapIndex(x, world.width);
+    const ty = wrapIndex(y, world.height);
+    const cell = world.cells[ty][tx];
+    return spriteIdForKind(cell.kind);
+  }
+  function generateWorld(seed) {
+    let rngState = RNG.createStreamRandomFromSeed(seed).rngState;
+    const base = generateBaseTerrainCells(rngState);
+    rngState = base.rngState;
+    const cells = base.cells;
+    for (let i = 0; i < MECHANICS.length; i++) {
+      const m = MECHANICS[i];
+      if (!m.placeWorld) continue;
+      rngState = m.placeWorld({ cells, rngState }).rngState;
+    }
+    const startPick = pickStart({ rngState });
+    rngState = startPick.rngState;
+    const world = {
+      seed,
+      width: WORLD_WIDTH,
+      height: WORLD_HEIGHT,
+      mapGenAlgorithm: MAP_GEN_ALGORITHM,
+      cells,
+      rngState
+    };
+    return { world, startPosition: startPick.startPosition };
+  }
+
+  // src/core/mechanics/onEnter.ts
+  var onEnterDefaultTerrain = ({ cell, world, pos, stepCount }) => {
+    const r = RNG.createTileRandom({ world, stepCount, pos });
+    return { message: r.perMoveLine(terrainLoreLinesForKind(cell.kind)) };
+  };
 
   // src/core/types.ts
   var LEFT_PANEL_KIND_AUTO = "auto";
@@ -2595,9 +2671,9 @@ ${pick.line}`,
   var UI_MAP_POI_TEXT_COLOR = 13;
   var UI_MAP_POI_UNCOMMITTED_TEXT_COLOR = UI_COLOR_BG;
   var UI_MAP_POI_TEXT_OFFSET_X_PX = 1;
-  var UI_COMBAT_PREVIEW_PLATE_PAD = 2;
-  var UI_COMBAT_PREVIEW_PLATE_W = 42;
-  var UI_COMBAT_PREVIEW_PLATE_INSET = 2;
+  var UI_PREVIEW_PLATE_PAD = 2;
+  var UI_PREVIEW_PLATE_W = 42;
+  var UI_PREVIEW_PLATE_INSET = 2;
   var UI_RIGHT_GRID_SPRITE_SCALE = 2;
   var UI_RIGHT_GRID_SPRITE_W = 2;
   var UI_RIGHT_GRID_SPRITE_H = 2;
@@ -2617,8 +2693,8 @@ ${pick.line}`,
   var UI_DELTA_GAP_PX = -4;
   var UI_FOOD_ICON_W_PX = 16;
   var UI_FOOD_ICON_H_PX = 16;
-  var UI_FOOD_VALUE_OFFSET_X = UI_FOOD_ICON_W_PX + 3;
-  var UI_FOOD_VALUE_OFFSET_Y = 5;
+  var UI_ICON_VALUE_OFFSET_X = UI_FOOD_ICON_W_PX + 3;
+  var UI_ICON_VALUE_OFFSET_Y = 5;
   var UI_GOLD_ICON_W_PX = 16;
   var UI_GOLD_ICON_H_PX = 16;
   var UI_GOLD_VALUE_OFFSET_X = UI_GOLD_ICON_W_PX + 3;
@@ -2693,15 +2769,8 @@ ${pick.line}`,
   function spriteIdForModeCrossCell(s, mode, row, col) {
     if (mode === "blank") return null;
     const pos = s.player.position;
-    const sourceKind = s.world.cells[pos.y]?.[pos.x]?.kind ?? "grass";
-    const s2 = (() => {
-      if (mode === "overworld") return { ...s, encounter: null };
-      if (mode === "camp") return { ...s, encounter: { kind: "camp", sourceCellId: -1, restoreMessage: "" } };
-      if (mode === "town") return { ...s, encounter: { kind: "town", sourceCellId: -1, restoreMessage: "" } };
-      if (mode === "farm") return { ...s, encounter: { kind: "farm", sourceCellId: -1, restoreMessage: "" } };
-      if (mode === "locksmith") return { ...s, encounter: { kind: "locksmith", sourceCellId: -1, restoreMessage: "" } };
-      return { ...s, encounter: { kind: "combat", enemyArmySize: 0, sourceKind, sourceCellId: -1, restoreMessage: "" } };
-    })();
+    const provider = mode === "overworld" ? null : MECHANIC_INDEX.previewEncounterByEncounterKind[mode];
+    const s2 = { ...s, encounter: provider ? provider() : null };
     const def = getRightGridCellDef(s2, row, col);
     if (def.spriteId != null) return def.spriteId;
     if (def.tilePreview && def.tilePreview.kind === "relativeToPlayer") {
@@ -2973,6 +3042,51 @@ ${pick.line}`,
       }
     }
   }
+  function drawPreviewPlateChrome(lines, illX, illY, illSize) {
+    const platePad = UI_PREVIEW_PLATE_PAD;
+    const plateW = UI_PREVIEW_PLATE_W;
+    const plateH = 16 * lines.length + platePad * 2;
+    const plateX = illX + illSize - plateW - UI_PREVIEW_PLATE_INSET;
+    const plateY = illY + UI_PREVIEW_PLATE_INSET;
+    rect(plateX, plateY, plateW, plateH, UI_COLOR_BG);
+    rectb(plateX, plateY, plateW, plateH, UI_COLOR_DIM);
+    const firstIconX = plateX + platePad;
+    const firstIconY = plateY + platePad;
+    for (let i = 0; i < lines.length; i++) {
+      const ln = lines[i];
+      const iconX = firstIconX;
+      const iconY = firstIconY + i * 16;
+      spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2);
+      const valueX = iconX + UI_ICON_VALUE_OFFSET_X;
+      const valueY = iconY + UI_ICON_VALUE_OFFSET_Y;
+      print(ln.text, valueX, valueY, UI_COLOR_TEXT);
+    }
+    return { firstIconX, firstIconY };
+  }
+  function drawDeltaOverlays(s, anchors) {
+    if (!ENABLE_ANIMATIONS) return;
+    const anims = s.ui.anim.active;
+    const frame = s.ui.clock.frame;
+    const cursorByTarget = {};
+    for (let i = 0; i < anims.length; i++) {
+      const a = anims[i];
+      if (a.kind !== "delta") continue;
+      const anchor = anchors[a.params.target];
+      if (!anchor) continue;
+      const delta = a.params.delta;
+      if (!delta) continue;
+      const dur = Math.max(1, a.durationFrames);
+      const t = Math.max(0, Math.min(dur, frame - a.startFrame));
+      const p = t / dur;
+      const label = delta > 0 ? `+${delta}` : `${delta}`;
+      const goodSign = anchor.goodSign ?? 1;
+      const color = delta * goodSign > 0 ? UI_COLOR_GOOD : UI_COLOR_BAD;
+      const dy = UI_DELTA_OFFSET_Y - Math.floor(p * UI_DELTA_RISE_PX);
+      const xCursor = cursorByTarget[a.params.target] ?? anchor.x + UI_DELTA_OFFSET_X;
+      print(label, xCursor, anchor.y + dy, color);
+      cursorByTarget[a.params.target] = xCursor + label.length * 6 + UI_DELTA_GAP_PX;
+    }
+  }
   function drawMap(s, x, y, sizePx) {
     const { markers } = computeGameMapView(s);
     const w = Math.max(1, s.world.width);
@@ -3026,162 +3140,15 @@ ${pick.line}`,
     } else if (s.run.isGameOver) {
       drawIllustrationWithTextureOverlay(SPRITES.cosmetics.tombstoneIllustration, illX, illY);
     } else {
-      if (!encounterKind) {
-        drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
-      } else if (encounterKind === "combat") {
-        drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
-        const platePad = UI_COMBAT_PREVIEW_PLATE_PAD;
-        const plateW = UI_COMBAT_PREVIEW_PLATE_W;
-        const plateH = 16 + platePad * 2;
-        const plateX = illX + illSize - plateW - UI_COMBAT_PREVIEW_PLATE_INSET;
-        const plateY = illY + UI_COMBAT_PREVIEW_PLATE_INSET;
-        rect(plateX, plateY, plateW, plateH, UI_COLOR_BG);
-        rectb(plateX, plateY, plateW, plateH, UI_COLOR_DIM);
-        const enemyIconX = plateX + platePad;
-        const enemyIconY = plateY + platePad;
-        spr(SPRITES.stats.enemy, enemyIconX, enemyIconY, 0, 1, 0, 0, 2, 2);
-        const enemyArmy = s.encounter && s.encounter.kind === "combat" ? s.encounter.enemyArmySize | 0 : 0;
-        const enemyCountX = enemyIconX + UI_FOOD_VALUE_OFFSET_X;
-        const enemyCountY = enemyIconY + UI_FOOD_VALUE_OFFSET_Y;
-        print(`${enemyArmy}`, enemyCountX, enemyCountY, UI_COLOR_TEXT);
-        if (ENABLE_ANIMATIONS) {
-          const anims = s.ui.anim.active;
-          const frame2 = s.ui.clock.frame;
-          let xCursor = enemyIconX + UI_DELTA_OFFSET_X;
-          for (let i = 0; i < anims.length; i++) {
-            const a = anims[i];
-            if (a.kind !== "delta") continue;
-            if (a.params.target !== "enemyArmy") continue;
-            const start = a.startFrame;
-            const dur = Math.max(1, a.durationFrames);
-            const t = Math.max(0, Math.min(dur, frame2 - start));
-            const p = t / dur;
-            const delta = a.params.delta;
-            if (!delta) continue;
-            const label = delta > 0 ? `+${delta}` : `${delta}`;
-            const color = delta < 0 ? UI_COLOR_GOOD : UI_COLOR_BAD;
-            const dy = UI_DELTA_OFFSET_Y - Math.floor(p * UI_DELTA_RISE_PX);
-            print(label, xCursor, enemyIconY + dy, color);
-            xCursor += label.length * 6 + UI_DELTA_GAP_PX;
+      drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
+      if (encounterKind) {
+        const provider = MECHANIC_INDEX.previewPlateByEncounterKind[encounterKind];
+        const lines = provider?.(s) ?? null;
+        if (lines && lines.length) {
+          const geom = drawPreviewPlateChrome(lines, illX, illY, illSize);
+          if (encounterKind === "combat") {
+            drawDeltaOverlays(s, { enemyArmy: { x: geom.firstIconX, y: geom.firstIconY, goodSign: -1 } });
           }
-        }
-      } else if (encounterKind === "camp") {
-        drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
-        const preview = computeCampPreviewModel(s);
-        {
-          const lines = [];
-          if (preview.foodGain > 0) {
-            lines.push({ spriteId: SPRITES.stats.food, text: `+${preview.foodGain}`, color: UI_COLOR_TEXT });
-            lines.push({ spriteId: SPRITES.stats.troop, text: `+${preview.armyGain}`, color: UI_COLOR_TEXT });
-          }
-          if (preview.scoutFoodCost != null) {
-            lines.push({ spriteId: SPRITES.stats.scout, text: `-${preview.scoutFoodCost}`, color: UI_COLOR_TEXT });
-          }
-          if (lines.length) {
-            const platePad = UI_COMBAT_PREVIEW_PLATE_PAD;
-            const plateW = UI_COMBAT_PREVIEW_PLATE_W;
-            const plateH = 16 * lines.length + platePad * 2;
-            const plateX = illX + illSize - plateW - UI_COMBAT_PREVIEW_PLATE_INSET;
-            const plateY = illY + UI_COMBAT_PREVIEW_PLATE_INSET;
-            rect(plateX, plateY, plateW, plateH, UI_COLOR_BG);
-            rectb(plateX, plateY, plateW, plateH, UI_COLOR_DIM);
-            for (let i = 0; i < lines.length; i++) {
-              const ln = lines[i];
-              const iconX = plateX + platePad;
-              const iconY = plateY + platePad + i * 16;
-              spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2);
-              const valueX = iconX + UI_FOOD_VALUE_OFFSET_X;
-              const valueY = iconY + UI_FOOD_VALUE_OFFSET_Y;
-              print(ln.text, valueX, valueY, ln.color);
-            }
-          }
-        }
-      } else if (encounterKind === "town") {
-        drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
-        const here = s.world.cells[pos.y][pos.x];
-        if (here.kind === "town") {
-          const lines = [];
-          const offers = here.offers || [];
-          for (let i = 0; i < offers.length; i++) {
-            const o = offers[i];
-            if (o === "buyFood")
-              lines.push({ spriteId: SPRITES.stats.food, text: `-${here.prices.foodGold | 0}`, color: UI_COLOR_TEXT });
-            else if (o === "buyTroops")
-              lines.push({ spriteId: SPRITES.stats.troop, text: `-${here.prices.troopsGold | 0}`, color: UI_COLOR_TEXT });
-            else if (o === "hireScout")
-              lines.push({ spriteId: SPRITES.stats.scout, text: `-${here.prices.scoutGold | 0}`, color: UI_COLOR_TEXT });
-            else if (o === "buyRumors")
-              lines.push({
-                spriteId: SPRITES.cosmetics.rumorIllustration,
-                text: `-${here.prices.rumorGold | 0}`,
-                color: UI_COLOR_TEXT
-              });
-          }
-          if (lines.length) {
-            const platePad = UI_COMBAT_PREVIEW_PLATE_PAD;
-            const plateW = UI_COMBAT_PREVIEW_PLATE_W;
-            const plateH = 16 * lines.length + platePad * 2;
-            const plateX = illX + illSize - plateW - UI_COMBAT_PREVIEW_PLATE_INSET;
-            const plateY = illY + UI_COMBAT_PREVIEW_PLATE_INSET;
-            rect(plateX, plateY, plateW, plateH, UI_COLOR_BG);
-            rectb(plateX, plateY, plateW, plateH, UI_COLOR_DIM);
-            for (let i = 0; i < lines.length; i++) {
-              const ln = lines[i];
-              const iconX = plateX + platePad;
-              const iconY = plateY + platePad + i * 16;
-              spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2);
-              const valueX = iconX + UI_FOOD_VALUE_OFFSET_X;
-              const valueY = iconY + UI_FOOD_VALUE_OFFSET_Y;
-              print(ln.text, valueX, valueY, ln.color);
-            }
-          }
-        }
-      } else if (encounterKind === "farm") {
-        drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
-        const here = s.world.cells[pos.y][pos.x];
-        if (here.kind === "farm") {
-          const lines = [
-            { spriteId: SPRITES.stats.food, text: `-${FARM_BUY_FOOD_GOLD_COST | 0}`, color: UI_COLOR_TEXT },
-            { spriteId: SPRITES.cosmetics.beastIllustration, text: `-${here.beastGoldCost | 0}`, color: UI_COLOR_TEXT }
-          ];
-          const platePad = UI_COMBAT_PREVIEW_PLATE_PAD;
-          const plateW = UI_COMBAT_PREVIEW_PLATE_W;
-          const plateH = 16 * lines.length + platePad * 2;
-          const plateX = illX + illSize - plateW - UI_COMBAT_PREVIEW_PLATE_INSET;
-          const plateY = illY + UI_COMBAT_PREVIEW_PLATE_INSET;
-          rect(plateX, plateY, plateW, plateH, UI_COLOR_BG);
-          rectb(plateX, plateY, plateW, plateH, UI_COLOR_DIM);
-          for (let i = 0; i < lines.length; i++) {
-            const ln = lines[i];
-            const iconX = plateX + platePad;
-            const iconY = plateY + platePad + i * 16;
-            spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2);
-            const valueX = iconX + UI_FOOD_VALUE_OFFSET_X;
-            const valueY = iconY + UI_FOOD_VALUE_OFFSET_Y;
-            print(ln.text, valueX, valueY, ln.color);
-          }
-        }
-      } else if (encounterKind === "locksmith") {
-        drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
-        const lines = [
-          { spriteId: SPRITES.stats.gold, text: `-${LOCKSMITH_KEY_GOLD_COST | 0}`, color: UI_COLOR_TEXT },
-          { spriteId: SPRITES.stats.food, text: `-${LOCKSMITH_KEY_FOOD_COST | 0}`, color: UI_COLOR_TEXT }
-        ];
-        const platePad = UI_COMBAT_PREVIEW_PLATE_PAD;
-        const plateW = UI_COMBAT_PREVIEW_PLATE_W;
-        const plateH = 16 * lines.length + platePad * 2;
-        const plateX = illX + illSize - plateW - UI_COMBAT_PREVIEW_PLATE_INSET;
-        const plateY = illY + UI_COMBAT_PREVIEW_PLATE_INSET;
-        rect(plateX, plateY, plateW, plateH, UI_COLOR_BG);
-        rectb(plateX, plateY, plateW, plateH, UI_COLOR_DIM);
-        for (let i = 0; i < lines.length; i++) {
-          const ln = lines[i];
-          const iconX = plateX + platePad;
-          const iconY = plateY + platePad + i * 16;
-          spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2);
-          const valueX = iconX + UI_FOOD_VALUE_OFFSET_X;
-          const valueY = iconY + UI_FOOD_VALUE_OFFSET_Y;
-          print(ln.text, valueX, valueY, ln.color);
         }
       }
     }
@@ -3199,8 +3166,8 @@ ${pick.line}`,
     const foodX = statusX;
     const foodY = armyY + UI_ARMY_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX;
     spr(SPRITES.stats.food, foodX, foodY, -1, 1, 0, 0, 2, 2);
-    const foodValueX = foodX + UI_FOOD_VALUE_OFFSET_X;
-    const foodValueY = foodY + UI_FOOD_VALUE_OFFSET_Y;
+    const foodValueX = foodX + UI_ICON_VALUE_OFFSET_X;
+    const foodValueY = foodY + UI_ICON_VALUE_OFFSET_Y;
     const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? UI_COLOR_WARN : UI_COLOR_TEXT;
     print(`${s.resources.food}`, foodValueX, foodValueY, foodColor);
     const goldX = statusX;
@@ -3209,39 +3176,11 @@ ${pick.line}`,
     const goldValueX = goldX + UI_GOLD_VALUE_OFFSET_X;
     const goldValueY = goldY + UI_GOLD_VALUE_OFFSET_Y;
     print(`${s.resources.gold}`, goldValueX, goldValueY, UI_COLOR_TEXT);
-    {
-      const anims = s.ui.anim.active;
-      const frame2 = s.ui.clock.frame;
-      const bases = {
-        army: { x: armyX, y: armyY },
-        food: { x: foodX, y: foodY },
-        gold: { x: goldX, y: goldY }
-      };
-      const cursorByTarget = {
-        army: bases.army.x + UI_DELTA_OFFSET_X,
-        food: bases.food.x + UI_DELTA_OFFSET_X,
-        gold: bases.gold.x + UI_DELTA_OFFSET_X
-      };
-      const draw = (target, delta, startFrame, durationFrames) => {
-        if (!delta) return;
-        const base = bases[target];
-        const dur = Math.max(1, durationFrames);
-        const t = Math.max(0, Math.min(dur, frame2 - startFrame));
-        const p = t / dur;
-        const label = delta > 0 ? `+${delta}` : `${delta}`;
-        const color = delta > 0 ? UI_COLOR_GOOD : UI_COLOR_BAD;
-        const dy = UI_DELTA_OFFSET_Y - Math.floor(p * UI_DELTA_RISE_PX);
-        const xCursor = cursorByTarget[target];
-        print(label, xCursor, base.y + dy, color);
-        cursorByTarget[target] = xCursor + label.length * 6 + UI_DELTA_GAP_PX;
-      };
-      for (let i = 0; i < anims.length; i++) {
-        const a = anims[i];
-        if (a.kind !== "delta") continue;
-        if (a.params.target === "enemyArmy") continue;
-        draw(a.params.target, a.params.delta, a.startFrame, a.durationFrames);
-      }
-    }
+    drawDeltaOverlays(s, {
+      army: { x: armyX, y: armyY },
+      food: { x: foodX, y: foodY },
+      gold: { x: goldX, y: goldY }
+    });
     const statusBottomY = goldY + UI_GOLD_ICON_H_PX + UI_AFTER_RESOURCES_GAP_PX;
     const headerBottomY = Math.max(illY + illSize, statusBottomY);
     const msgY = headerBottomY + 4;

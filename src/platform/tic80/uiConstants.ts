@@ -29,10 +29,11 @@ export const UI_MAP_POI_TEXT_COLOR = 13
 export const UI_MAP_POI_UNCOMMITTED_TEXT_COLOR = UI_COLOR_BG
 export const UI_MAP_POI_TEXT_OFFSET_X_PX = 1
 
-// Combat preview plate layout inside illustration block.
-export const UI_COMBAT_PREVIEW_PLATE_PAD = 2
-export const UI_COMBAT_PREVIEW_PLATE_W = 42
-export const UI_COMBAT_PREVIEW_PLATE_INSET = 2
+// Encounter preview plate layout inside illustration block. Used by every
+// encounter that ships a previewPlate (combat, camp, town, farm, locksmith).
+export const UI_PREVIEW_PLATE_PAD = 2
+export const UI_PREVIEW_PLATE_W = 42
+export const UI_PREVIEW_PLATE_INSET = 2
 
 // Right grid sprite draw policy.
 export const UI_RIGHT_GRID_SPRITE_SCALE = 2 // 16->32
@@ -65,8 +66,12 @@ export const UI_DELTA_GAP_PX = -4
 // Food line (hero)
 export const UI_FOOD_ICON_W_PX = 16
 export const UI_FOOD_ICON_H_PX = 16
-export const UI_FOOD_VALUE_OFFSET_X = UI_FOOD_ICON_W_PX + 3
-export const UI_FOOD_VALUE_OFFSET_Y = 5
+
+// Offset of the value text rendered next to a 16x16 stat/preview icon. Shared
+// across the food/gold/troops/scout/beast/enemy lines in the stats bar and the
+// encounter preview plate.
+export const UI_ICON_VALUE_OFFSET_X = UI_FOOD_ICON_W_PX + 3
+export const UI_ICON_VALUE_OFFSET_Y = 5
 
 // Gold line (hero)
 export const UI_GOLD_ICON_W_PX = 16

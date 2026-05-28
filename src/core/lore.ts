@@ -299,7 +299,6 @@ export const TOWN_NAME_POOL = [
 
 export const CROSSING_NAME_POOL = [
   "Salt",
-  "Crow's",
   "Brass",
   "Three-Lane",
   "Big Oak",

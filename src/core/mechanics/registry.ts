@@ -1,9 +1,11 @@
-import type { CellKind } from '../types'
+import type { CellKind, EncounterKind } from '../types'
 import type {
-  EncounterKind,
   MechanicDef,
   MoveEventPolicy,
   OnEnterTile,
+  PoiSignpostContribution,
+  PreviewEncounterProvider,
+  PreviewPlateProvider,
   ReduceEncounterAction,
   RightGridProvider,
 } from './types'
@@ -13,6 +15,9 @@ export type MechanicIndex = {
   onEnterTileByKind: Partial<Record<CellKind, OnEnterTile>>
   rightGridByEncounterKind: Partial<Record<EncounterKind, RightGridProvider>>
   reduceEncounterActionByEncounterKind: Partial<Record<EncounterKind, ReduceEncounterAction>>
+  previewPlateByEncounterKind: Partial<Record<EncounterKind, PreviewPlateProvider>>
+  previewEncounterByEncounterKind: Partial<Record<EncounterKind, PreviewEncounterProvider>>
+  poiSignpostByKind: Partial<Record<CellKind, PoiSignpostContribution>>
   mapLabelByKind: Partial<Record<CellKind, string>>
   enterFoodCostByKind: Partial<Record<CellKind, number>>
   moveEventPolicyByKind: Partial<Record<CellKind, MoveEventPolicy>>
@@ -24,6 +29,9 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
   const onEnterTileByKind: Partial<Record<CellKind, OnEnterTile>> = {}
   const rightGridByEncounterKind: Partial<Record<EncounterKind, RightGridProvider>> = {}
   const reduceEncounterActionByEncounterKind: Partial<Record<EncounterKind, ReduceEncounterAction>> = {}
+  const previewPlateByEncounterKind: Partial<Record<EncounterKind, PreviewPlateProvider>> = {}
+  const previewEncounterByEncounterKind: Partial<Record<EncounterKind, PreviewEncounterProvider>> = {}
+  const poiSignpostByKind: Partial<Record<CellKind, PoiSignpostContribution>> = {}
   const mapLabelByKind: Partial<Record<CellKind, string>> = {}
   const enterFoodCostByKind: Partial<Record<CellKind, number>> = {}
   const moveEventPolicyByKind: Partial<Record<CellKind, MoveEventPolicy>> = {}
@@ -38,21 +46,16 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
     }
     seenIds.add(m.id)
 
-    // encounterKind keys both rightGrid lookup and reduceEncounterAction dispatch.
-    // rightGrid / reduceEncounterAction without encounterKind have no lookup key — reject.
-    if (m.rightGrid && !m.encounterKind) {
-      throw new Error(`Mechanic ${m.id} sets rightGrid without encounterKind`)
-    }
-    if (m.reduceEncounterAction && !m.encounterKind) {
-      throw new Error(`Mechanic ${m.id} sets reduceEncounterAction without encounterKind`)
-    }
-    if (m.encounterKind) {
-      if (seenEncounterKinds.has(m.encounterKind)) {
-        throw new Error(`Duplicate encounterKind: ${m.encounterKind}`)
+    if (m.encounter) {
+      const ek = m.encounter.kind
+      if (seenEncounterKinds.has(ek)) {
+        throw new Error(`Duplicate encounterKind: ${ek}`)
       }
-      seenEncounterKinds.add(m.encounterKind)
-      if (m.rightGrid) rightGridByEncounterKind[m.encounterKind] = m.rightGrid
-      if (m.reduceEncounterAction) reduceEncounterActionByEncounterKind[m.encounterKind] = m.reduceEncounterAction
+      seenEncounterKinds.add(ek)
+      if (m.encounter.rightGrid) rightGridByEncounterKind[ek] = m.encounter.rightGrid
+      if (m.encounter.reduceAction) reduceEncounterActionByEncounterKind[ek] = m.encounter.reduceAction
+      if (m.encounter.previewPlate) previewPlateByEncounterKind[ek] = m.encounter.previewPlate
+      if (m.encounter.previewEncounter) previewEncounterByEncounterKind[ek] = m.encounter.previewEncounter
     }
 
     const costByKind = m.enterFoodCostByKind
@@ -100,6 +103,7 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
       ownerByKind[kind] = m.id
       if (m.onEnterTile) onEnterTileByKind[kind] = m.onEnterTile
       if (m.mapLabel != null) mapLabelByKind[kind] = m.mapLabel
+      if (m.poiSignpost) poiSignpostByKind[kind] = m.poiSignpost
       const cost = costByKind?.[kind]
       if (cost != null) enterFoodCostByKind[kind] = cost
       const policy = policyByKind?.[kind]
@@ -112,6 +116,9 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
     onEnterTileByKind,
     rightGridByEncounterKind,
     reduceEncounterActionByEncounterKind,
+    previewPlateByEncounterKind,
+    previewEncounterByEncounterKind,
+    poiSignpostByKind,
     mapLabelByKind,
     enterFoodCostByKind,
     moveEventPolicyByKind,

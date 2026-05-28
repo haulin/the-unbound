@@ -6,15 +6,27 @@ import {
   ACTION_TOWN_LEAVE,
   BARKEEP_TIPS,
   TOWN_BUY_LINES,
+  TOWN_COUNT,
   TOWN_ENTER_LINES,
+  TOWN_FOOD_BUNDLE,
+  TOWN_NAME_POOL,
+  TOWN_PRICE_FOOD_MAX,
+  TOWN_PRICE_FOOD_MIN,
+  TOWN_PRICE_RUMOR_MAX,
+  TOWN_PRICE_RUMOR_MIN,
+  TOWN_PRICE_SCOUT_MAX,
+  TOWN_PRICE_SCOUT_MIN,
+  TOWN_PRICE_TROOPS_MAX,
+  TOWN_PRICE_TROOPS_MIN,
   TOWN_SCOUT_ALREADY_HAVE_LINES,
   TOWN_SCOUT_HIRE_LINES,
+  TOWN_TROOPS_BUNDLE,
 } from '../../constants'
 import { cellIdForPos, getCellAt } from '../../cells'
 import { foodCarryCap, FOOD_CARRY_FULL_MESSAGE, resourcesWithClampedFoodIfNeeded } from '../../foodCarry'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
-import type { State, TownCell, TownEncounter, TownOfferKind } from '../../types'
+import type { Cell, State, TownCell, TownEncounter, TownOfferKind } from '../../types'
 import {
   applyDeltas,
   buy,
@@ -22,7 +34,16 @@ import {
   noGoldResponse,
   setEncounterMessage,
 } from '../encounterHelpers'
-import type { MechanicDef, OnEnterTile, ReduceEncounterAction, TileEnterResult } from '../types'
+import { cellId, isTerrainCell, placeNamedFeature } from '../../worldgen'
+import type {
+  MechanicDef,
+  OnEnterTile,
+  PlaceWorldProvider,
+  PreviewPlateLine,
+  PreviewPlateProvider,
+  ReduceEncounterAction,
+  TileEnterResult,
+} from '../types'
 
 function townPrefix(town: TownCell): string {
   const name = town.name || 'A Town'
@@ -145,6 +166,73 @@ function reduceTownHireScout(prevState: State, town: TownCell): State {
   })
 }
 
+// ---- Worldgen placement ----
+
+// The first town never omits `hireScout` so the hero is guaranteed a place to
+// buy a scout early. Subsequent towns drop one of the four base offers at
+// random.
+const placeNamedTowns: PlaceWorldProvider = ({ cells, rngState }) => {
+  const baseOffers: TownOfferKind[] = [
+    ACTION_TOWN_BUY_FOOD,
+    ACTION_TOWN_BUY_TROOPS,
+    ACTION_TOWN_HIRE_SCOUT,
+    ACTION_TOWN_BUY_RUMOR,
+  ]
+  const omitNoScoutIndices = [0, 1, 3] as const
+
+  let townIndex = 0
+
+  const next = placeNamedFeature(cells, rngState, {
+    count: TOWN_COUNT,
+    namePool: TOWN_NAME_POOL,
+    fallbackName: 'A Town',
+    canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+    buildCell: ({ x, y, name, rng }) => {
+      let omitIdx: number
+      if (townIndex === 0) {
+        const idx = rng.intExclusive(omitNoScoutIndices.length)
+        omitIdx = omitNoScoutIndices[idx]!
+      } else {
+        omitIdx = rng.intExclusive(baseOffers.length)
+      }
+      const offers = baseOffers.filter((_k, idx) => idx !== omitIdx)
+
+      const foodGold = rng.intInRange(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX)
+      const troopsGold = rng.intInRange(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX)
+      const scoutGold = rng.intInRange(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX)
+      const rumorGold = rng.intInRange(TOWN_PRICE_RUMOR_MIN, TOWN_PRICE_RUMOR_MAX)
+
+      const cell: Cell = {
+        kind: 'town',
+        id: cellId(x, y),
+        name,
+        offers,
+        prices: { foodGold, troopsGold, scoutGold, rumorGold },
+        bundles: { food: TOWN_FOOD_BUNDLE, troops: TOWN_TROOPS_BUNDLE },
+      }
+      townIndex++
+      return cell
+    },
+  })
+  return { rngState: next }
+}
+
+// ---- Preview plate ----
+
+const townPreviewPlate: PreviewPlateProvider = (s) => {
+  const here = getCellAt(s.world, s.player.position)
+  if (!here || here.kind !== 'town') return null
+  const lines: PreviewPlateLine[] = []
+  for (let i = 0; i < here.offers.length; i++) {
+    const o = here.offers[i]!
+    if (o === 'buyFood') lines.push({ spriteId: SPRITES.stats.food, text: `-${here.prices.foodGold}` })
+    else if (o === 'buyTroops') lines.push({ spriteId: SPRITES.stats.troop, text: `-${here.prices.troopsGold}` })
+    else if (o === 'hireScout') lines.push({ spriteId: SPRITES.stats.scout, text: `-${here.prices.scoutGold}` })
+    else if (o === 'buyRumors') lines.push({ spriteId: SPRITES.cosmetics.rumorIllustration, text: `-${here.prices.rumorGold}` })
+  }
+  return lines.length ? lines : null
+}
+
 function reduceTownBuyRumor(prevState: State, town: TownCell): State {
   const prefix = townPrefix(town)
   const result = buy(prevState.resources, { gold: town.prices.rumorGold, gain: {} })
@@ -167,33 +255,42 @@ export const townMechanic: MechanicDef = {
   kinds: ['town'],
   mapLabel: 'T',
   onEnterTile: onEnterTown,
-  encounterKind: 'town',
-  reduceEncounterAction: reduceTownAction,
-  rightGrid: (s, row, col) => {
-    const town = getCellAt(s.world, s.player.position) as TownCell
+  poiSignpost: {
+    rank: 30,
+    name: (cell) => `${(cell as TownCell).name || 'A Town'} Town`,
+  },
+  placeWorld: placeNamedTowns,
+  encounter: {
+    kind: 'town',
+    reduceAction: reduceTownAction,
+    previewPlate: townPreviewPlate,
+    previewEncounter: (): TownEncounter => ({ kind: 'town', sourceCellId: -1, restoreMessage: '' }),
+    rightGrid: (s, row, col) => {
+      const town = getCellAt(s.world, s.player.position) as TownCell
 
-    function spriteIdForOffer(o: TownOfferKind | undefined): number | null {
-      if (!o) return null
-      if (o === 'buyFood') return SPRITES.buttons.food
-      if (o === 'buyTroops') return SPRITES.buttons.troop
-      if (o === 'hireScout') return SPRITES.buttons.scout
-      if (o === 'buyRumors') return SPRITES.buttons.rumorTip
-      return null
-    }
+      function spriteIdForOffer(o: TownOfferKind | undefined): number | null {
+        if (!o) return null
+        if (o === 'buyFood') return SPRITES.buttons.food
+        if (o === 'buyTroops') return SPRITES.buttons.troop
+        if (o === 'hireScout') return SPRITES.buttons.scout
+        if (o === 'buyRumors') return SPRITES.buttons.rumorTip
+        return null
+      }
 
-    const offerAt = (idx: number) => {
-      const o = town.offers[idx]
-      if (!o) return { action: null }
-      const spriteId = spriteIdForOffer(o)
-      if (spriteId == null) return { action: null }
-      return { spriteId, action: { type: o } }
-    }
+      const offerAt = (idx: number) => {
+        const o = town.offers[idx]
+        if (!o) return { action: null }
+        const spriteId = spriteIdForOffer(o)
+        if (spriteId == null) return { action: null }
+        return { spriteId, action: { type: o } }
+      }
 
-    if (row === 0 && col === 1) return offerAt(0) // North
-    if (row === 1 && col === 0) return offerAt(1) // West
-    if (row === 2 && col === 1) return offerAt(2) // South
-    if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_TOWN_LEAVE } }
-    if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.marketStall, action: null }
-    return { action: null }
+      if (row === 0 && col === 1) return offerAt(0) // North
+      if (row === 1 && col === 0) return offerAt(1) // West
+      if (row === 2 && col === 1) return offerAt(2) // South
+      if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_TOWN_LEAVE } }
+      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.marketStall, action: null }
+      return { action: null }
+    },
   },
 }

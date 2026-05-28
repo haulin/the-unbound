@@ -2,9 +2,10 @@ import {
   ENABLE_ANIMATIONS,
   GRID_TRANSITION_STEP_FRAMES,
 } from '../../core/constants'
+import { MECHANIC_INDEX } from '../../core/mechanics'
 import { getRightGridCellDef } from '../../core/rightGrid'
 import { getSpriteIdAt } from '../../core/world'
-import type { GridTransitionAnim, MoveSlideAnim, State } from '../../core/types'
+import type { GridFromKind, GridTransitionAnim, MoveSlideAnim, State } from '../../core/types'
 import { SPRITES } from '../../core/spriteIds'
 import * as Layout from './layout'
 import type { RenderHints } from './input'
@@ -44,23 +45,18 @@ function crossRevealIndex(row: number, col: number): number {
 
 function spriteIdForModeCrossCell(
   s: State,
-  mode: 'blank' | 'overworld' | 'combat' | 'camp' | 'town' | 'farm' | 'locksmith',
+  mode: GridFromKind,
   row: number,
   col: number,
 ): number | null {
   if (mode === 'blank') return null
 
   const pos = s.player.position
-  const sourceKind = s.world.cells[pos.y]?.[pos.x]?.kind ?? 'grass'
 
-  const s2: State = (() => {
-    if (mode === 'overworld') return { ...s, encounter: null }
-    if (mode === 'camp') return { ...s, encounter: { kind: 'camp', sourceCellId: -1, restoreMessage: '' } }
-    if (mode === 'town') return { ...s, encounter: { kind: 'town', sourceCellId: -1, restoreMessage: '' } }
-    if (mode === 'farm') return { ...s, encounter: { kind: 'farm', sourceCellId: -1, restoreMessage: '' } }
-    if (mode === 'locksmith') return { ...s, encounter: { kind: 'locksmith', sourceCellId: -1, restoreMessage: '' } }
-    return { ...s, encounter: { kind: 'combat', enemyArmySize: 0, sourceKind, sourceCellId: -1, restoreMessage: '' } }
-  })()
+  // Synthesize the state the right-grid sprite resolver expects: `overworld`
+  // clears the encounter; an encounter mode uses that mechanic's placeholder.
+  const provider = mode === 'overworld' ? null : MECHANIC_INDEX.previewEncounterByEncounterKind[mode]
+  const s2: State = { ...s, encounter: provider ? provider() : null }
 
   const def = getRightGridCellDef(s2, row, col)
   if (def.spriteId != null) return def.spriteId

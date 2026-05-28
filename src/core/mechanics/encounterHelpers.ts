@@ -7,13 +7,14 @@ import { RNG } from '../rng'
 import type {
   DeltaAnimTarget,
   Encounter,
+  GridFromKind,
   Resources,
   Run,
   State,
   Ui,
 } from '../types'
 import { enqueueDeltas, enqueueGridTransition } from '../uiAnim'
-import type { AnimSpec, GridFromKind } from './types'
+import type { AnimSpec } from './types'
 
 // ---- Message + encounter scaffolding ------------------------------------------
 

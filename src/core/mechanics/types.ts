@@ -1,5 +1,26 @@
-import type { Action, Cell, CellKind, Encounter, Resources, State, Vec2, World } from '../types'
+import type {
+  Action,
+  Cell,
+  CellGrid,
+  CellKind,
+  Encounter,
+  EncounterKind,
+  GridFromKind,
+  GridToKind,
+  Resources,
+  State,
+  Vec2,
+  World,
+} from '../types'
 import type { RightGridCellDef } from '../rightGrid'
+
+// PoI signpost contribution. Ranks are conventionally multiples of 10 so new
+// PoIs can slot between existing ones without renumbering (e.g. Lair=15 between
+// locksmith=10 and farm=20). Lower rank wins distance ties.
+export type PoiSignpostContribution = {
+  rank: number
+  name: (cell: Cell) => string
+}
 
 export type MoveEventSource = 'woods' | 'mountain' | 'swamp' | 'henge'
 export type MoveEvent =
@@ -12,11 +33,7 @@ export type MoveEventPolicy = {
   scoutLostHalves?: boolean
 }
 
-export type EncounterKind = Encounter['kind']
 export type RightGridProvider = (s: State, row: number, col: number) => RightGridCellDef
-
-export type GridFromKind = 'blank' | 'overworld' | EncounterKind
-export type GridToKind = 'overworld' | EncounterKind
 
 // Anim a mechanic asks the reducer to enqueue from `TileEnterResult.enterAnims`.
 // `afterFrames` is an offset (in frames) relative to the move-slide reveal.
@@ -63,6 +80,34 @@ export type OnEnterTile = (ctx: TileEnterCtx) => TileEnterResult
 // Returns a State (possibly === prevState) to mean "I claim this action".
 export type ReduceEncounterAction = (state: State, action: Action) => State | null
 
+// Mechanic-owned feature placement during worldgen. The runner in `world.ts`
+// calls each mechanic's `placeWorld` in `MECHANICS` array order, threading
+// `rngState`. Peer-aware placers (locksmith ↔ gate) read already-placed cells
+// via `findCellByKind`.
+export type PlaceWorldProvider = (args: { cells: CellGrid; rngState: number }) => { rngState: number }
+
+// One line in an encounter preview plate: a 16x16 icon + a short value string.
+// Color is the renderer's job; mechanics return semantically-neutral lines.
+export type PreviewPlateLine = { spriteId: number; text: string }
+export type PreviewPlateProvider = (state: State) => readonly PreviewPlateLine[] | null
+
+// Placeholder encounter used by `rightGridRenderPlan` to synthesize "what the
+// cross would look like with this encounter open" for grid transitions. Never
+// reduced over — only fed to the right-grid sprite resolver.
+export type PreviewEncounterProvider = () => Encounter
+
+// The encounter a mechanic owns end-to-end. Nested under `MechanicDef.encounter`
+// so the type system enforces "any of these hooks can only exist alongside the
+// kind discriminator". The registry indexes each sub-hook by `kind` and rejects
+// duplicate kinds across mechanics.
+export type MechanicEncounter = {
+  kind: EncounterKind
+  reduceAction?: ReduceEncounterAction
+  rightGrid?: RightGridProvider
+  previewPlate?: PreviewPlateProvider
+  previewEncounter?: PreviewEncounterProvider
+}
+
 export type MechanicDef = {
   id: string
   kinds: readonly CellKind[]
@@ -70,13 +115,9 @@ export type MechanicDef = {
   enterFoodCostByKind?: Partial<Record<CellKind, number>>
   moveEventPolicyByKind?: Partial<Record<CellKind, MoveEventPolicy>>
 
-  // Tile-enter hook: side effects, optional encounter open, optional teleport, etc.
   onEnterTile?: OnEnterTile
+  encounter?: MechanicEncounter
 
-  // The encounter kind this mechanic owns end-to-end: drives both
-  // `rightGridByEncounterKind` lookup and `reduceEncounterActionByEncounterKind` dispatch.
-  // A mechanic claims at most one encounter kind. The registry validates uniqueness.
-  encounterKind?: EncounterKind
-  reduceEncounterAction?: ReduceEncounterAction
-  rightGrid?: RightGridProvider
+  poiSignpost?: PoiSignpostContribution
+  placeWorld?: PlaceWorldProvider
 }

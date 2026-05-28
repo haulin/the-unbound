@@ -2,8 +2,10 @@ import {
   ACTION_CAMP_LEAVE,
   ACTION_CAMP_SEARCH,
   CAMP_COOLDOWN_MOVES,
+  CAMP_COUNT,
   CAMP_EMPTY_LINES,
   CAMP_FOOD_GAIN,
+  CAMP_NAME_POOL,
   CAMP_RECRUIT_LINES,
 } from '../../constants'
 import { cellIdForPos, getCellAt, setCellAt } from '../../cells'
@@ -16,7 +18,15 @@ import {
   leaveEncounter,
   setEncounterMessage,
 } from '../encounterHelpers'
-import type { MechanicDef, OnEnterTile, ReduceEncounterAction, TileEnterResult } from '../types'
+import { cellId, isTerrainCell, placeNamedFeature } from '../../worldgen'
+import type {
+  MechanicDef,
+  OnEnterTile,
+  PlaceWorldProvider,
+  PreviewPlateProvider,
+  ReduceEncounterAction,
+  TileEnterResult,
+} from '../types'
 
 // ---- Public helpers ----
 
@@ -24,25 +34,28 @@ export function computeCampArmyGain(args: { seed: number; campId: number; stepCo
   return RNG.keyedIntInRange({ seed: args.seed, stepCount: args.stepCount, cellId: args.campId }, 1, 2)
 }
 
-export type CampPreviewModel = {
-  campName: string
-  foodGain: number
-  armyGain: number
-  scoutFoodCost: number | null
+// ---- Worldgen placement ----
+
+const placeNamedCamps: PlaceWorldProvider = ({ cells, rngState }) => {
+  const next = placeNamedFeature(cells, rngState, {
+    count: CAMP_COUNT,
+    namePool: CAMP_NAME_POOL,
+    fallbackName: 'A Camp',
+    canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+    buildCell: ({ x, y, name }) => ({ kind: 'camp', id: cellId(x, y), name, nextReadyStep: 0 }),
+  })
+  return { rngState: next }
 }
 
-export function computeCampPreviewModel(s: State): CampPreviewModel {
+const campPreviewPlate: PreviewPlateProvider = (s) => {
   const camp = getCellAt(s.world, s.player.position) as CampCell
-  const campName = camp.name || 'A Camp'
   const stepCount = s.run.stepCount
-  const readyAt = camp.nextReadyStep ?? 0
-  const isReady = stepCount >= readyAt
-
-  const foodGain = isReady ? CAMP_FOOD_GAIN : 0
-  const armyGain = isReady ? computeCampArmyGain({ seed: s.world.seed, campId: camp.id, stepCount }) : 0
-  const scoutFoodCost = null
-
-  return { campName, foodGain, armyGain, scoutFoodCost }
+  if (stepCount < (camp.nextReadyStep ?? 0)) return null
+  const armyGain = computeCampArmyGain({ seed: s.world.seed, campId: camp.id, stepCount })
+  return [
+    { spriteId: SPRITES.stats.food, text: `+${CAMP_FOOD_GAIN}` },
+    { spriteId: SPRITES.stats.troop, text: `+${armyGain}` },
+  ]
 }
 
 // ---- Encounter open ----
@@ -123,13 +136,22 @@ export const campMechanic: MechanicDef = {
   kinds: ['camp'],
   mapLabel: 'C',
   onEnterTile: onEnterCamp,
-  encounterKind: 'camp',
-  reduceEncounterAction: reduceCampAction,
-  rightGrid: (_s, row, col) => {
-    if (row === 0 && col === 1) return { action: null } // North disabled
-    if (row === 1 && col === 0) return { spriteId: SPRITES.buttons.search, action: { type: ACTION_CAMP_SEARCH } }
-    if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_CAMP_LEAVE } }
-    if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.campfireIcon, action: null }
-    return { action: null }
+  poiSignpost: {
+    rank: 40,
+    name: (cell) => `${(cell as CampCell).name || 'A Camp'} Camp`,
+  },
+  placeWorld: placeNamedCamps,
+  encounter: {
+    kind: 'camp',
+    reduceAction: reduceCampAction,
+    previewPlate: campPreviewPlate,
+    previewEncounter: (): CampEncounter => ({ kind: 'camp', sourceCellId: -1, restoreMessage: '' }),
+    rightGrid: (_s, row, col) => {
+      if (row === 0 && col === 1) return { action: null } // North disabled
+      if (row === 1 && col === 0) return { spriteId: SPRITES.buttons.search, action: { type: ACTION_CAMP_SEARCH } }
+      if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_CAMP_LEAVE } }
+      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.campfireIcon, action: null }
+      return { action: null }
+    },
   },
 }

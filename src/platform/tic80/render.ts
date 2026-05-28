@@ -1,14 +1,12 @@
 import {
   ENABLE_ANIMATIONS,
-  FARM_BUY_FOOD_GOLD_COST,
   FOOD_WARNING_THRESHOLD,
-  LOCKSMITH_KEY_FOOD_COST,
-  LOCKSMITH_KEY_GOLD_COST,
   LORE_MAX_CHARS_PER_LINE,
   LOST_COORD_LABEL,
 } from '../../core/constants'
 import { SPRITES } from '../../core/spriteIds'
-import { computeCampPreviewModel } from '../../core/mechanics/defs/camp'
+import { MECHANIC_INDEX } from '../../core/mechanics'
+import type { PreviewPlateLine } from '../../core/mechanics/types'
 import { computeGameMapView } from '../../core/gameMap'
 import { getSpriteIdAt } from '../../core/world'
 import { torusDelta } from '../../core/math'
@@ -16,6 +14,7 @@ import {
   LEFT_PANEL_KIND_MAP,
   LEFT_PANEL_KIND_MINIMAP,
   LEFT_PANEL_KIND_SPRITE,
+  type DeltaAnimTarget,
   type State,
 } from '../../core/types'
 import { PANEL_LEFT_WIDTH, SCREEN_HEIGHT } from './layout'
@@ -107,6 +106,81 @@ function drawIllustrationWithTextureOverlay(spriteId: number, x: number, y: numb
   }
 }
 
+// Generic preview-plate chrome shared by all encounter previews. Returns the
+// first-line icon origin so animated overlays (combat enemy delta) can anchor
+// to the plate without re-deriving its geometry.
+type PlateGeometry = { firstIconX: number; firstIconY: number }
+
+function drawPreviewPlateChrome(
+  lines: readonly PreviewPlateLine[],
+  illX: number,
+  illY: number,
+  illSize: number,
+): PlateGeometry {
+  const platePad = UI.UI_PREVIEW_PLATE_PAD
+  const plateW = UI.UI_PREVIEW_PLATE_W
+  const plateH = 16 * lines.length + platePad * 2
+  const plateX = illX + illSize - plateW - UI.UI_PREVIEW_PLATE_INSET
+  const plateY = illY + UI.UI_PREVIEW_PLATE_INSET
+  rect(plateX, plateY, plateW, plateH, UI.UI_COLOR_BG)
+  rectb(plateX, plateY, plateW, plateH, UI.UI_COLOR_DIM)
+
+  const firstIconX = plateX + platePad
+  const firstIconY = plateY + platePad
+  for (let i = 0; i < lines.length; i++) {
+    const ln = lines[i]!
+    const iconX = firstIconX
+    const iconY = firstIconY + i * 16
+    spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2)
+
+    const valueX = iconX + UI.UI_ICON_VALUE_OFFSET_X
+    const valueY = iconY + UI.UI_ICON_VALUE_OFFSET_Y
+    print(ln.text, valueX, valueY, UI.UI_COLOR_TEXT)
+  }
+
+  return { firstIconX, firstIconY }
+}
+
+type DeltaAnchor = {
+  x: number
+  y: number
+  // Sign of `delta` that counts as "good" for the player. Default +1 (positive
+  // deltas = green); enemyArmy passes -1 because the enemy losing troops is
+  // good for the player.
+  goodSign?: 1 | -1
+}
+
+// Animated +/- delta overlays. One shared pass for every delta animation —
+// callers wire up which targets to draw and where each one anchors.
+function drawDeltaOverlays(s: State, anchors: Partial<Record<DeltaAnimTarget, DeltaAnchor>>) {
+  if (!ENABLE_ANIMATIONS) return
+  const anims = s.ui.anim.active
+  const frame = s.ui.clock.frame
+  const cursorByTarget: Partial<Record<DeltaAnimTarget, number>> = {}
+
+  for (let i = 0; i < anims.length; i++) {
+    const a = anims[i]!
+    if (a.kind !== 'delta') continue
+    const anchor = anchors[a.params.target]
+    if (!anchor) continue
+    const delta = a.params.delta
+    if (!delta) continue
+
+    const dur = Math.max(1, a.durationFrames)
+    const t = Math.max(0, Math.min(dur, frame - a.startFrame))
+    const p = t / dur
+
+    const label = delta > 0 ? `+${delta}` : `${delta}`
+    const goodSign = anchor.goodSign ?? 1
+    const color = delta * goodSign > 0 ? UI.UI_COLOR_GOOD : UI.UI_COLOR_BAD
+    const dy = UI.UI_DELTA_OFFSET_Y - Math.floor(p * UI.UI_DELTA_RISE_PX)
+
+    const xCursor = cursorByTarget[a.params.target] ?? anchor.x + UI.UI_DELTA_OFFSET_X
+    print(label, xCursor, anchor.y + dy, color)
+    cursorByTarget[a.params.target] = xCursor + label.length * 6 + UI.UI_DELTA_GAP_PX
+  }
+}
+
 function drawMap(s: State, x: number, y: number, sizePx: number) {
   const { markers } = computeGameMapView(s)
   const w = Math.max(1, s.world.width)
@@ -174,197 +248,16 @@ function drawLeftPanel(s: State) {
     // Game over: use a fixed tombstone illustration.
     drawIllustrationWithTextureOverlay(SPRITES.cosmetics.tombstoneIllustration, illX, illY)
   } else {
-    if (!encounterKind) {
-      drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
-    } else if (encounterKind === 'combat') {
-      // Combat preview: use the 64x64 illustration space as a composite.
-      // - Render the underlying tile as a full 64x64 preview.
-      // - Overlay a small "enemy stats" plate on top (filled + bordered),
-      //   using the same icon/value/delta layout constants as the player stats.
-      drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
+    drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
 
-      const platePad = UI.UI_COMBAT_PREVIEW_PLATE_PAD
-      const plateW = UI.UI_COMBAT_PREVIEW_PLATE_W
-      const plateH = 16 + platePad * 2
-      const plateX = illX + illSize - plateW - UI.UI_COMBAT_PREVIEW_PLATE_INSET
-      const plateY = illY + UI.UI_COMBAT_PREVIEW_PLATE_INSET
-      rect(plateX, plateY, plateW, plateH, UI.UI_COLOR_BG)
-      rectb(plateX, plateY, plateW, plateH, UI.UI_COLOR_DIM)
-
-      const enemyIconX = plateX + platePad
-      const enemyIconY = plateY + platePad
-      // Use color 0 as transparent for UI-like overlay sprites.
-      spr(SPRITES.stats.enemy, enemyIconX, enemyIconY, 0, 1, 0, 0, 2, 2)
-
-      const enemyArmy = s.encounter && s.encounter.kind === 'combat' ? (s.encounter.enemyArmySize | 0) : 0
-      const enemyCountX = enemyIconX + UI.UI_FOOD_VALUE_OFFSET_X
-      const enemyCountY = enemyIconY + UI.UI_FOOD_VALUE_OFFSET_Y
-      print(`${enemyArmy}`, enemyCountX, enemyCountY, UI.UI_COLOR_TEXT)
-
-      // Enemy delta overlay near the count.
-      if (ENABLE_ANIMATIONS) {
-        const anims = s.ui.anim.active
-        const frame = s.ui.clock.frame
-        let xCursor = enemyIconX + UI.UI_DELTA_OFFSET_X
-        for (let i = 0; i < anims.length; i++) {
-          const a = anims[i]!
-          if (a.kind !== 'delta') continue
-          if (a.params.target !== 'enemyArmy') continue
-          const start = a.startFrame
-          const dur = Math.max(1, a.durationFrames)
-          const t = Math.max(0, Math.min(dur, frame - start))
-          const p = t / dur
-          const delta = a.params.delta
-          if (!delta) continue
-
-          const label = delta > 0 ? `+${delta}` : `${delta}`
-          const color = delta < 0 ? UI.UI_COLOR_GOOD : UI.UI_COLOR_BAD
-          const dy = UI.UI_DELTA_OFFSET_Y - Math.floor(p * UI.UI_DELTA_RISE_PX)
-          print(label, xCursor, enemyIconY + dy, color)
-          xCursor += label.length * 6 + UI.UI_DELTA_GAP_PX
+    if (encounterKind) {
+      const provider = MECHANIC_INDEX.previewPlateByEncounterKind[encounterKind]
+      const lines = provider?.(s) ?? null
+      if (lines && lines.length) {
+        const geom = drawPreviewPlateChrome(lines, illX, illY, illSize)
+        if (encounterKind === 'combat') {
+          drawDeltaOverlays(s, { enemyArmy: { x: geom.firstIconX, y: geom.firstIconY, goodSign: -1 } })
         }
-      }
-    } else if (encounterKind === 'camp') {
-      // Camp preview: underlying tile + up to three stacked stat lines.
-      drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
-
-      const preview = computeCampPreviewModel(s)
-      {
-        type Line = { spriteId: number; text: string; color: number }
-        const lines: Line[] = []
-        if (preview.foodGain > 0) {
-          lines.push({ spriteId: SPRITES.stats.food, text: `+${preview.foodGain}`, color: UI.UI_COLOR_TEXT })
-          lines.push({ spriteId: SPRITES.stats.troop, text: `+${preview.armyGain}`, color: UI.UI_COLOR_TEXT })
-        }
-        if (preview.scoutFoodCost != null) {
-          lines.push({ spriteId: SPRITES.stats.scout, text: `-${preview.scoutFoodCost}`, color: UI.UI_COLOR_TEXT })
-        }
-
-        if (lines.length) {
-          const platePad = UI.UI_COMBAT_PREVIEW_PLATE_PAD
-          const plateW = UI.UI_COMBAT_PREVIEW_PLATE_W
-          const plateH = 16 * lines.length + platePad * 2
-          const plateX = illX + illSize - plateW - UI.UI_COMBAT_PREVIEW_PLATE_INSET
-          const plateY = illY + UI.UI_COMBAT_PREVIEW_PLATE_INSET
-          rect(plateX, plateY, plateW, plateH, UI.UI_COLOR_BG)
-          rectb(plateX, plateY, plateW, plateH, UI.UI_COLOR_DIM)
-
-          for (let i = 0; i < lines.length; i++) {
-            const ln = lines[i]!
-            const iconX = plateX + platePad
-            const iconY = plateY + platePad + i * 16
-            spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2)
-
-            const valueX = iconX + UI.UI_FOOD_VALUE_OFFSET_X
-            const valueY = iconY + UI.UI_FOOD_VALUE_OFFSET_Y
-            print(ln.text, valueX, valueY, ln.color)
-          }
-        }
-      }
-    } else if (encounterKind === 'town') {
-      // Town preview: show offer prices.
-      drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
-
-      const here = s.world.cells[pos.y]![pos.x]!
-      if (here.kind === 'town') {
-        type Line = { spriteId: number; text: string; color: number }
-        const lines: Line[] = []
-        const offers = here.offers || []
-        for (let i = 0; i < offers.length; i++) {
-          const o = offers[i]!
-          if (o === 'buyFood')
-            lines.push({ spriteId: SPRITES.stats.food, text: `-${here.prices.foodGold | 0}`, color: UI.UI_COLOR_TEXT })
-          else if (o === 'buyTroops')
-            lines.push({ spriteId: SPRITES.stats.troop, text: `-${here.prices.troopsGold | 0}`, color: UI.UI_COLOR_TEXT })
-          else if (o === 'hireScout')
-            lines.push({ spriteId: SPRITES.stats.scout, text: `-${here.prices.scoutGold | 0}`, color: UI.UI_COLOR_TEXT })
-          else if (o === 'buyRumors')
-            lines.push({
-              spriteId: SPRITES.cosmetics.rumorIllustration,
-              text: `-${here.prices.rumorGold | 0}`,
-              color: UI.UI_COLOR_TEXT,
-            })
-        }
-
-        if (lines.length) {
-          const platePad = UI.UI_COMBAT_PREVIEW_PLATE_PAD
-          const plateW = UI.UI_COMBAT_PREVIEW_PLATE_W
-          const plateH = 16 * lines.length + platePad * 2
-          const plateX = illX + illSize - plateW - UI.UI_COMBAT_PREVIEW_PLATE_INSET
-          const plateY = illY + UI.UI_COMBAT_PREVIEW_PLATE_INSET
-          rect(plateX, plateY, plateW, plateH, UI.UI_COLOR_BG)
-          rectb(plateX, plateY, plateW, plateH, UI.UI_COLOR_DIM)
-
-          for (let i = 0; i < lines.length; i++) {
-            const ln = lines[i]!
-            const iconX = plateX + platePad
-            const iconY = plateY + platePad + i * 16
-            spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2)
-
-            const valueX = iconX + UI.UI_FOOD_VALUE_OFFSET_X
-            const valueY = iconY + UI.UI_FOOD_VALUE_OFFSET_Y
-            print(ln.text, valueX, valueY, ln.color)
-          }
-        }
-      }
-    } else if (encounterKind === 'farm') {
-      // Farm preview: keep the tile preview; show farm shop costs.
-      drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
-
-      const here = s.world.cells[pos.y]![pos.x]!
-      if (here.kind === 'farm') {
-        type Line = { spriteId: number; text: string; color: number }
-        const lines: Line[] = [
-          { spriteId: SPRITES.stats.food, text: `-${FARM_BUY_FOOD_GOLD_COST | 0}`, color: UI.UI_COLOR_TEXT },
-          { spriteId: SPRITES.cosmetics.beastIllustration, text: `-${here.beastGoldCost | 0}`, color: UI.UI_COLOR_TEXT },
-        ]
-
-        const platePad = UI.UI_COMBAT_PREVIEW_PLATE_PAD
-        const plateW = UI.UI_COMBAT_PREVIEW_PLATE_W
-        const plateH = 16 * lines.length + platePad * 2
-        const plateX = illX + illSize - plateW - UI.UI_COMBAT_PREVIEW_PLATE_INSET
-        const plateY = illY + UI.UI_COMBAT_PREVIEW_PLATE_INSET
-        rect(plateX, plateY, plateW, plateH, UI.UI_COLOR_BG)
-        rectb(plateX, plateY, plateW, plateH, UI.UI_COLOR_DIM)
-
-        for (let i = 0; i < lines.length; i++) {
-          const ln = lines[i]!
-          const iconX = plateX + platePad
-          const iconY = plateY + platePad + i * 16
-          spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2)
-
-          const valueX = iconX + UI.UI_FOOD_VALUE_OFFSET_X
-          const valueY = iconY + UI.UI_FOOD_VALUE_OFFSET_Y
-          print(ln.text, valueX, valueY, ln.color)
-        }
-      }
-    } else if (encounterKind === 'locksmith') {
-      // Locksmith preview: keep the tile preview; show key costs (gold or food).
-      drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
-
-      type Line = { spriteId: number; text: string; color: number }
-      const lines: Line[] = [
-        { spriteId: SPRITES.stats.gold, text: `-${LOCKSMITH_KEY_GOLD_COST | 0}`, color: UI.UI_COLOR_TEXT },
-        { spriteId: SPRITES.stats.food, text: `-${LOCKSMITH_KEY_FOOD_COST | 0}`, color: UI.UI_COLOR_TEXT },
-      ]
-
-      const platePad = UI.UI_COMBAT_PREVIEW_PLATE_PAD
-      const plateW = UI.UI_COMBAT_PREVIEW_PLATE_W
-      const plateH = 16 * lines.length + platePad * 2
-      const plateX = illX + illSize - plateW - UI.UI_COMBAT_PREVIEW_PLATE_INSET
-      const plateY = illY + UI.UI_COMBAT_PREVIEW_PLATE_INSET
-      rect(plateX, plateY, plateW, plateH, UI.UI_COLOR_BG)
-      rectb(plateX, plateY, plateW, plateH, UI.UI_COLOR_DIM)
-
-      for (let i = 0; i < lines.length; i++) {
-        const ln = lines[i]!
-        const iconX = plateX + platePad
-        const iconY = plateY + platePad + i * 16
-        spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2)
-
-        const valueX = iconX + UI.UI_FOOD_VALUE_OFFSET_X
-        const valueY = iconY + UI.UI_FOOD_VALUE_OFFSET_Y
-        print(ln.text, valueX, valueY, ln.color)
       }
     }
   }
@@ -386,8 +279,8 @@ function drawLeftPanel(s: State) {
   const foodX = statusX
   const foodY = armyY + UI.UI_ARMY_ICON_H_PX + UI.UI_HERO_RESOURCE_GAP_PX
   spr(SPRITES.stats.food, foodX, foodY, -1, 1, 0, 0, 2, 2) // 16x16
-  const foodValueX = foodX + UI.UI_FOOD_VALUE_OFFSET_X
-  const foodValueY = foodY + UI.UI_FOOD_VALUE_OFFSET_Y
+  const foodValueX = foodX + UI.UI_ICON_VALUE_OFFSET_X
+  const foodValueY = foodY + UI.UI_ICON_VALUE_OFFSET_Y
   const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? UI.UI_COLOR_WARN : UI.UI_COLOR_TEXT
   print(`${s.resources.food}`, foodValueX, foodValueY, foodColor)
 
@@ -398,46 +291,11 @@ function drawLeftPanel(s: State) {
   const goldValueY = goldY + UI.UI_GOLD_VALUE_OFFSET_Y
   print(`${s.resources.gold}`, goldValueX, goldValueY, UI.UI_COLOR_TEXT)
 
-  // Resource delta flashes (non-blocking).
-  {
-    const anims = s.ui.anim.active
-    const frame = s.ui.clock.frame
-    const bases = {
-      army: { x: armyX, y: armyY },
-      food: { x: foodX, y: foodY },
-      gold: { x: goldX, y: goldY },
-    } as const
-
-    const cursorByTarget: Record<'army' | 'food' | 'gold', number> = {
-      army: bases.army.x + UI.UI_DELTA_OFFSET_X,
-      food: bases.food.x + UI.UI_DELTA_OFFSET_X,
-      gold: bases.gold.x + UI.UI_DELTA_OFFSET_X,
-    }
-
-    const draw = (target: 'army' | 'food' | 'gold', delta: number, startFrame: number, durationFrames: number) => {
-      if (!delta) return
-      const base = bases[target]
-      const dur = Math.max(1, durationFrames)
-      const t = Math.max(0, Math.min(dur, frame - startFrame))
-      const p = t / dur
-
-      const label = delta > 0 ? `+${delta}` : `${delta}`
-      const color = delta > 0 ? UI.UI_COLOR_GOOD : UI.UI_COLOR_BAD
-      const dy = UI.UI_DELTA_OFFSET_Y - Math.floor(p * UI.UI_DELTA_RISE_PX)
-
-      // Anchor over the icon, and stack horizontally so +N stays readable.
-      const xCursor = cursorByTarget[target]
-      print(label, xCursor, base.y + dy, color)
-      cursorByTarget[target] = xCursor + label.length * 6 + UI.UI_DELTA_GAP_PX
-    }
-
-    for (let i = 0; i < anims.length; i++) {
-      const a = anims[i]!
-      if (a.kind !== 'delta') continue
-      if (a.params.target === 'enemyArmy') continue
-      draw(a.params.target, a.params.delta, a.startFrame, a.durationFrames)
-    }
-  }
+  drawDeltaOverlays(s, {
+    army: { x: armyX, y: armyY },
+    food: { x: foodX, y: foodY },
+    gold: { x: goldX, y: goldY },
+  })
 
   const statusBottomY = goldY + UI.UI_GOLD_ICON_H_PX + UI.UI_AFTER_RESOURCES_GAP_PX
   const headerBottomY = Math.max(illY + illSize, statusBottomY)

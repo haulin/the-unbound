@@ -2,11 +2,12 @@ import {
   ACTION_LOCKSMITH_LEAVE,
   ACTION_LOCKSMITH_PAY_FOOD,
   ACTION_LOCKSMITH_PAY_GOLD,
+  GATE_LOCKSMITH_MIN_DISTANCE,
   LOCKSMITH_KEY_FOOD_COST,
   LOCKSMITH_KEY_GOLD_COST,
   TOWN_NO_GOLD_LINES,
 } from '../../constants'
-import { cellIdForPos } from '../../cells'
+import { cellIdForPos, findCellByKind } from '../../cells'
 import {
   LOCKSMITH_ENTER_LINES,
   LOCKSMITH_NAME,
@@ -18,7 +19,16 @@ import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
 import type { LocksmithEncounter, State } from '../../types'
 import { applyDeltas, buy, leaveEncounter, setEncounterMessage } from '../encounterHelpers'
-import type { MechanicDef, OnEnterTile, ReduceEncounterAction, TileEnterResult } from '../types'
+import { isTerrainCell, placeFeature } from '../../worldgen'
+import type {
+  MechanicDef,
+  OnEnterTile,
+  PlaceWorldProvider,
+  PreviewPlateLine,
+  PreviewPlateProvider,
+  ReduceEncounterAction,
+  TileEnterResult,
+} from '../types'
 
 const onEnterLocksmith: OnEnterTile = ({ cell, world, pos, stepCount, resources }) => {
   if (cell.kind !== 'locksmith') return {}
@@ -79,6 +89,35 @@ function reduceLocksmithPayGold(prevState: State, sourceCellId: number): State {
   })
 }
 
+// ---- Worldgen placement ----
+
+// Peer-aware on gate: gate runs first in MECHANICS so its position is readable
+// here. We assert (rather than fall back to "no constraint") because a future
+// MECHANICS reorder that flipped the two would otherwise silently land the
+// pair adjacent and only the determinism snapshot would notice — and only
+// until someone re-snapshotted on autopilot.
+const placeLocksmith: PlaceWorldProvider = ({ cells, rngState }) => {
+  const gatePos = findCellByKind(cells, 'gate')
+  if (!gatePos) throw new Error('placeLocksmith: gate must be placed before locksmith')
+  const res = placeFeature(cells, rngState, {
+    count: 1,
+    canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+    awayFrom: { pos: gatePos, minDistance: GATE_LOCKSMITH_MIN_DISTANCE },
+    buildCell: () => ({ kind: 'locksmith' }),
+  })
+  return { rngState: res.rngState }
+}
+
+// ---- Preview plate ----
+
+const locksmithPreviewPlate: PreviewPlateProvider = () => {
+  const lines: PreviewPlateLine[] = [
+    { spriteId: SPRITES.stats.gold, text: `-${LOCKSMITH_KEY_GOLD_COST}` },
+    { spriteId: SPRITES.stats.food, text: `-${LOCKSMITH_KEY_FOOD_COST}` },
+  ]
+  return lines
+}
+
 function reduceLocksmithPayFood(prevState: State): State {
   const rnd = RNG.createRunCopyRandom(prevState)
   const result = buy(prevState.resources, { food: LOCKSMITH_KEY_FOOD_COST, gain: { hasBronzeKey: true } })
@@ -99,16 +138,25 @@ export const locksmithMechanic: MechanicDef = {
   kinds: ['locksmith'],
   mapLabel: 'L',
   onEnterTile: onEnterLocksmith,
-  encounterKind: 'locksmith',
-  reduceEncounterAction: reduceLocksmithAction,
-  rightGrid: (_s, row, col) => {
-    if (row === 0 && col === 1)
-      return { spriteId: SPRITES.buttons.gold, action: { type: ACTION_LOCKSMITH_PAY_GOLD } }
-    if (row === 1 && col === 0)
-      return { spriteId: SPRITES.buttons.food, action: { type: ACTION_LOCKSMITH_PAY_FOOD } }
-    if (row === 1 && col === 2)
-      return { spriteId: SPRITES.buttons.return, action: { type: ACTION_LOCKSMITH_LEAVE } }
-    if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.locksmithKiln, action: null }
-    return { action: null }
+  poiSignpost: {
+    rank: 10,
+    name: () => LOCKSMITH_NAME,
+  },
+  placeWorld: placeLocksmith,
+  encounter: {
+    kind: 'locksmith',
+    reduceAction: reduceLocksmithAction,
+    previewPlate: locksmithPreviewPlate,
+    previewEncounter: (): LocksmithEncounter => ({ kind: 'locksmith', sourceCellId: -1, restoreMessage: '' }),
+    rightGrid: (_s, row, col) => {
+      if (row === 0 && col === 1)
+        return { spriteId: SPRITES.buttons.gold, action: { type: ACTION_LOCKSMITH_PAY_GOLD } }
+      if (row === 1 && col === 0)
+        return { spriteId: SPRITES.buttons.food, action: { type: ACTION_LOCKSMITH_PAY_FOOD } }
+      if (row === 1 && col === 2)
+        return { spriteId: SPRITES.buttons.return, action: { type: ACTION_LOCKSMITH_LEAVE } }
+      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.locksmithKiln, action: null }
+      return { action: null }
+    },
   },
 }

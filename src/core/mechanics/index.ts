@@ -12,18 +12,23 @@ import { combatMechanic } from './defs/combat'
 import { fishingLakeMechanic } from './defs/fishingLake'
 import { rainbowEndMechanic } from './defs/rainbowEnd'
 
+// Array order = worldgen order: `world.ts` calls each `placeWorld` in this
+// order, threading RNG state. Reordering changes the determinism golden. Gate
+// goes first, locksmith second (reads gate position for min-distance). Pure
+// encounter/event mechanics (terrainHazards, combat) have no `placeWorld` and
+// sit at the end.
 export const MECHANICS: readonly MechanicDef[] = [
   gateMechanic,
   locksmithMechanic,
-  signpostMechanic,
   farmMechanic,
   campMechanic,
-  hengeMechanic,
   townMechanic,
-  terrainHazardsMechanic,
-  combatMechanic,
+  hengeMechanic,
+  signpostMechanic,
   fishingLakeMechanic,
   rainbowEndMechanic,
+  terrainHazardsMechanic,
+  combatMechanic,
 ] as const
 
 export const MECHANIC_INDEX = buildMechanicIndex(MECHANICS)

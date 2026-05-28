@@ -178,6 +178,25 @@ describe('signpost', () => {
     expect(msg).toBe('The Gate\nSE, 5 leagues away.')
   })
 
+  it('cells without a poiSignpost contribution are not candidates', () => {
+    // fishingLake, signpost, rainbowEnd, and bare terrain are NOT signpost targets
+    // because none of those mechanics register a `poiSignpost` contribution. A grid
+    // containing only those should yield an empty signpost message.
+    const msg = formatNearestPoiSignpostMessage(
+      { x: 0, y: 0 },
+      {
+        width: 10,
+        height: 10,
+        cells: makeCells(10, 10, [
+          { x: 3, y: 2, cell: { kind: 'fishingLake', id: 23, nextReadyStep: 0 } },
+          { x: 4, y: 1, cell: { kind: 'signpost' } },
+          { x: 1, y: 4, cell: { kind: 'rainbowEnd', id: 41, hasPaidOut: false } },
+        ]),
+      },
+    )
+    expect(msg).toBe('')
+  })
+
   it('skips too-close targets (D<=2) when a farther target exists', () => {
     const msg = formatNearestPoiSignpostMessage(
       { x: 0, y: 0 },

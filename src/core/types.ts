@@ -130,10 +130,7 @@ export type DeltaAnim = BaseAnim & {
 
 export type GridTransitionAnim = BaseAnim & {
   kind: 'gridTransition'
-  params: {
-    from: 'blank' | 'overworld' | 'combat' | 'camp' | 'town' | 'farm' | 'locksmith'
-    to: 'overworld' | 'combat' | 'camp' | 'town' | 'farm' | 'locksmith'
-  }
+  params: { from: GridFromKind; to: GridToKind }
 }
 
 export type Anim = MoveSlideAnim | DeltaAnim | GridTransitionAnim
@@ -167,7 +164,6 @@ export type Resources = {
 export type CombatEncounter = {
   kind: 'combat'
   enemyArmySize: number
-  sourceKind: CellKind
   sourceCellId: number
   restoreMessage: string
 }
@@ -197,6 +193,13 @@ export type LocksmithEncounter = {
 }
 
 export type Encounter = CombatEncounter | CampEncounter | TownEncounter | FarmEncounter | LocksmithEncounter
+export type EncounterKind = Encounter['kind']
+
+// Grid-transition source/target. The right-grid cross can fly in/out between
+// the overworld view, an encounter view, or a fully blank view (used for
+// teleport "lost" reveals). Kept here so `GridTransitionAnim` stays self-contained.
+export type GridFromKind = 'blank' | 'overworld' | EncounterKind
+export type GridToKind = 'overworld' | EncounterKind
 
 export type State = { world: World; player: Player; run: Run; resources: Resources; encounter: Encounter | null; ui: Ui }
 

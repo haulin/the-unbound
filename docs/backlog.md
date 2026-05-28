@@ -136,7 +136,7 @@ See `docs/2026-05-27-slot-system-design.md` for the demo roster.
 - skip modal if nothing to do (not enough money or cooldown - camp/farm/town)
 - maybe adjust worldgen as it feels like swamps & mountains are too common
 - Consider making roads cost food only ~50% of the time (mechanics/balance change; would require tests + tuning).
-- Collectibles to find. Maybe just getting one of each creatures (healer/scout/beast) - shows on home page instead of question marks.
+- Collectibles to find. Maybe just getting one of each creatures (healer/scout/beast) - shows on home page instead of question marks. Another home page challenge icon is - not using a map the whole run.
 - buying scout shows animation - switch to show map, reveal tiles, hide map (if it was hidden)
 - active item that allows you to auto-win a fight or land a hit at least
 - passive item no food consumed for 10 steps

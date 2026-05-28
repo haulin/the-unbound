@@ -2,8 +2,12 @@ import {
   ACTION_FARM_BUY_BEAST,
   ACTION_FARM_BUY_FOOD,
   ACTION_FARM_LEAVE,
+  FARM_BEAST_GOLD_MAX,
+  FARM_BEAST_GOLD_MIN,
   FARM_BUY_FOOD_AMOUNT,
   FARM_BUY_FOOD_GOLD_COST,
+  FARM_COUNT,
+  FARM_NAME_POOL,
 } from '../../constants'
 import { cellIdForPos, getCellAt } from '../../cells'
 import { foodCarryCap, FOOD_CARRY_FULL_MESSAGE, resourcesWithClampedFoodIfNeeded } from '../../foodCarry'
@@ -23,7 +27,16 @@ import {
   noGoldResponse,
   setEncounterMessage,
 } from '../encounterHelpers'
-import type { MechanicDef, OnEnterTile, ReduceEncounterAction, TileEnterResult } from '../types'
+import { cellId, isTerrainCell, placeNamedFeature } from '../../worldgen'
+import type {
+  MechanicDef,
+  OnEnterTile,
+  PlaceWorldProvider,
+  PreviewPlateLine,
+  PreviewPlateProvider,
+  ReduceEncounterAction,
+  TileEnterResult,
+} from '../types'
 
 function farmPrefix(farm: FarmCell): string {
   const name = farm.name || 'A Farm'
@@ -100,6 +113,34 @@ function reduceFarmBuyFood(prevState: State, farm: FarmCell): State {
   })
 }
 
+// ---- Worldgen placement ----
+
+const placeNamedFarms: PlaceWorldProvider = ({ cells, rngState }) => {
+  const next = placeNamedFeature(cells, rngState, {
+    count: FARM_COUNT,
+    namePool: FARM_NAME_POOL,
+    fallbackName: 'A Farm',
+    canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+    buildCell: ({ x, y, name, rng }) => {
+      const beastGoldCost = rng.intInRange(FARM_BEAST_GOLD_MIN, FARM_BEAST_GOLD_MAX)
+      return { kind: 'farm', id: cellId(x, y), name, beastGoldCost }
+    },
+  })
+  return { rngState: next }
+}
+
+// ---- Preview plate ----
+
+const farmPreviewPlate: PreviewPlateProvider = (s) => {
+  const here = getCellAt(s.world, s.player.position)
+  if (!here || here.kind !== 'farm') return null
+  const lines: PreviewPlateLine[] = [
+    { spriteId: SPRITES.stats.food, text: `-${FARM_BUY_FOOD_GOLD_COST}` },
+    { spriteId: SPRITES.cosmetics.beastIllustration, text: `-${here.beastGoldCost}` },
+  ]
+  return lines
+}
+
 function reduceFarmBuyBeast(prevState: State, farm: FarmCell): State {
   const prefix = farmPrefix(farm)
   const rnd = RNG.createRunCopyRandom(prevState)
@@ -125,16 +166,25 @@ export const farmMechanic: MechanicDef = {
   kinds: ['farm'],
   mapLabel: 'F',
   onEnterTile: onEnterFarm,
-  encounterKind: 'farm',
-  reduceEncounterAction: reduceFarmAction,
-  rightGrid: (_s, row, col) => {
-    if (row === 0 && col === 1)
-      return { spriteId: SPRITES.buttons.food, action: { type: ACTION_FARM_BUY_FOOD } }
-    if (row === 1 && col === 0)
-      return { spriteId: SPRITES.buttons.beast, action: { type: ACTION_FARM_BUY_BEAST } }
-    if (row === 1 && col === 2)
-      return { spriteId: SPRITES.buttons.return, action: { type: ACTION_FARM_LEAVE } }
-    if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.farmBarn, action: null }
-    return { action: null }
+  poiSignpost: {
+    rank: 20,
+    name: (cell) => `${(cell as FarmCell).name || 'A Farm'} Farm`,
+  },
+  placeWorld: placeNamedFarms,
+  encounter: {
+    kind: 'farm',
+    reduceAction: reduceFarmAction,
+    previewPlate: farmPreviewPlate,
+    previewEncounter: (): FarmEncounter => ({ kind: 'farm', sourceCellId: -1, restoreMessage: '' }),
+    rightGrid: (_s, row, col) => {
+      if (row === 0 && col === 1)
+        return { spriteId: SPRITES.buttons.food, action: { type: ACTION_FARM_BUY_FOOD } }
+      if (row === 1 && col === 0)
+        return { spriteId: SPRITES.buttons.beast, action: { type: ACTION_FARM_BUY_BEAST } }
+      if (row === 1 && col === 2)
+        return { spriteId: SPRITES.buttons.return, action: { type: ACTION_FARM_LEAVE } }
+      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.farmBarn, action: null }
+      return { action: null }
+    },
   },
 }
