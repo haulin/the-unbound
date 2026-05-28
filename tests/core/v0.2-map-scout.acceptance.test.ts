@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
 import { getRightGridCellDef } from '../../src/core/rightGrid'
 import {
-  ACTION_CAMP_LEAVE,
-  ACTION_CAMP_SEARCH,
   ACTION_MOVE,
   ACTION_TOGGLE_MAP,
   ACTION_TOGGLE_MINIMAP,
@@ -15,7 +13,11 @@ import {
   MAP_HINT_MESSAGE,
   SWAMP_LOST_PERCENT,
 } from '../../src/core/constants'
-import { computeCampArmyGain } from '../../src/core/mechanics/defs/camp'
+import {
+  ACTION_CAMP_LEAVE,
+  ACTION_CAMP_SEARCH,
+  computeCampArmyGain,
+} from '../../src/core/mechanics/defs/camp'
 import { RNG } from '../../src/core/rng'
 import type { Cell, State, World } from '../../src/core/types'
 

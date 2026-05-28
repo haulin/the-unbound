@@ -22,13 +22,17 @@ Executing a strict task list tends to produce the minimum structure that passes 
 
 ### Mechanics live in mechanic modules
 
-Prefer adding/changing gameplay behavior by editing a mechanic module and registering it once, instead of touching multiple switch statements.
+**Architectural goal**: adding or editing one mechanic should touch the **minimum number of files**. The realistic target is one def file in `src/core/mechanics/defs/*` plus one line in `MECHANICS`. Every cross-cutting registry, switch statement, or constant that hardcodes a mechanic name is a tax on this goal — surface them in review and migrate them to data-driven seams when they become friction.
+
+This means action constants, action union types, encounter shapes, signpost ranks, preview-plate behavior, placement logic, lore-pool wiring, etc. all live on the mechanic def. Core only owns generic dispatch.
 
 - **Where**: `src/core/mechanics/defs/*` + registry in `src/core/mechanics/index.ts`
-- **Why**: reduces “sprinkled logic” and makes extensions mostly “add module + register”.
 - **Top-level hooks** (all optional): `onEnterTile`, `poiSignpost`, `placeWorld`, plus declarative fields `kinds`, `mapLabel`, `enterFoodCostByKind`, `moveEventPolicyByKind`. Hook signatures live in `src/core/mechanics/types.ts`.
-- **Encounter hooks** (all optional, nested under `encounter: { kind, ... }`): `reduceAction`, `rightGrid`, `previewPlate`, `previewEncounter`. The nested shape means the type system enforces "any encounter hook can only exist alongside `kind`" — no runtime cross-field validation needed.
+- **Encounter hooks** (all optional, nested under `encounter: { kind, ... }`): `reduceAction`, `rightGrid`, `previewPlate`, `previewPlateDeltaAnchors`, `previewEncounter`. The nested shape means the type system enforces "any encounter hook can only exist alongside `kind`" — no runtime cross-field validation needed.
+- **Action constants live next to their reducer**: per-mechanic action constants and union types (e.g. `ACTION_CAMP_SEARCH`, `CampAction`) are exported from the def file, not from `src/core/constants.ts`. The central `Action` type in `types.ts` aggregates them via one import per mechanic.
 - **MECHANICS array order = worldgen order**: `world.ts` iterates the `MECHANICS` array and calls each `placeWorld` in order, threading `rngState`. Reorder with intent — the determinism golden in `tests/core/world.determinism.test.ts` will catch unintended RNG-shape changes.
+- **Acceptable taxes** (unavoidable today): one line per new modal encounter in `types.ts`'s `Encounter` and `Action` unions, one line in the `MECHANICS` array, and (if the mechanic places features) one entry in the determinism golden. Anything beyond that is a candidate for refactoring.
+- **Anti-pattern**: per-mechanic explanatory comments that repeat the same rationale in every def. Document the principle once here; let the def files be self-evident.
 - **More**: `docs/plans/2026-05-04-mechanic-modules-registry-design.md`
 
 ### RNG discipline: don’t perturb simulation for flavor

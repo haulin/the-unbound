@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
 import {
-  ACTION_TOWN_BUY_FOOD,
-  ACTION_TOWN_BUY_RUMOR,
-  ACTION_TOWN_BUY_TROOPS,
-  ACTION_TOWN_HIRE_SCOUT,
-  ACTION_TOWN_LEAVE,
   BARKEEP_TIPS,
   ENABLE_ANIMATIONS,
   TOWN_BUY_LINES,
@@ -13,6 +8,13 @@ import {
   TOWN_SCOUT_ALREADY_HAVE_LINES,
   TOWN_SCOUT_HIRE_LINES,
 } from '../../src/core/constants'
+import {
+  ACTION_TOWN_BUY_FOOD,
+  ACTION_TOWN_BUY_RUMOR,
+  ACTION_TOWN_BUY_TROOPS,
+  ACTION_TOWN_HIRE_SCOUT,
+  ACTION_TOWN_LEAVE,
+} from '../../src/core/mechanics/defs/town'
 import { FOOD_CARRY_FULL_MESSAGE } from '../../src/core/foodCarry'
 import { RNG } from '../../src/core/rng'
 import type { Cell, DeltaAnim, GridTransitionAnim, State, TownCell, World } from '../../src/core/types'

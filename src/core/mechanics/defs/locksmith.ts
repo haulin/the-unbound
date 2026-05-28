@@ -1,7 +1,4 @@
 import {
-  ACTION_LOCKSMITH_LEAVE,
-  ACTION_LOCKSMITH_PAY_FOOD,
-  ACTION_LOCKSMITH_PAY_GOLD,
   GATE_LOCKSMITH_MIN_DISTANCE,
   LOCKSMITH_KEY_FOOD_COST,
   LOCKSMITH_KEY_GOLD_COST,
@@ -29,6 +26,14 @@ import type {
   ReduceEncounterAction,
   TileEnterResult,
 } from '../types'
+
+export const ACTION_LOCKSMITH_PAY_GOLD = 'LOCKSMITH_PAY_GOLD' as const
+export const ACTION_LOCKSMITH_PAY_FOOD = 'LOCKSMITH_PAY_FOOD' as const
+export const ACTION_LOCKSMITH_LEAVE = 'LOCKSMITH_LEAVE' as const
+export type LocksmithAction =
+  | { type: typeof ACTION_LOCKSMITH_PAY_GOLD }
+  | { type: typeof ACTION_LOCKSMITH_PAY_FOOD }
+  | { type: typeof ACTION_LOCKSMITH_LEAVE }
 
 const onEnterLocksmith: OnEnterTile = ({ cell, world, pos, stepCount, resources }) => {
   if (cell.kind !== 'locksmith') return {}

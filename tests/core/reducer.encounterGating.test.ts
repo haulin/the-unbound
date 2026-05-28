@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
-import { ACTION_FIGHT, ACTION_RETURN } from '../../src/core/constants'
+import { ACTION_FIGHT, ACTION_RETURN } from '../../src/core/mechanics/defs/combat'
 import type { State, World } from '../../src/core/types'
 
 // When the run is over (game-over or won), the encounter dispatcher must skip the

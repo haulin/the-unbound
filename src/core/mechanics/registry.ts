@@ -5,6 +5,7 @@ import type {
   OnEnterTile,
   PoiSignpostContribution,
   PreviewEncounterProvider,
+  PreviewPlateDeltaAnchor,
   PreviewPlateProvider,
   ReduceEncounterAction,
   RightGridProvider,
@@ -16,6 +17,7 @@ export type MechanicIndex = {
   rightGridByEncounterKind: Partial<Record<EncounterKind, RightGridProvider>>
   reduceEncounterActionByEncounterKind: Partial<Record<EncounterKind, ReduceEncounterAction>>
   previewPlateByEncounterKind: Partial<Record<EncounterKind, PreviewPlateProvider>>
+  previewPlateDeltaAnchorsByEncounterKind: Partial<Record<EncounterKind, readonly PreviewPlateDeltaAnchor[]>>
   previewEncounterByEncounterKind: Partial<Record<EncounterKind, PreviewEncounterProvider>>
   poiSignpostByKind: Partial<Record<CellKind, PoiSignpostContribution>>
   mapLabelByKind: Partial<Record<CellKind, string>>
@@ -30,6 +32,7 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
   const rightGridByEncounterKind: Partial<Record<EncounterKind, RightGridProvider>> = {}
   const reduceEncounterActionByEncounterKind: Partial<Record<EncounterKind, ReduceEncounterAction>> = {}
   const previewPlateByEncounterKind: Partial<Record<EncounterKind, PreviewPlateProvider>> = {}
+  const previewPlateDeltaAnchorsByEncounterKind: Partial<Record<EncounterKind, readonly PreviewPlateDeltaAnchor[]>> = {}
   const previewEncounterByEncounterKind: Partial<Record<EncounterKind, PreviewEncounterProvider>> = {}
   const poiSignpostByKind: Partial<Record<CellKind, PoiSignpostContribution>> = {}
   const mapLabelByKind: Partial<Record<CellKind, string>> = {}
@@ -55,6 +58,9 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
       if (m.encounter.rightGrid) rightGridByEncounterKind[ek] = m.encounter.rightGrid
       if (m.encounter.reduceAction) reduceEncounterActionByEncounterKind[ek] = m.encounter.reduceAction
       if (m.encounter.previewPlate) previewPlateByEncounterKind[ek] = m.encounter.previewPlate
+      if (m.encounter.previewPlateDeltaAnchors) {
+        previewPlateDeltaAnchorsByEncounterKind[ek] = m.encounter.previewPlateDeltaAnchors
+      }
       if (m.encounter.previewEncounter) previewEncounterByEncounterKind[ek] = m.encounter.previewEncounter
     }
 
@@ -117,6 +123,7 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
     rightGridByEncounterKind,
     reduceEncounterActionByEncounterKind,
     previewPlateByEncounterKind,
+    previewPlateDeltaAnchorsByEncounterKind,
     previewEncounterByEncounterKind,
     poiSignpostByKind,
     mapLabelByKind,

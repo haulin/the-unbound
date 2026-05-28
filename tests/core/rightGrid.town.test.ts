@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { getRightGridCellDef } from '../../src/core/rightGrid'
+import { ACTION_TOGGLE_MAP } from '../../src/core/constants'
 import {
-  ACTION_TOGGLE_MAP,
   ACTION_TOWN_BUY_FOOD,
   ACTION_TOWN_BUY_TROOPS,
   ACTION_TOWN_HIRE_SCOUT,
   ACTION_TOWN_LEAVE,
-} from '../../src/core/constants'
+} from '../../src/core/mechanics/defs/town'
 import type { Cell, State, World } from '../../src/core/types'
 
 function makeWorld(): World {

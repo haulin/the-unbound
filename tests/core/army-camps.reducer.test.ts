@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
 import {
-  ACTION_CAMP_LEAVE,
-  ACTION_CAMP_SEARCH,
   ACTION_MOVE,
   ACTION_RESTART,
   CAMP_COOLDOWN_MOVES,
@@ -10,6 +8,7 @@ import {
   ENABLE_ANIMATIONS,
   INITIAL_FOOD,
 } from '../../src/core/constants'
+import { ACTION_CAMP_LEAVE, ACTION_CAMP_SEARCH } from '../../src/core/mechanics/defs/camp'
 import { gameOverMessage as expectedGameOverLine } from '../../src/core/gameOver'
 import type { DeltaAnim, State, World } from '../../src/core/types'
 

@@ -1,27 +1,19 @@
 import type {
-  ACTION_FARM_BUY_BEAST,
-  ACTION_FARM_BUY_FOOD,
-  ACTION_FARM_LEAVE,
-  ACTION_FIGHT,
-  ACTION_CAMP_LEAVE,
-  ACTION_CAMP_SEARCH,
-  ACTION_LOCKSMITH_LEAVE,
-  ACTION_LOCKSMITH_PAY_FOOD,
-  ACTION_LOCKSMITH_PAY_GOLD,
   ACTION_MOVE,
   ACTION_NEW_RUN,
-  ACTION_RETURN,
   ACTION_RESTART,
   ACTION_SHOW_GOAL,
   ACTION_TICK,
-  ACTION_TOWN_BUY_FOOD,
-  ACTION_TOWN_BUY_RUMOR,
-  ACTION_TOWN_BUY_TROOPS,
-  ACTION_TOWN_HIRE_SCOUT,
-  ACTION_TOWN_LEAVE,
   ACTION_TOGGLE_MAP,
   ACTION_TOGGLE_MINIMAP,
 } from './constants'
+import type { CampAction } from './mechanics/defs/camp'
+import type { CombatAction } from './mechanics/defs/combat'
+import type { FarmAction } from './mechanics/defs/farm'
+import type { LocksmithAction } from './mechanics/defs/locksmith'
+import type { TownAction, TownOfferKind } from './mechanics/defs/town'
+
+export type { TownOfferKind }
 
 export type Vec2 = { x: number; y: number }
 
@@ -50,11 +42,6 @@ export type HengeCell = { kind: 'henge'; id: number; name: string; nextReadyStep
 export type FishingLakeCell = { kind: 'fishingLake'; id: number; nextReadyStep: number }
 export type RainbowEndCell = { kind: 'rainbowEnd'; id: number; hasPaidOut: boolean }
 
-export type TownOfferKind =
-  | typeof ACTION_TOWN_BUY_FOOD
-  | typeof ACTION_TOWN_BUY_TROOPS
-  | typeof ACTION_TOWN_HIRE_SCOUT
-  | typeof ACTION_TOWN_BUY_RUMOR
 export type TownCell = {
   kind: 'town'
   id: number
@@ -203,6 +190,7 @@ export type GridToKind = 'overworld' | EncounterKind
 
 export type State = { world: World; player: Player; run: Run; resources: Resources; encounter: Encounter | null; ui: Ui }
 
+// Global actions + per-mechanic action unions aggregated from the defs.
 export type Action =
   | { type: typeof ACTION_NEW_RUN; seed: number }
   | { type: typeof ACTION_RESTART }
@@ -210,20 +198,10 @@ export type Action =
   | { type: typeof ACTION_TOGGLE_MINIMAP }
   | { type: typeof ACTION_TOGGLE_MAP }
   | { type: typeof ACTION_MOVE; dx: number; dy: number }
-  | { type: typeof ACTION_FIGHT }
-  | { type: typeof ACTION_RETURN }
   | { type: typeof ACTION_TICK }
-  | { type: typeof ACTION_CAMP_SEARCH }
-  | { type: typeof ACTION_CAMP_LEAVE }
-  | { type: typeof ACTION_TOWN_BUY_FOOD }
-  | { type: typeof ACTION_TOWN_BUY_TROOPS }
-  | { type: typeof ACTION_TOWN_HIRE_SCOUT }
-  | { type: typeof ACTION_TOWN_BUY_RUMOR }
-  | { type: typeof ACTION_TOWN_LEAVE }
-  | { type: typeof ACTION_FARM_BUY_FOOD }
-  | { type: typeof ACTION_FARM_BUY_BEAST }
-  | { type: typeof ACTION_FARM_LEAVE }
-  | { type: typeof ACTION_LOCKSMITH_PAY_GOLD }
-  | { type: typeof ACTION_LOCKSMITH_PAY_FOOD }
-  | { type: typeof ACTION_LOCKSMITH_LEAVE }
+  | CombatAction
+  | CampAction
+  | TownAction
+  | FarmAction
+  | LocksmithAction
 

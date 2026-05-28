@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
 import {
-  ACTION_FARM_BUY_BEAST,
-  ACTION_FARM_BUY_FOOD,
-  ACTION_FARM_LEAVE,
-  ACTION_LOCKSMITH_LEAVE,
-  ACTION_LOCKSMITH_PAY_FOOD,
-  ACTION_LOCKSMITH_PAY_GOLD,
   ACTION_MOVE,
-  ACTION_TOWN_BUY_FOOD,
   FISHING_LAKE_COOLDOWN_LINES,
   FISHING_LAKE_COOLDOWN_MOVES,
   LOCKSMITH_KEY_FOOD_COST,
@@ -16,6 +9,17 @@ import {
   RAINBOW_END_GOLD_PAYOUT,
   RAINBOW_END_SPENT_LINES,
 } from '../../src/core/constants'
+import {
+  ACTION_FARM_BUY_BEAST,
+  ACTION_FARM_BUY_FOOD,
+  ACTION_FARM_LEAVE,
+} from '../../src/core/mechanics/defs/farm'
+import {
+  ACTION_LOCKSMITH_LEAVE,
+  ACTION_LOCKSMITH_PAY_FOOD,
+  ACTION_LOCKSMITH_PAY_GOLD,
+} from '../../src/core/mechanics/defs/locksmith'
+import { ACTION_TOWN_BUY_FOOD } from '../../src/core/mechanics/defs/town'
 import type { Cell, State, TownCell, World } from '../../src/core/types'
 import { FOOD_CARRY_FULL_MESSAGE } from '../../src/core/foodCarry'
 

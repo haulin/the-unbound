@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getRightGridCellDef } from '../../src/core/rightGrid'
-import { ACTION_CAMP_LEAVE, ACTION_CAMP_SEARCH, ACTION_TOGGLE_MAP } from '../../src/core/constants'
+import { ACTION_TOGGLE_MAP } from '../../src/core/constants'
+import { ACTION_CAMP_LEAVE, ACTION_CAMP_SEARCH } from '../../src/core/mechanics/defs/camp'
 import type { State, World, Cell } from '../../src/core/types'
 
 function makeWorld(): World {

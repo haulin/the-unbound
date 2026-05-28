@@ -5,7 +5,6 @@ import {
   TERRAIN_KINDS,
   WORLD_HEIGHT,
   WORLD_WIDTH,
-  spriteIdForKind,
 } from './constants'
 import { wrapIndex } from './math'
 import { MECHANICS } from './mechanics'
@@ -83,13 +82,6 @@ function pickStart({ rngState }: { rngState: number }) {
   const x = v % WORLD_WIDTH
   const y = Math.floor(v / WORLD_WIDTH)
   return { startPosition: { x, y }, rngState: rng.rngState }
-}
-
-export function getSpriteIdAt(world: World, x: number, y: number) {
-  const tx = wrapIndex(x, world.width)
-  const ty = wrapIndex(y, world.height)
-  const cell = world.cells[ty]![tx]!
-  return spriteIdForKind(cell.kind)
 }
 
 export function generateWorld(seed: number): GeneratedWorld {

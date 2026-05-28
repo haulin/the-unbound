@@ -1,6 +1,4 @@
 import {
-  ACTION_CAMP_LEAVE,
-  ACTION_CAMP_SEARCH,
   CAMP_COOLDOWN_MOVES,
   CAMP_COUNT,
   CAMP_EMPTY_LINES,
@@ -27,6 +25,12 @@ import type {
   ReduceEncounterAction,
   TileEnterResult,
 } from '../types'
+
+export const ACTION_CAMP_SEARCH = 'CAMP_SEARCH' as const
+export const ACTION_CAMP_LEAVE = 'CAMP_LEAVE' as const
+export type CampAction =
+  | { type: typeof ACTION_CAMP_SEARCH }
+  | { type: typeof ACTION_CAMP_LEAVE }
 
 // ---- Public helpers ----
 

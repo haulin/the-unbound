@@ -511,28 +511,48 @@
   var ACTION_SHOW_GOAL = "SHOW_GOAL";
   var ACTION_TOGGLE_MINIMAP = "TOGGLE_MINIMAP";
   var ACTION_TOGGLE_MAP = "TOGGLE_MAP";
-  var ACTION_FIGHT = "FIGHT";
-  var ACTION_RETURN = "RETURN";
   var ACTION_TICK = "TICK";
-  var ACTION_CAMP_SEARCH = "CAMP_SEARCH";
-  var ACTION_CAMP_LEAVE = "CAMP_LEAVE";
-  var ACTION_TOWN_BUY_FOOD = "buyFood";
-  var ACTION_TOWN_BUY_TROOPS = "buyTroops";
-  var ACTION_TOWN_HIRE_SCOUT = "hireScout";
-  var ACTION_TOWN_BUY_RUMOR = "buyRumors";
-  var ACTION_TOWN_LEAVE = "TOWN_LEAVE";
-  var ACTION_FARM_BUY_FOOD = "FARM_BUY_FOOD";
-  var ACTION_FARM_BUY_BEAST = "FARM_BUY_BEAST";
-  var ACTION_FARM_LEAVE = "FARM_LEAVE";
-  var ACTION_LOCKSMITH_PAY_GOLD = "LOCKSMITH_PAY_GOLD";
-  var ACTION_LOCKSMITH_PAY_FOOD = "LOCKSMITH_PAY_FOOD";
-  var ACTION_LOCKSMITH_LEAVE = "LOCKSMITH_LEAVE";
   var MOVE_SLIDE_FRAMES = 15;
   var LORE_MAX_CHARS_PER_LINE = 19;
+
+  // src/core/math.ts
+  function wrapIndex(i, size) {
+    const r = i % size;
+    return r < 0 ? r + size : r;
+  }
+  function torusDelta(from, to, size) {
+    const raw = to - from;
+    const a = raw;
+    const b = raw - size;
+    const c = raw + size;
+    let best = a;
+    for (const cand of [b, c]) {
+      if (Math.abs(cand) < Math.abs(best)) best = cand;
+      else if (Math.abs(cand) === Math.abs(best) && cand > best) best = cand;
+    }
+    return best;
+  }
+  function manhattan(dx, dy) {
+    return Math.abs(dx) + Math.abs(dy);
+  }
+  function dirLabel(dx, dy) {
+    let s = "";
+    if (dy < 0) s += "N";
+    else if (dy > 0) s += "S";
+    if (dx < 0) s += "W";
+    else if (dx > 0) s += "E";
+    return s;
+  }
 
   // src/core/cells.ts
   function getCellAt(world, pos) {
     return world.cells[pos.y][pos.x];
+  }
+  function getSpriteIdAt(world, x, y) {
+    const tx = wrapIndex(x, world.width);
+    const ty = wrapIndex(y, world.height);
+    const cell = world.cells[ty][tx];
+    return spriteIdForKind(cell.kind);
   }
   function cellIdForPos(world, pos) {
     return pos.y * world.width + pos.x;
@@ -716,35 +736,6 @@
     return GAME_OVER_LINES[idx] ?? "";
   }
 
-  // src/core/math.ts
-  function wrapIndex(i, size) {
-    const r = i % size;
-    return r < 0 ? r + size : r;
-  }
-  function torusDelta(from, to, size) {
-    const raw = to - from;
-    const a = raw;
-    const b = raw - size;
-    const c = raw + size;
-    let best = a;
-    for (const cand of [b, c]) {
-      if (Math.abs(cand) < Math.abs(best)) best = cand;
-      else if (Math.abs(cand) === Math.abs(best) && cand > best) best = cand;
-    }
-    return best;
-  }
-  function manhattan(dx, dy) {
-    return Math.abs(dx) + Math.abs(dy);
-  }
-  function dirLabel(dx, dy) {
-    let s = "";
-    if (dy < 0) s += "N";
-    else if (dy > 0) s += "S";
-    if (dx < 0) s += "W";
-    else if (dx > 0) s += "E";
-    return s;
-  }
-
   // src/core/mechanics/registry.ts
   function buildMechanicIndex(mechanics) {
     const seenIds = /* @__PURE__ */ new Set();
@@ -753,6 +744,7 @@
     const rightGridByEncounterKind2 = {};
     const reduceEncounterActionByEncounterKind2 = {};
     const previewPlateByEncounterKind = {};
+    const previewPlateDeltaAnchorsByEncounterKind = {};
     const previewEncounterByEncounterKind = {};
     const poiSignpostByKind = {};
     const mapLabelByKind = {};
@@ -774,6 +766,9 @@
         if (m.encounter.rightGrid) rightGridByEncounterKind2[ek] = m.encounter.rightGrid;
         if (m.encounter.reduceAction) reduceEncounterActionByEncounterKind2[ek] = m.encounter.reduceAction;
         if (m.encounter.previewPlate) previewPlateByEncounterKind[ek] = m.encounter.previewPlate;
+        if (m.encounter.previewPlateDeltaAnchors) {
+          previewPlateDeltaAnchorsByEncounterKind[ek] = m.encounter.previewPlateDeltaAnchors;
+        }
         if (m.encounter.previewEncounter) previewEncounterByEncounterKind[ek] = m.encounter.previewEncounter;
       }
       const costByKind = m.enterFoodCostByKind;
@@ -826,6 +821,7 @@
       rightGridByEncounterKind: rightGridByEncounterKind2,
       reduceEncounterActionByEncounterKind: reduceEncounterActionByEncounterKind2,
       previewPlateByEncounterKind,
+      previewPlateDeltaAnchorsByEncounterKind,
       previewEncounterByEncounterKind,
       poiSignpostByKind,
       mapLabelByKind,
@@ -1030,6 +1026,9 @@ ${line}` } };
   }
 
   // src/core/mechanics/defs/locksmith.ts
+  var ACTION_LOCKSMITH_PAY_GOLD = "LOCKSMITH_PAY_GOLD";
+  var ACTION_LOCKSMITH_PAY_FOOD = "LOCKSMITH_PAY_FOOD";
+  var ACTION_LOCKSMITH_LEAVE = "LOCKSMITH_LEAVE";
   var onEnterLocksmith = ({ cell, world, pos, stepCount, resources }) => {
     if (cell.kind !== "locksmith") return {};
     const r = RNG.createTileRandom({ world, stepCount, pos });
@@ -1216,6 +1215,9 @@ ${dir}, ${chosen.d} leagues away.`;
   }
 
   // src/core/mechanics/defs/farm.ts
+  var ACTION_FARM_BUY_FOOD = "FARM_BUY_FOOD";
+  var ACTION_FARM_BUY_BEAST = "FARM_BUY_BEAST";
+  var ACTION_FARM_LEAVE = "FARM_LEAVE";
   function farmPrefix(farm) {
     const name = farm.name || "A Farm";
     return `${name} Farm`;
@@ -1339,6 +1341,8 @@ ${rnd.perMoveLine(MULE_BUY_LINES, { cellId: farm.id })}`,
   };
 
   // src/core/mechanics/defs/camp.ts
+  var ACTION_CAMP_SEARCH = "CAMP_SEARCH";
+  var ACTION_CAMP_LEAVE = "CAMP_LEAVE";
   function computeCampArmyGain(args) {
     return RNG.keyedIntInRange({ seed: args.seed, stepCount: args.stepCount, cellId: args.campId }, 1, 2);
   }
@@ -1464,6 +1468,8 @@ ${line}`,
   }
 
   // src/core/mechanics/defs/combat.ts
+  var ACTION_FIGHT = "FIGHT";
+  var ACTION_RETURN = "RETURN";
   function spawnEnemyArmy(opts) {
     const playerArmy = Math.max(0, Math.trunc(opts.playerArmy));
     const r = RNG.createStreamRandom(opts.rngState);
@@ -1632,6 +1638,9 @@ ${line}`,
       rightGrid: combatRightGrid,
       reduceAction: reduceCombatAction,
       previewPlate: combatPreviewPlate,
+      // Enemy-army delta popups land on the plate's enemy line. Negative deltas
+      // (enemy losing troops) are "good" for the player → green.
+      previewPlateDeltaAnchors: [{ target: "enemyArmy", lineIndex: 0, goodSign: -1 }],
       previewEncounter: () => ({
         kind: "combat",
         enemyArmySize: 0,
@@ -1703,6 +1712,11 @@ ${r.perMoveLine(HENGE_LORE_LINES, { cellId: hengeCell.id })}`;
   };
 
   // src/core/mechanics/defs/town.ts
+  var ACTION_TOWN_BUY_FOOD = "buyFood";
+  var ACTION_TOWN_BUY_TROOPS = "buyTroops";
+  var ACTION_TOWN_HIRE_SCOUT = "hireScout";
+  var ACTION_TOWN_BUY_RUMOR = "buyRumors";
+  var ACTION_TOWN_LEAVE = "TOWN_LEAVE";
   function townPrefix(town) {
     const name = town.name || "A Town";
     return `${name} Town`;
@@ -2168,12 +2182,6 @@ ${pick.line}`,
     const y = Math.floor(v / WORLD_WIDTH);
     return { startPosition: { x, y }, rngState: rng.rngState };
   }
-  function getSpriteIdAt(world, x, y) {
-    const tx = wrapIndex(x, world.width);
-    const ty = wrapIndex(y, world.height);
-    const cell = world.cells[ty][tx];
-    return spriteIdForKind(cell.kind);
-  }
   function generateWorld(seed) {
     let rngState = RNG.createStreamRandomFromSeed(seed).rngState;
     const base = generateBaseTerrainCells(rngState);
@@ -2208,6 +2216,85 @@ ${pick.line}`,
   var LEFT_PANEL_KIND_SPRITE = "sprite";
   var LEFT_PANEL_KIND_MINIMAP = "minimap";
   var LEFT_PANEL_KIND_MAP = "map";
+
+  // src/core/gameMap.ts
+  function updateRunPathMemoryAfterMove(args) {
+    const prevPath = args.prevPath ?? [];
+    let path = prevPath.concat([{ pos: args.nextPos, isMapped: false }]);
+    let lostBufferStartIndex = args.prevLostBufferStartIndex ?? null;
+    if (args.teleported) {
+      lostBufferStartIndex = path.length - 1;
+    }
+    if (!args.nextKnowsPosition && lostBufferStartIndex == null) {
+      lostBufferStartIndex = path.length - 1;
+    }
+    if (args.nextKnowsPosition) {
+      if (lostBufferStartIndex != null) {
+        const start = Math.max(0, Math.min(lostBufferStartIndex, path.length - 1));
+        const mapped = path.slice();
+        for (let i = start; i < mapped.length; i++) {
+          const step = mapped[i];
+          if (step.isMapped) continue;
+          mapped[i] = { pos: step.pos, isMapped: true };
+        }
+        path = mapped;
+        lostBufferStartIndex = null;
+      } else {
+        const idx = path.length - 1;
+        const step = path[idx];
+        if (!step.isMapped) {
+          const mapped = path.slice();
+          mapped[idx] = { pos: step.pos, isMapped: true };
+          path = mapped;
+        }
+      }
+    }
+    return { path, lostBufferStartIndex };
+  }
+  function computeGameMapView(s) {
+    const { mapLabelByKind } = MECHANIC_INDEX;
+    const showPlayer = !!s.run.knowsPosition;
+    const markers = [];
+    const seen = /* @__PURE__ */ new Set();
+    function push(pos, label, isMapped) {
+      const k = `${label}@${pos.x},${pos.y}`;
+      if (seen.has(k)) return;
+      seen.add(k);
+      markers.push({ pos, label, isMapped });
+    }
+    const candidates = [];
+    const path = s.run.path ?? [];
+    if (s.run.knowsPosition) {
+      if (s.resources.hasScout) {
+        for (let y = 0; y < s.world.height; y++) {
+          for (let x = 0; x < s.world.width; x++) {
+            const kind = s.world.cells[y][x].kind;
+            if (!SCOUT_GLOBAL_REVEAL_KINDS.includes(kind)) continue;
+            candidates.push({ pos: { x, y }, isMapped: true });
+          }
+        }
+      }
+      for (let i = 0; i < path.length; i++) {
+        const step = path[i];
+        if (!step.isMapped) continue;
+        candidates.push({ pos: step.pos, isMapped: true });
+      }
+    } else {
+      const start = s.run.lostBufferStartIndex ?? path.length;
+      for (let i = Math.max(0, start); i < path.length; i++) {
+        const step = path[i];
+        candidates.push({ pos: step.pos, isMapped: step.isMapped });
+      }
+    }
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i];
+      const kind = s.world.cells[c.pos.y][c.pos.x].kind;
+      const label = mapLabelByKind[kind];
+      if (!label) continue;
+      push(c.pos, label, c.isMapped);
+    }
+    return { markers, showPlayer };
+  }
 
   // src/core/reducer.ts
   var { onEnterTileByKind } = MECHANIC_INDEX;
@@ -2433,39 +2520,6 @@ ${pick.line}`,
     }
     return { ...baseState, ui: uiWith };
   }
-  function updateRunPathMemoryAfterMove(args) {
-    const prevPath = args.prevPath ?? [];
-    let path = prevPath.concat([{ pos: args.nextPos, isMapped: false }]);
-    let lostBufferStartIndex = args.prevLostBufferStartIndex ?? null;
-    if (args.teleported) {
-      lostBufferStartIndex = path.length - 1;
-    }
-    if (!args.nextKnowsPosition && lostBufferStartIndex == null) {
-      lostBufferStartIndex = path.length - 1;
-    }
-    if (args.nextKnowsPosition) {
-      if (lostBufferStartIndex != null) {
-        const start = Math.max(0, Math.min(lostBufferStartIndex, path.length - 1));
-        const mapped = path.slice();
-        for (let i = start; i < mapped.length; i++) {
-          const step = mapped[i];
-          if (step.isMapped) continue;
-          mapped[i] = { pos: step.pos, isMapped: true };
-        }
-        path = mapped;
-        lostBufferStartIndex = null;
-      } else {
-        const idx = path.length - 1;
-        const step = path[idx];
-        if (!step.isMapped) {
-          const mapped = path.slice();
-          mapped[idx] = { pos: step.pos, isMapped: true };
-          path = mapped;
-        }
-      }
-    }
-    return { path, lostBufferStartIndex };
-  }
   function reduceRestart(s) {
     const next = processAction(null, { type: ACTION_NEW_RUN, seed: s.world.seed + 1 });
     return next || s;
@@ -2605,52 +2659,6 @@ ${pick.line}`,
     const def = getRightGridCellDef(state2, row, col);
     const a = def.action;
     return a || null;
-  }
-
-  // src/core/gameMap.ts
-  function computeGameMapView(s) {
-    const { mapLabelByKind } = MECHANIC_INDEX;
-    const showPlayer = !!s.run.knowsPosition;
-    const markers = [];
-    const seen = /* @__PURE__ */ new Set();
-    function push(pos, label, isMapped) {
-      const k = `${label}@${pos.x},${pos.y}`;
-      if (seen.has(k)) return;
-      seen.add(k);
-      markers.push({ pos, label, isMapped });
-    }
-    const candidates = [];
-    const path = s.run.path ?? [];
-    if (s.run.knowsPosition) {
-      if (s.resources.hasScout) {
-        for (let y = 0; y < s.world.height; y++) {
-          for (let x = 0; x < s.world.width; x++) {
-            const kind = s.world.cells[y][x].kind;
-            if (!SCOUT_GLOBAL_REVEAL_KINDS.includes(kind)) continue;
-            candidates.push({ pos: { x, y }, isMapped: true });
-          }
-        }
-      }
-      for (let i = 0; i < path.length; i++) {
-        const step = path[i];
-        if (!step.isMapped) continue;
-        candidates.push({ pos: step.pos, isMapped: true });
-      }
-    } else {
-      const start = s.run.lostBufferStartIndex ?? path.length;
-      for (let i = Math.max(0, start); i < path.length; i++) {
-        const step = path[i];
-        candidates.push({ pos: step.pos, isMapped: step.isMapped });
-      }
-    }
-    for (let i = 0; i < candidates.length; i++) {
-      const c = candidates[i];
-      const kind = s.world.cells[c.pos.y][c.pos.x].kind;
-      const label = mapLabelByKind[kind];
-      if (!label) continue;
-      push(c.pos, label, c.isMapped);
-    }
-    return { markers, showPlayer };
   }
 
   // src/platform/tic80/uiConstants.ts
@@ -3063,6 +3071,19 @@ ${pick.line}`,
     }
     return { firstIconX, firstIconY };
   }
+  function plateAnchorsFromSpecs(specs, geom) {
+    const anchors = {};
+    for (let i = 0; i < specs.length; i++) {
+      const spec = specs[i];
+      const anchor = {
+        x: geom.firstIconX,
+        y: geom.firstIconY + spec.lineIndex * 16
+      };
+      if (spec.goodSign != null) anchor.goodSign = spec.goodSign;
+      anchors[spec.target] = anchor;
+    }
+    return anchors;
+  }
   function drawDeltaOverlays(s, anchors) {
     if (!ENABLE_ANIMATIONS) return;
     const anims = s.ui.anim.active;
@@ -3146,8 +3167,9 @@ ${pick.line}`,
         const lines = provider?.(s) ?? null;
         if (lines && lines.length) {
           const geom = drawPreviewPlateChrome(lines, illX, illY, illSize);
-          if (encounterKind === "combat") {
-            drawDeltaOverlays(s, { enemyArmy: { x: geom.firstIconX, y: geom.firstIconY, goodSign: -1 } });
+          const anchorSpecs = MECHANIC_INDEX.previewPlateDeltaAnchorsByEncounterKind[encounterKind];
+          if (anchorSpecs && anchorSpecs.length) {
+            drawDeltaOverlays(s, plateAnchorsFromSpecs(anchorSpecs, geom));
           }
         }
       }

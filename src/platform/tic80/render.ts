@@ -6,9 +6,9 @@ import {
 } from '../../core/constants'
 import { SPRITES } from '../../core/spriteIds'
 import { MECHANIC_INDEX } from '../../core/mechanics'
-import type { PreviewPlateLine } from '../../core/mechanics/types'
+import type { PreviewPlateLine, PreviewPlateDeltaAnchor } from '../../core/mechanics/types'
 import { computeGameMapView } from '../../core/gameMap'
-import { getSpriteIdAt } from '../../core/world'
+import { getSpriteIdAt } from '../../core/cells'
 import { torusDelta } from '../../core/math'
 import {
   LEFT_PANEL_KIND_MAP,
@@ -150,6 +150,26 @@ type DeltaAnchor = {
   goodSign?: 1 | -1
 }
 
+// Resolve mechanic-supplied plate anchor specs (lineIndex + goodSign) to
+// pixel-space anchors using the plate geometry returned by
+// `drawPreviewPlateChrome`. Mechanics never deal in pixels.
+function plateAnchorsFromSpecs(
+  specs: readonly PreviewPlateDeltaAnchor[],
+  geom: PlateGeometry,
+): Partial<Record<DeltaAnimTarget, DeltaAnchor>> {
+  const anchors: Partial<Record<DeltaAnimTarget, DeltaAnchor>> = {}
+  for (let i = 0; i < specs.length; i++) {
+    const spec = specs[i]!
+    const anchor: DeltaAnchor = {
+      x: geom.firstIconX,
+      y: geom.firstIconY + spec.lineIndex * 16,
+    }
+    if (spec.goodSign != null) anchor.goodSign = spec.goodSign
+    anchors[spec.target] = anchor
+  }
+  return anchors
+}
+
 // Animated +/- delta overlays. One shared pass for every delta animation —
 // callers wire up which targets to draw and where each one anchors.
 function drawDeltaOverlays(s: State, anchors: Partial<Record<DeltaAnimTarget, DeltaAnchor>>) {
@@ -255,8 +275,9 @@ function drawLeftPanel(s: State) {
       const lines = provider?.(s) ?? null
       if (lines && lines.length) {
         const geom = drawPreviewPlateChrome(lines, illX, illY, illSize)
-        if (encounterKind === 'combat') {
-          drawDeltaOverlays(s, { enemyArmy: { x: geom.firstIconX, y: geom.firstIconY, goodSign: -1 } })
+        const anchorSpecs = MECHANIC_INDEX.previewPlateDeltaAnchorsByEncounterKind[encounterKind]
+        if (anchorSpecs && anchorSpecs.length) {
+          drawDeltaOverlays(s, plateAnchorsFromSpecs(anchorSpecs, geom))
         }
       }
     }

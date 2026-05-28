@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
-import {
-  ACTION_FARM_LEAVE,
-  ACTION_MOVE,
-  INITIAL_FOOD,
-} from '../../src/core/constants'
+import { ACTION_MOVE, INITIAL_FOOD } from '../../src/core/constants'
+import { ACTION_FARM_LEAVE } from '../../src/core/mechanics/defs/farm'
 import { foodCarryCap } from '../../src/core/foodCarry'
 import type { State, World } from '../../src/core/types'
 

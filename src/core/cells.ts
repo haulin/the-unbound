@@ -1,7 +1,19 @@
+import { spriteIdForKind } from './constants'
+import { wrapIndex } from './math'
 import type { Cell, CellGrid, CellKind, Vec2, World } from './types'
 
 export function getCellAt(world: World, pos: Vec2): Cell {
   return world.cells[pos.y]![pos.x]!
+}
+
+// Wrap-aware sprite lookup for arbitrary (x, y). Renderers and right-grid
+// previews use this with offsets that can fall outside the world bounds; the
+// torus wrap keeps them on the map.
+export function getSpriteIdAt(world: World, x: number, y: number): number {
+  const tx = wrapIndex(x, world.width)
+  const ty = wrapIndex(y, world.height)
+  const cell = world.cells[ty]![tx]!
+  return spriteIdForKind(cell.kind)
 }
 
 export function cellIdForPos(world: { width: number }, pos: Vec2): number {

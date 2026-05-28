@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
 import {
-  ACTION_LOCKSMITH_LEAVE,
-  ACTION_LOCKSMITH_PAY_FOOD,
   ACTION_MOVE,
   ACTION_NEW_RUN,
   GOAL_NARRATIVE,
   INITIAL_FOOD,
 } from '../../src/core/constants'
+import { ACTION_LOCKSMITH_LEAVE, ACTION_LOCKSMITH_PAY_FOOD } from '../../src/core/mechanics/defs/locksmith'
 import type { State, World } from '../../src/core/types'
 
 function newRun(seed = 1): State {

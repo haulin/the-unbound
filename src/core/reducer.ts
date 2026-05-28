@@ -34,11 +34,10 @@ import {
   type State,
   type Ui,
   type Cell,
-  type RunPathStep,
-  type Vec2,
 } from './types'
 import { enqueueAnim, enqueueDeltas, enqueueGridTransition } from './uiAnim'
 import { resourcesWithClampedFoodIfNeeded } from './foodCarry'
+import { updateRunPathMemoryAfterMove } from './gameMap'
 
 const { onEnterTileByKind } = MECHANIC_INDEX
 const { enterFoodCostByKind } = MECHANIC_INDEX
@@ -316,50 +315,6 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
   }
 
   return { ...baseState, ui: uiWith }
-}
-
-function updateRunPathMemoryAfterMove(args: {
-  prevPath: RunPathStep[] | null | undefined
-  prevLostBufferStartIndex: number | null | undefined
-  nextPos: Vec2
-  nextKnowsPosition: boolean
-  teleported: boolean
-}): { path: RunPathStep[]; lostBufferStartIndex: number | null } {
-  const prevPath = args.prevPath ?? []
-  let path = prevPath.concat([{ pos: args.nextPos, isMapped: false }])
-  let lostBufferStartIndex = args.prevLostBufferStartIndex ?? null
-
-  if (args.teleported) {
-    lostBufferStartIndex = path.length - 1
-  }
-
-  if (!args.nextKnowsPosition && lostBufferStartIndex == null) {
-    lostBufferStartIndex = path.length - 1
-  }
-
-  if (args.nextKnowsPosition) {
-    if (lostBufferStartIndex != null) {
-      const start = Math.max(0, Math.min(lostBufferStartIndex, path.length - 1))
-      const mapped = path.slice()
-      for (let i = start; i < mapped.length; i++) {
-        const step = mapped[i]!
-        if (step.isMapped) continue
-        mapped[i] = { pos: step.pos, isMapped: true }
-      }
-      path = mapped
-      lostBufferStartIndex = null
-    } else {
-      const idx = path.length - 1
-      const step = path[idx]!
-      if (!step.isMapped) {
-        const mapped = path.slice()
-        mapped[idx] = { pos: step.pos, isMapped: true }
-        path = mapped
-      }
-    }
-  }
-
-  return { path, lostBufferStartIndex }
 }
 
 function reduceRestart(s: State): State {

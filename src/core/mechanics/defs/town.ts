@@ -1,9 +1,4 @@
 import {
-  ACTION_TOWN_BUY_FOOD,
-  ACTION_TOWN_BUY_RUMOR,
-  ACTION_TOWN_BUY_TROOPS,
-  ACTION_TOWN_HIRE_SCOUT,
-  ACTION_TOWN_LEAVE,
   BARKEEP_TIPS,
   TOWN_BUY_LINES,
   TOWN_COUNT,
@@ -26,7 +21,7 @@ import { cellIdForPos, getCellAt } from '../../cells'
 import { foodCarryCap, FOOD_CARRY_FULL_MESSAGE, resourcesWithClampedFoodIfNeeded } from '../../foodCarry'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
-import type { Cell, State, TownCell, TownEncounter, TownOfferKind } from '../../types'
+import type { Cell, State, TownCell, TownEncounter } from '../../types'
 import {
   applyDeltas,
   buy,
@@ -44,6 +39,24 @@ import type {
   ReduceEncounterAction,
   TileEnterResult,
 } from '../types'
+
+export const ACTION_TOWN_BUY_FOOD = 'buyFood' as const
+export const ACTION_TOWN_BUY_TROOPS = 'buyTroops' as const
+export const ACTION_TOWN_HIRE_SCOUT = 'hireScout' as const
+export const ACTION_TOWN_BUY_RUMOR = 'buyRumors' as const
+export const ACTION_TOWN_LEAVE = 'TOWN_LEAVE' as const
+
+// `TownOfferKind` lists the four base offers (a town never sells "leave");
+// it's what `TownCell.offers` carries and what the right-grid maps to button
+// sprites. Defined here so a future "add an offer" change is local.
+export type TownOfferKind =
+  | typeof ACTION_TOWN_BUY_FOOD
+  | typeof ACTION_TOWN_BUY_TROOPS
+  | typeof ACTION_TOWN_HIRE_SCOUT
+  | typeof ACTION_TOWN_BUY_RUMOR
+export type TownAction =
+  | { type: TownOfferKind }
+  | { type: typeof ACTION_TOWN_LEAVE }
 
 function townPrefix(town: TownCell): string {
   const name = town.name || 'A Town'

@@ -1,6 +1,4 @@
 import {
-  ACTION_FIGHT,
-  ACTION_RETURN,
   COMBAT_FLEE_EXIT_LINES,
   COMBAT_FOOD_BONUS_MAX,
   COMBAT_GOLD_REWARD_MAX,
@@ -22,6 +20,12 @@ import type {
   RightGridProvider,
   TileEnterResult,
 } from '../types'
+
+export const ACTION_FIGHT = 'FIGHT' as const
+export const ACTION_RETURN = 'RETURN' as const
+export type CombatAction =
+  | { type: typeof ACTION_FIGHT }
+  | { type: typeof ACTION_RETURN }
 
 // ---- Pure combat math -------------------------------------------------------------
 
@@ -251,6 +255,9 @@ export const combatMechanic: MechanicDef = {
     rightGrid: combatRightGrid,
     reduceAction: reduceCombatAction,
     previewPlate: combatPreviewPlate,
+    // Enemy-army delta popups land on the plate's enemy line. Negative deltas
+    // (enemy losing troops) are "good" for the player → green.
+    previewPlateDeltaAnchors: [{ target: 'enemyArmy', lineIndex: 0, goodSign: -1 }],
     previewEncounter: (): CombatEncounter => ({
       kind: 'combat',
       enemyArmySize: 0,

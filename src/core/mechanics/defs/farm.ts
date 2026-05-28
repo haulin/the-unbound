@@ -1,7 +1,4 @@
 import {
-  ACTION_FARM_BUY_BEAST,
-  ACTION_FARM_BUY_FOOD,
-  ACTION_FARM_LEAVE,
   FARM_BEAST_GOLD_MAX,
   FARM_BEAST_GOLD_MIN,
   FARM_BUY_FOOD_AMOUNT,
@@ -37,6 +34,14 @@ import type {
   ReduceEncounterAction,
   TileEnterResult,
 } from '../types'
+
+export const ACTION_FARM_BUY_FOOD = 'FARM_BUY_FOOD' as const
+export const ACTION_FARM_BUY_BEAST = 'FARM_BUY_BEAST' as const
+export const ACTION_FARM_LEAVE = 'FARM_LEAVE' as const
+export type FarmAction =
+  | { type: typeof ACTION_FARM_BUY_FOOD }
+  | { type: typeof ACTION_FARM_BUY_BEAST }
+  | { type: typeof ACTION_FARM_LEAVE }
 
 function farmPrefix(farm: FarmCell): string {
   const name = farm.name || 'A Farm'

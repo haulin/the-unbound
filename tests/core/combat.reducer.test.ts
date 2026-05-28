@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
 import {
-  ACTION_FIGHT,
   ACTION_MOVE,
-  ACTION_RETURN,
   COMBAT_ENCOUNTER_LINES,
   COMBAT_FOOD_BONUS_MAX,
   COMBAT_GOLD_REWARD_MAX,
@@ -14,7 +12,7 @@ import {
   INITIAL_GOLD,
   WOODS_AMBUSH_PERCENT,
 } from '../../src/core/constants'
-import { spawnEnemyArmy } from '../../src/core/mechanics/defs/combat'
+import { ACTION_FIGHT, ACTION_RETURN, spawnEnemyArmy } from '../../src/core/mechanics/defs/combat'
 import { RNG } from '../../src/core/rng'
 import { foodCarryCap } from '../../src/core/foodCarry'
 import type { DeltaAnim, State, World } from '../../src/core/types'

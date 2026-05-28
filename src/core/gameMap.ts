@@ -1,8 +1,69 @@
 import { SCOUT_GLOBAL_REVEAL_KINDS } from './constants'
 import { MECHANIC_INDEX } from './mechanics'
-import type { State, Vec2 } from './types'
+import type { RunPathStep, State, Vec2 } from './types'
 
 export type GameMapMarker = { pos: Vec2; label: string; isMapped: boolean }
+
+// Updates the run-path "memory" after a move. The path is an append-only log
+// of visited cells; each step also carries an `isMapped` bit that flips to
+// true once the player has *committed* knowledge of that step's position (i.e.
+// they are no longer lost about it).
+//
+// Three semantics layered here:
+//   1. A move always appends the new position, initially unmapped.
+//   2. While lost (knowsPosition === false), we mark a buffer of "unmapped
+//      tail" — these steps' positions are tentative and shouldn't be committed
+//      to the map yet.
+//   3. When the player relocates (knowsPosition becomes true), the entire
+//      lost-buffer tail is committed retroactively. Outside a lost-buffer, a
+//      regular known-position move just marks the new step.
+//
+// Teleports always *start* a new lost buffer at the landing position — the
+// player loses orientation at the destination regardless of whether they knew
+// where they were before.
+export function updateRunPathMemoryAfterMove(args: {
+  prevPath: RunPathStep[] | null | undefined
+  prevLostBufferStartIndex: number | null | undefined
+  nextPos: Vec2
+  nextKnowsPosition: boolean
+  teleported: boolean
+}): { path: RunPathStep[]; lostBufferStartIndex: number | null } {
+  const prevPath = args.prevPath ?? []
+  let path = prevPath.concat([{ pos: args.nextPos, isMapped: false }])
+  let lostBufferStartIndex = args.prevLostBufferStartIndex ?? null
+
+  if (args.teleported) {
+    lostBufferStartIndex = path.length - 1
+  }
+
+  if (!args.nextKnowsPosition && lostBufferStartIndex == null) {
+    lostBufferStartIndex = path.length - 1
+  }
+
+  if (args.nextKnowsPosition) {
+    if (lostBufferStartIndex != null) {
+      const start = Math.max(0, Math.min(lostBufferStartIndex, path.length - 1))
+      const mapped = path.slice()
+      for (let i = start; i < mapped.length; i++) {
+        const step = mapped[i]!
+        if (step.isMapped) continue
+        mapped[i] = { pos: step.pos, isMapped: true }
+      }
+      path = mapped
+      lostBufferStartIndex = null
+    } else {
+      const idx = path.length - 1
+      const step = path[idx]!
+      if (!step.isMapped) {
+        const mapped = path.slice()
+        mapped[idx] = { pos: step.pos, isMapped: true }
+        path = mapped
+      }
+    }
+  }
+
+  return { path, lostBufferStartIndex }
+}
 
 
 export function computeGameMapView(s: State): { markers: GameMapMarker[]; showPlayer: boolean } {

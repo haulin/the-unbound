@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
-import { ACTION_MOVE, ACTION_TOWN_LEAVE, ENABLE_ANIMATIONS, MOVE_SLIDE_FRAMES } from '../../src/core/constants'
+import { ACTION_MOVE, ENABLE_ANIMATIONS, MOVE_SLIDE_FRAMES } from '../../src/core/constants'
+import { ACTION_TOWN_LEAVE } from '../../src/core/mechanics/defs/town'
 import type { Cell, GridTransitionAnim, State, World } from '../../src/core/types'
 
 function grass(): Cell {

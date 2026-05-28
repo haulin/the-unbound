@@ -4,7 +4,7 @@ import {
 } from '../../core/constants'
 import { MECHANIC_INDEX } from '../../core/mechanics'
 import { getRightGridCellDef } from '../../core/rightGrid'
-import { getSpriteIdAt } from '../../core/world'
+import { getSpriteIdAt } from '../../core/cells'
 import type { GridFromKind, GridTransitionAnim, MoveSlideAnim, State } from '../../core/types'
 import { SPRITES } from '../../core/spriteIds'
 import * as Layout from './layout'

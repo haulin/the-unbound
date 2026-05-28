@@ -3,10 +3,12 @@ import {
   ACTION_FARM_BUY_BEAST,
   ACTION_FARM_BUY_FOOD,
   ACTION_FARM_LEAVE,
+} from '../../src/core/mechanics/defs/farm'
+import {
   ACTION_LOCKSMITH_LEAVE,
   ACTION_LOCKSMITH_PAY_FOOD,
   ACTION_LOCKSMITH_PAY_GOLD,
-} from '../../src/core/constants'
+} from '../../src/core/mechanics/defs/locksmith'
 import type { Action, Cell, Encounter } from '../../src/core/types'
 
 describe('v0.4 types smoke', () => {

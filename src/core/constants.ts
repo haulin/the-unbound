@@ -177,31 +177,14 @@ export const GRID_TRANSITION_STEP_FRAMES = 5
 
 export const HENGE_COOLDOWN_MOVES = 3
 
+// Global actions (per-mechanic actions live on the mechanic defs).
 export const ACTION_NEW_RUN = 'NEW_RUN' as const
 export const ACTION_RESTART = 'RESTART' as const
 export const ACTION_MOVE = 'MOVE' as const
 export const ACTION_SHOW_GOAL = 'SHOW_GOAL' as const
 export const ACTION_TOGGLE_MINIMAP = 'TOGGLE_MINIMAP' as const
 export const ACTION_TOGGLE_MAP = 'TOGGLE_MAP' as const
-export const ACTION_FIGHT = 'FIGHT' as const
-export const ACTION_RETURN = 'RETURN' as const
 export const ACTION_TICK = 'TICK' as const
-export const ACTION_CAMP_SEARCH = 'CAMP_SEARCH' as const
-export const ACTION_CAMP_LEAVE = 'CAMP_LEAVE' as const
-
-export const ACTION_TOWN_BUY_FOOD = 'buyFood' as const
-export const ACTION_TOWN_BUY_TROOPS = 'buyTroops' as const
-export const ACTION_TOWN_HIRE_SCOUT = 'hireScout' as const
-export const ACTION_TOWN_BUY_RUMOR = 'buyRumors' as const
-export const ACTION_TOWN_LEAVE = 'TOWN_LEAVE' as const
-
-export const ACTION_FARM_BUY_FOOD = 'FARM_BUY_FOOD' as const
-export const ACTION_FARM_BUY_BEAST = 'FARM_BUY_BEAST' as const
-export const ACTION_FARM_LEAVE = 'FARM_LEAVE' as const
-
-export const ACTION_LOCKSMITH_PAY_GOLD = 'LOCKSMITH_PAY_GOLD' as const
-export const ACTION_LOCKSMITH_PAY_FOOD = 'LOCKSMITH_PAY_FOOD' as const
-export const ACTION_LOCKSMITH_LEAVE = 'LOCKSMITH_LEAVE' as const
 
 export const MOVE_SLIDE_FRAMES = 15
 export const LORE_MAX_CHARS_PER_LINE = 19

@@ -3,6 +3,7 @@ import type {
   Cell,
   CellGrid,
   CellKind,
+  DeltaAnimTarget,
   Encounter,
   EncounterKind,
   GridFromKind,
@@ -91,6 +92,19 @@ export type PlaceWorldProvider = (args: { cells: CellGrid; rngState: number }) =
 export type PreviewPlateLine = { spriteId: number; text: string }
 export type PreviewPlateProvider = (state: State) => readonly PreviewPlateLine[] | null
 
+// Anchor specs for animated +/- delta popups that should land on the preview
+// plate (rather than on the top-status icons). The renderer turns each spec
+// into pixel coordinates via its own plate geometry.
+//
+// `lineIndex` is the index into the plate lines (0 = first line). `goodSign`
+// is the sign of `delta` that counts as "good" for the player (default +1).
+// Combat passes -1 because the enemy losing troops is good for the player.
+export type PreviewPlateDeltaAnchor = {
+  target: DeltaAnimTarget
+  lineIndex: number
+  goodSign?: 1 | -1
+}
+
 // Placeholder encounter used by `rightGridRenderPlan` to synthesize "what the
 // cross would look like with this encounter open" for grid transitions. Never
 // reduced over — only fed to the right-grid sprite resolver.
@@ -105,6 +119,7 @@ export type MechanicEncounter = {
   reduceAction?: ReduceEncounterAction
   rightGrid?: RightGridProvider
   previewPlate?: PreviewPlateProvider
+  previewPlateDeltaAnchors?: readonly PreviewPlateDeltaAnchor[]
   previewEncounter?: PreviewEncounterProvider
 }
 
