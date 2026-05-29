@@ -1,6 +1,56 @@
-# The Unbound — coding guide
+# The Unbound — design & coding guide
 
-This is a short guide for writing maintainable code in this repo. It prioritizes **durable principles** over “what we changed in v0.x”. Deep dives belong in design/plan docs; keep this file lean enough to be safe default context.
+A short guide for The Unbound. The first half is *game design pillars* — gameplay, UX, and slot composition. The second half is *coding principles*. Both prioritize **durable rules** over "what we changed in v0.x". Deep dives belong in design/plan docs; keep this file lean enough to be safe default context.
+
+For *narrative* tone, see [`lore-and-tone.md`](./lore-and-tone.md). For roadmap and ideas, see [`backlog.md`](./backlog.md).
+
+## Game design pillars
+
+### Every ability is a new verb
+
+A good ability changes what is *possible*, not what is *likely*. The Scout *reveals*. The Boar *charges*. The Mule *carries* what no one else can. If an ability can only be described with a number — `+10% odds`, `revive 1`, `30% chance to refund` — it is a stat tweak. Stat tweaks are invisible during play and forgettable afterward.
+
+Balance the *roster*, not the individual ability. No single slot should fit every run; that is where balance lives. Each individual ability, taken alone, should feel like a cheat code when it clicks.
+
+The design test is not *"is this balanced?"* It is *"is there a moment in a run where having this feels unfair, in my favour?"* If the answer is no, the ability is a draft, not a design.
+
+### Four buttons in two modes
+
+The Unbound's gameplay grammar is **four buttons that mean different things depending on context**. The same hardware (T/R/B/L on a face-button cluster, or four corners of the screen) drives both modes; you are never in both at once.
+
+- **Overworld:** four directional moves — N/E/S/W.
+- **PoI modal:** four contextual choices — T/R/B/L. The modal *replaces* the overworld buttons for the duration of the encounter.
+- **Modal convention:** within any PoI modal, R is the Leave button. Good practice for muscle memory — the player never has to wonder how to back out of a brand-new PoI type.
+
+Meta-buttons that exist outside the gameplay frame — map toggle (because screen real-estate is expensive), menu / start a new game — are *not* counted in the four-button rule. They sit in their own UI lane and don't compete with gameplay grammar.
+
+New gameplay mechanics must fit this vocabulary. If a feature requires a fifth gameplay input, it requires a redesign first. Minimum-input games are deep at the *state* level, never at the *control* level.
+
+### Teach in line, never in screens
+
+No tutorial screens, no how-to-play modals, no first-launch walkthroughs. Mechanics introduce themselves via a single contextual line of flavour the first time they appear. The player learns the world by encountering it, not by reading about it.
+
+This is also the project's tonal default — see `lore-and-tone.md`'s *"Nothing is explained that can be discovered."*
+
+### Slot composition
+
+Pairing rules and the activation-flash convention for any current or future slot.
+
+- A slot's negative must bite *adjacent* to its positive — same domain, different beat. Same-resource cancellation (`+1 gold` / `-1 gold`) is forbidden because it nets to zero and gives no strategic shape.
+- Effects fire on discrete events (combat, Camp Search, Town visit, flee, ambush roll). Per-step ticks are banned — they generate UI noise and force constant attention.
+- Passive stat changes are allowed but discouraged. Where an event trigger can carry the cost, prefer it. Reinforces *"every ability is a new verb."*
+- Positive-only slots are allowed when the 1-of-3 slot opportunity cost is enough balance.
+- Aim for unique negatives across active slots. Duplicates should be reviewed.
+
+**Sprite-flash on activation.** For any slot whose effect fires at a discrete event, pulse the slot's button-strip icon for 200–400 ms. One animation primitive, shared by every event-triggered P or N. Makes the cause visible to the player.
+
+The unallocated effect pool and parked slot ideas all live in [`backlog.md`](./backlog.md) under *Slot system — deferred (post-demo)*.
+
+### Capture wide, ship narrow
+
+The backlog is intentionally promiscuous. Almost every idea — including ones we will never ship — earns a slot, on the condition that it doesn't violate the gameplay grammar (the four-button rule) or the tone register (folk-myth, no high fantasy).
+
+The reason isn't that we plan to build everything. It is that **architecture knows what's coming** (when v0.7 ships, the seams should already accommodate v0.10 and v0.13 mechanics on the same surface — wide seams now cost less than rewrites later); **idea generation is the hard part** (a half-formed idea costs nothing to capture today and costs the next brainstorm if discarded); and **adjacent ideas spark each other** (sparse backlogs go cold, dense ones generate). The filter is not *"is this likely?"* — it is *"does this break the gameplay grammar?"*
 
 ## General principles (mostly repo-agnostic)
 

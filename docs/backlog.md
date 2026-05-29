@@ -63,7 +63,7 @@ See `docs/2026-05-27-slot-system-design.md` for the full design.
 - Captain specialty added to Camp pool. P4 +10% combat odds + N7 +ambush% in woods/mountains. New 16×16 sprite (head + shoulders + flag-on-pole). New lore pool `CAPTAIN_*`.
 - Fisherman specialty added to Town pool. P8 double lake yields + N8 +1 troop loss per flee. New 16×16 sprite (rod-on-shoulder). New lore pool `FISHERMAN_*`.
 - Magpie specialty added to Farm pool. P probabilistic 30% refund on folk payments (Town food, Camp/Town hires, Locksmith fee); shows original price, gold check against original, refund visible. No demo negative; balanced by probability + higher purchase price. New 16×16 bird sprite. New lore pool `MAGPIE_*`.
-- Final slot-system audit against `docs/slot-system.md` (pairing rules, P+P slot exemptions, ledger consistency).
+- Final slot-system audit against pairing rules in `the-unbound-learnings.md` (P+P slot exemptions, ledger consistency).
 
 **v0.10 — Taverns** (demo release milestone)
 - Tavern PoI (named, standalone, one or two per map)
@@ -130,6 +130,74 @@ See `docs/2026-05-27-slot-system-design.md` for the demo roster.
 - Crossing as bi-directional bazaar (buy + sell at the same PoI).
 - Rainbow's-End variant of the terrain-restriction negative — interesting only if a slot needs a specific cost.
 
+### Effect pool (brainstorm catalog)
+
+Effects available to current or future slots. Includes both already-wired-to-demo-slots (kept here for swap inspiration; canonical truth lives in slot defs) and unallocated. Grouped by domain. Composition rules live in `the-unbound-learnings.md` under *Slot composition*.
+
+**Positive — Food / inventory**
+- +50 food carry cap
+- Double lake yields
+- Biome finder: chance of +1 food per visited tile of a specific biome
+- Free food on flee
+- First aid: prevent next starvation casualty
+
+**Positive — Army / combat**
+- +10% combat odds
+- Opening volley: kill ~25% of enemy army at start of combat (with floor and cap)
+- Kick in a pinch: +1 guaranteed hit on round 1
+- Revive 1 wounded soldier per combat
+- Auto-revive `floor(losses/2)` wounded soldiers per combat
+- Cannot die in combat — lose all troops, survive with 1; slot self-consumes (Healer leaves after saving once) or charges steep gold/food on the save
+- Reveal enemy strength before combat opens — combat becomes a decision, not a roll
+- Free flee: no troop loss on next flee
+- Skip one combat per run (sneak / distract past)
+- +1 troop per Camp Search
+
+**Positive — Navigation**
+- Halve woods/swamp lost chance
+- Reveal farms/camps/henges on the map when oriented
+
+**Positive — Economy**
+- Prices -1 in towns
+- Reduce any payment by 1 gold or food
+- Probabilistic refund of 1 on any payment (~30% chance)
+- Reveal PoI prices in signpost / map before visit (paired with hide-prices-by-default game-wide rule) — information, not discount
+- Biome finder: chance of +1 gold per visited tile of a specific biome
+- Better gambling odds at taverns *(depends on taverns landing)*
+
+**Negative — Food / inventory**
+- -1 food per Camp Search
+- -1 food per combat
+- -1 lake yield (post-doubling)
+
+**Negative — Army / combat**
+- +X% ambush chance in woods/mountains
+- +1 troop loss per flee
+- Enemy gets +1 first hit (loud)
+- -10% combat odds
+- -1 troop per Camp Search
+
+**Negative — Navigation**
+- +X% lost chance in woods/swamp
+- Slot demands a water-adjacent visit every N moves or leaves the party
+
+**Negative — Economy**
+- -1 gold per Town visit
+- +1 prices in towns
+- Locksmith asks +N gold/food
+- Worse gambling odds at taverns *(depends on taverns landing)*
+- Barkeep tips/rumors cost more *(depends on taverns landing)*
+
+**Negative — Cooldowns**
+- +1 cooldown on lakes/camps/henges
+
+**Negative — Terrain**
+- Cannot enter a specific terrain (Rainbow's End variant: no gold from rainbows while held)
+- -1 troop on first step into a specific terrain
+
+**Negative — Constraint**
+- Cannot coexist with another named slot
+
 ## Ideas
 - when map is toggled on we should highlight the button more - white border maybe
 - disabled buttons rendered with a checkerboard overlay?
@@ -153,10 +221,6 @@ See `docs/2026-05-27-slot-system-design.md` for the demo roster.
 
 
 
-
-## UI interaction model
-
-- No tutorial screens; teach via contextual one-line text when mechanics first appear.
 
 ## shop clarity (deferred)
 

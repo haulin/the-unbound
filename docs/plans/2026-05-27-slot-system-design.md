@@ -2,7 +2,7 @@
 
 Outcome of a design brainstorm. The slot system gives players a choice of up to three companions or pieces of gear per run, drawn from a pool of seven. Each companion brings a clear advantage and (most) a counterweight. Selling them happens at The Crossing, a new sell-only PoI.
 
-This document captures the chosen design and the implementation notes. The effect pool and pairing rules live in [`slot-system.md`](./slot-system.md). World tone and the lore restrictions that shape the slot system live in [`lore-and-tone.md`](./lore-and-tone.md). Roadmap phasing lives in [`backlog.md`](./backlog.md). Line pools live in [`../src/core/lore.ts`](../src/core/lore.ts).
+This document captures the chosen design and the implementation notes. The pairing rules and sprite-flash convention live in [`the-unbound-learnings.md`](./the-unbound-learnings.md) under *Slot composition*. The effect pool catalog lives in [`backlog.md`](./backlog.md) under *Slot system — deferred*. World tone and the lore restrictions that shape the slot system live in [`lore-and-tone.md`](./lore-and-tone.md). Roadmap phasing lives in [`backlog.md`](./backlog.md). Line pools live in [`../src/core/lore.ts`](../src/core/lore.ts).
 
 ## Decision context
 
@@ -139,7 +139,7 @@ A tame magpie bought at farms. She palms a coin out of any payment about a third
 - **Mule lore pool rename.** `FARM_BUY_BEAST_LINES` → `MULE_BUY_LINES`, `FARM_BEAST_ALREADY_LINES` → `MULE_ALREADY_LINES`. Touches callsites beyond `lore.ts`. Land alongside the Boar so the Mule-related work happens in one place.
 - **Magpie price-quoting UX.** The player must see the *original* price; the gold check is against the original; the deduction is reduced by 1 only on a successful 30% roll. Confirm against the existing town-purchase flow before locking implementation.
 - **Boar/Mule bidirectional exclusion.** At purchase time, check the held slots. Refuse buy with one of two lore pools depending on direction (`BOAR_MULE_REFUSED_LINES` or `MULE_BOAR_REFUSED_LINES`). Same UX pattern as "you already have a beast at heel" today.
-- **Sprite-flash animation primitive.** One shared animation, used by every event-triggered P or N. Wire up for: Mule N1, Healer P5+N9, Boar P3'+N15, Captain P4+N7, Fisherman P8+N8, Magpie P. See [`slot-system.md`](./slot-system.md#sprite-flash-on-activation) for the convention.
+- **Sprite-flash animation primitive.** One shared animation, used by every event-triggered P or N. Wire up for: Mule N1, Healer P5+N9, Boar P3'+N15, Captain P4+N7, Fisherman P8+N8, Magpie P. See [`the-unbound-learnings.md`](./the-unbound-learnings.md) under *Slot composition* for the convention.
 - **Specialty pool infrastructure.** Generalize the existing single-Hire-Scout pattern at Camps/Towns into a per-PoI specialty (one of the slot pool, chosen at worldgen by seed). Farms gain the same pattern. Modal stays 3 buttons + Leave.
 
 ## Deferred (canonical list lives in [`backlog.md`](./backlog.md))
@@ -157,7 +157,7 @@ A tame magpie bought at farms. She palms a coin out of any payment about a third
 
 ## References
 
-- [`slot-system.md`](./slot-system.md) — living catalog of P/N effects and pairing rules
+- [`the-unbound-learnings.md`](./the-unbound-learnings.md) — pairing rules, sprite-flash convention, and the broader design pillars
+- [`backlog.md`](./backlog.md) — roadmap phasing, effect pool catalog, ability redesign candidates, deferred slot ideas
 - [`lore-and-tone.md`](./lore-and-tone.md) — world tone, companion register, what the world doesn't have
-- [`backlog.md`](./backlog.md) — roadmap phasing and the canonical deferred list
 - [`../src/core/lore.ts`](../src/core/lore.ts) — line pools

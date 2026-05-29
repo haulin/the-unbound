@@ -34,6 +34,6 @@ Does The Crossing show up on the Scout-revealed PoI set? Not yet decided. Defaul
 ## References
 
 - [`2026-05-27-slot-system-design.md`](./2026-05-27-slot-system-design.md) — chosen design
-- [`slot-system.md`](./slot-system.md) — effect pool catalog and pairing rules
+- [`slot-system.md`](./slot-system.md) — effect pool catalog (now in `backlog.md`) and pairing rules (now in `the-unbound-learnings.md`)
 - [`lore-and-tone.md`](./lore-and-tone.md) — voice, world tone, the companion register, what the world doesn't have
 - [`../src/core/lore.ts`](../src/core/lore.ts) — line pools
