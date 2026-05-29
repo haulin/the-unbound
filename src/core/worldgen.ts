@@ -46,6 +46,17 @@ type PlaceFeatureOpts = {
   awayFrom?: { pos: Vec2; minDistance: number }
 }
 
+// Worst-case bound on RNG attempts before declaring the candidate set
+// exhausted. With a 10×10 torus this gives ~50 attempts per cell on average,
+// which is comfortably above any realistic worldgen rejection rate (the
+// tightest current predicate is `here.kind === 'mountain'`, which on noise
+// passes yields ~12-17 mountains out of 100 → ~7% acceptance rate). Hitting
+// this ceiling means the predicate genuinely has zero candidates (e.g. a noise
+// pass that produced no mountain tiles) — fail loudly rather than spin
+// forever. Tunable; bumping it costs nothing because successful placements
+// short-circuit the loop.
+const PLACE_FEATURE_MAX_ATTEMPTS = WORLD_WIDTH * WORLD_HEIGHT * 50
+
 export function placeFeature(
   cells: CellGrid,
   rngState: number,
@@ -54,7 +65,14 @@ export function placeFeature(
   const placed: Vec2[] = []
   const rng = RNG.createStreamRandom(rngState)
   const minD = opts.awayFrom ? clampMinTorusDistance(opts.awayFrom.minDistance) : 0
+  let attempts = 0
   while (placed.length < opts.count) {
+    if (attempts >= PLACE_FEATURE_MAX_ATTEMPTS) {
+      throw new Error(
+        `placeFeature: exhausted ${PLACE_FEATURE_MAX_ATTEMPTS} attempts after placing ${placed.length}/${opts.count} features — predicate may have no candidates on this seed`,
+      )
+    }
+    attempts += 1
     const v = rng.intExclusive(WORLD_WIDTH * WORLD_HEIGHT)
     const x = v % WORLD_WIDTH
     const y = Math.floor(v / WORLD_WIDTH)

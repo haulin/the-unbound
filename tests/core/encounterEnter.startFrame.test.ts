@@ -22,6 +22,7 @@ import type {
   TownOfferKind,
   World,
 } from '../../src/core/types'
+import { makeResources } from './_helpers/makeResources'
 
 // Regression lock for the entire class of "encounter grid-transition fires at the wrong frame"
 // bugs. The contract is: when entering an encounter modal, the gridTransition anim must be
@@ -48,19 +49,17 @@ function blankWorldWith(opts: { center: Cell; rngState?: number }): World {
   }
 }
 
-function stateAt(world: World, opts: { hasBronzeKey?: boolean } = {}): State {
+function stateAt(world: World, opts: { hasKey?: boolean } = {}): State {
   return {
     world,
     player: { position: { x: 2, y: 1 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: {
+    resources: makeResources({
       food: INITIAL_FOOD,
       gold: 100,
       armySize: INITIAL_ARMY_SIZE,
-      hasBronzeKey: opts.hasBronzeKey ?? false,
-      hasScout: false,
-      hasTameBeast: false,
-    },
+      inventory: opts.hasKey ? ['bronzeKey'] : [],
+    }),
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -124,7 +123,10 @@ describe('encounter-enter grid transitions fire at startFrame + MOVE_SLIDE_FRAME
   })
 
   it('locksmith', () => {
-    const next = processAction(stateAt(blankWorldWith({ center: { kind: 'locksmith' } })), moveSouth)!
+    // v0.5: locksmith requires Blood as a precondition for the modal to open.
+    const s0 = stateAt(blankWorldWith({ center: { kind: 'locksmith' } }))
+    s0.resources.inventory.push('blood')
+    const next = processAction(s0, moveSouth)!
     const t = gridTransition(next, 'overworld', 'locksmith')
     expect(t).toBeDefined()
     expect(t!.startFrame).toBe(MOVE_SLIDE_FRAMES)

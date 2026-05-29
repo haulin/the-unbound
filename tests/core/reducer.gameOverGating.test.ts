@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
 import { ACTION_MOVE, HENGE_COOLDOWN_MOVES } from '../../src/core/constants'
 import type { Action, Cell, HengeCell, State, World } from '../../src/core/types'
+import { makeResources } from './_helpers/makeResources'
 
 // When the food cost of a move kills the player (army drops to 0), the destination tile's
 // onEnterTile handler must not fire — no cell mutations, no encounter open, no RNG advance,
@@ -31,7 +32,7 @@ function starveState(world: World): State {
     world,
     player: { position: { x: 2, y: 1 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: 0, gold: 0, armySize: 1, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
+    resources: makeResources({ food: 0, gold: 0, armySize: 1 }),
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -82,7 +83,7 @@ describe('reducer game-over gating: tile handler suppressed when move kills play
     const gate: Cell = { kind: 'gate' }
     const world = blankWorld({ center: gate })
     const s = starveState(world)
-    const sWithKey: State = { ...s, resources: { ...s.resources, hasBronzeKey: true } }
+    const sWithKey: State = { ...s, resources: { ...s.resources, inventory: ['bronzeKey'] } }
 
     const next = processAction(sWithKey, stepSouth)!
 

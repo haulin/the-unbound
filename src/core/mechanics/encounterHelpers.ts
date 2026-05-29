@@ -2,7 +2,7 @@
 // Must NOT import MECHANIC_INDEX or any def-level module — would create a cycle, since
 // MECHANIC_INDEX itself is built from the defs that import this file.
 
-import { ENABLE_ANIMATIONS, TOWN_NO_GOLD_LINES } from '../constants'
+import { ENABLE_ANIMATIONS, MAX_PARTY_SLOTS, TOWN_NO_GOLD_LINES } from '../constants'
 import { RNG } from '../rng'
 import type {
   DeltaAnimTarget,
@@ -87,15 +87,16 @@ export function applyDeltas(state: State, args: ApplyDeltasArgs): State {
 
 // ---- Buy primitive --------------------------------------------------------------
 
-// What the player gains: numeric fields are added; boolean flags are set true.
-// Food gain is NOT clamped here — caller clamps via `resourcesWithClampedFoodIfNeeded`
-// and rebuilds the food delta from the applied diff if needed.
+// What the player gains. Numeric fields are added; slot tokens are appended
+// (idempotent — already-held slots are no-ops; party respects `MAX_PARTY_SLOTS`
+// via `appendPartySlot`). Food gain is NOT clamped here — caller clamps via
+// `resourcesWithClampedFoodIfNeeded` and rebuilds the food delta from the
+// applied diff if needed.
 export type BuyGain = Partial<{
   food: number
   armySize: number
-  hasBronzeKey: boolean
-  hasScout: boolean
-  hasTameBeast: boolean
+  inventory: readonly string[]
+  party: readonly string[]
 }>
 
 export type BuyResult =
@@ -115,14 +116,23 @@ export function buy(
   const gain = spec.gain
   const foodGain = gain.food ?? 0
   const armyGain = gain.armySize ?? 0
+  let inventory = resources.inventory
+  if (gain.inventory) {
+    for (const slot of gain.inventory) {
+      if (!inventory.includes(slot)) inventory = [...inventory, slot]
+    }
+  }
+  let party = resources.party
+  if (gain.party) {
+    for (const slot of gain.party) party = appendPartySlot(party, slot)
+  }
   const next: Resources = {
     ...resources,
     gold: resources.gold - goldCost,
     food: resources.food - foodCost + foodGain,
     armySize: resources.armySize + armyGain,
-    ...(gain.hasBronzeKey ? { hasBronzeKey: true } : {}),
-    ...(gain.hasScout ? { hasScout: true } : {}),
-    ...(gain.hasTameBeast ? { hasTameBeast: true } : {}),
+    inventory,
+    party,
   }
 
   const deltas: ResourceDelta[] = []
@@ -132,6 +142,18 @@ export function buy(
   if (armyGain) deltas.push({ target: 'army', delta: armyGain })
 
   return { outcome: 'ok', resources: next, deltas }
+}
+
+// ---- Party-slot append --------------------------------------------------------
+
+// Idempotent on duplicates and silently no-ops once `party` reaches
+// `MAX_PARTY_SLOTS`. Single-hire callsites (town hireScout, farm hireBeast)
+// already gate on the slot not being held; this guard lives here so the cap is
+// enforced once.
+export function appendPartySlot(party: readonly string[], slot: string): string[] {
+  if (party.includes(slot)) return [...party]
+  if (party.length >= MAX_PARTY_SLOTS) return [...party]
+  return [...party, slot]
 }
 
 // ---- Apply enter-anims --------------------------------------------------------

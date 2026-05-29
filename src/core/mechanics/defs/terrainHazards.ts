@@ -14,7 +14,7 @@ import { RNG } from '../../rng'
 import { pickTeleportDestination } from '../../teleport'
 import type { MechanicDef, MoveEventPolicy, OnEnterTile } from '../types'
 import { rollMoveEvent } from '../moveEvents'
-import { startCombatEncounter } from './combat'
+import { rolledEnemySpawn, STANDARD_COMBAT_VARIANT, startCombatEncounter } from './combat'
 
 const woodsPolicy: MoveEventPolicy = {
   ambushPercent: WOODS_AMBUSH_PERCENT,
@@ -41,7 +41,7 @@ const onEnterTerrainHazards: OnEnterTile = ({ cell, world, pos, stepCount, resou
 
   const event = rollMoveEvent({
     policy,
-    hasScout: !!resources.hasScout,
+    hasScout: resources.party.includes('scout'),
     source: kind,
     rngKeys: { seed: world.seed, stepCount, cellId: cellIdForPos(world, pos) },
   })
@@ -55,7 +55,7 @@ const onEnterTerrainHazards: OnEnterTile = ({ cell, world, pos, stepCount, resou
     return startCombatEncounter({
       world,
       pos,
-      playerArmy: resources.armySize,
+      spawnEnemy: rolledEnemySpawn(resources.armySize),
       encounterMessage,
       restoreMessage: tileMessage,
     })
@@ -90,4 +90,5 @@ export const terrainHazardsMechanic: MechanicDef = {
     mountain: mountainPolicy,
   },
   onEnterTile: onEnterTerrainHazards,
+  combatVariant: STANDARD_COMBAT_VARIANT,
 }

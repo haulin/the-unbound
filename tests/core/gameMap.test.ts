@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { computeGameMapView } from '../../src/core/gameMap'
 import type { Cell, State, World } from '../../src/core/types'
+import { makeResources } from './_helpers/makeResources'
 
 function grass(): Cell {
   return { kind: 'grass' }
@@ -39,7 +40,7 @@ function makeState(): State {
     world: makeWorld(),
     player: { position: { x: 0, y: 0 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: 10, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
+    resources: makeResources({ food: 10, gold: 0, armySize: 5 }),
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -87,7 +88,7 @@ describe('computeGameMapView', () => {
   it('while lost, scout does not globally reveal farms/camps/henges until oriented', () => {
     const s = makeState()
     s.run.knowsPosition = false
-    s.resources.hasScout = true
+    s.resources.party = ['scout']
     s.run.path = [{ pos: { x: 0, y: 1 }, isMapped: false }] // locksmith only
     s.run.lostBufferStartIndex = 0
 
@@ -97,7 +98,7 @@ describe('computeGameMapView', () => {
   it('with scout, reveals farms/camps/henges/towns globally but not gate/locksmith', () => {
     const s = makeState()
     s.run.knowsPosition = true
-    s.resources.hasScout = true
+    s.resources.party = ['scout']
     s.run.path = [
       { pos: { x: 0, y: 1 }, isMapped: true }, // locksmith (mapped -> visible)
       { pos: { x: 1, y: 1 }, isMapped: true }, // town (mapped -> visible)

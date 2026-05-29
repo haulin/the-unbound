@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
 import { ACTION_MOVE } from '../../src/core/constants'
 import type { Cell, State, World } from '../../src/core/types'
+import { makeResources } from './_helpers/makeResources'
 
 function grass(): Cell {
   return { kind: 'grass' }
@@ -36,14 +37,7 @@ function makeState(): State {
       lostBufferStartIndex: null,
       copyCursors: {},
     },
-    resources: {
-      food: 10,
-      gold: 0,
-      armySize: 5,
-      hasBronzeKey: false,
-      hasScout: false,
-      hasTameBeast: false,
-    },
+    resources: makeResources({ food: 10, gold: 0, armySize: 5 }),
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }

@@ -4,6 +4,7 @@ import { ACTION_MOVE, INITIAL_FOOD } from '../../src/core/constants'
 import { ACTION_FARM_LEAVE } from '../../src/core/mechanics/defs/farm'
 import { foodCarryCap } from '../../src/core/foodCarry'
 import type { State, World } from '../../src/core/types'
+import { makeResources } from './_helpers/makeResources'
 
 function makeWorld(): World {
   return {
@@ -34,7 +35,7 @@ function makeState(): State {
       lostBufferStartIndex: null,
       copyCursors: {},
     },
-    resources: { food: INITIAL_FOOD, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
+    resources: makeResources({ food: INITIAL_FOOD, gold: 0, armySize: 5 }),
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -58,7 +59,7 @@ describe('farms + food reducer', () => {
     const next = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
 
     expect(next.encounter?.kind).toBe('farm')
-    const cap = foodCarryCap({ armySize: 5, hasTameBeast: false })
+    const cap = foodCarryCap({ armySize: 5, party: [] })
     expect(next.resources.food).toBe(Math.min(INITIAL_FOOD - 1, cap))
     expect(next.world.rngState).toBe(beforeRng)
     const cell = next.world.cells[1]![1]!

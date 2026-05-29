@@ -1,4 +1,5 @@
-import type { CellKind, EncounterKind } from '../types'
+import type { CellKind, EncounterKind, World } from '../types'
+import type { CombatVariantConfig } from './defs/combat'
 import type {
   MechanicDef,
   MoveEventPolicy,
@@ -10,6 +11,8 @@ import type {
   ReduceEncounterAction,
   RightGridProvider,
 } from './types'
+
+export type OnCombatResolvedHook = (world: World, sourceCellId: number) => World
 
 export type MechanicIndex = {
   ownerByKind: Partial<Record<CellKind, string>>
@@ -23,6 +26,8 @@ export type MechanicIndex = {
   mapLabelByKind: Partial<Record<CellKind, string>>
   enterFoodCostByKind: Partial<Record<CellKind, number>>
   moveEventPolicyByKind: Partial<Record<CellKind, MoveEventPolicy>>
+  combatVariantByKind: Partial<Record<CellKind, CombatVariantConfig>>
+  onCombatResolvedByKind: Partial<Record<CellKind, OnCombatResolvedHook>>
 }
 
 export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicIndex {
@@ -38,6 +43,8 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
   const mapLabelByKind: Partial<Record<CellKind, string>> = {}
   const enterFoodCostByKind: Partial<Record<CellKind, number>> = {}
   const moveEventPolicyByKind: Partial<Record<CellKind, MoveEventPolicy>> = {}
+  const combatVariantByKind: Partial<Record<CellKind, CombatVariantConfig>> = {}
+  const onCombatResolvedByKind: Partial<Record<CellKind, OnCombatResolvedHook>> = {}
 
   const seenEncounterKinds = new Set<EncounterKind>()
 
@@ -110,6 +117,8 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
       if (m.onEnterTile) onEnterTileByKind[kind] = m.onEnterTile
       if (m.mapLabel != null) mapLabelByKind[kind] = m.mapLabel
       if (m.poiSignpost) poiSignpostByKind[kind] = m.poiSignpost
+      if (m.combatVariant) combatVariantByKind[kind] = m.combatVariant
+      if (m.onCombatResolved) onCombatResolvedByKind[kind] = m.onCombatResolved
       const cost = costByKind?.[kind]
       if (cost != null) enterFoodCostByKind[kind] = cost
       const policy = policyByKind?.[kind]
@@ -129,5 +138,7 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
     mapLabelByKind,
     enterFoodCostByKind,
     moveEventPolicyByKind,
+    combatVariantByKind,
+    onCombatResolvedByKind,
   }
 }

@@ -15,6 +15,7 @@ import {
 import { manhattan, torusDelta } from '../../src/core/math'
 import { RNG } from '../../src/core/rng'
 import type { Cell, State, World } from '../../src/core/types'
+import { makeResources } from './_helpers/makeResources'
 
 function newRun(seed = 1): State {
   const s = processAction(null, { type: ACTION_NEW_RUN, seed })
@@ -48,7 +49,7 @@ function makeState(world: World): State {
     world,
     player: { position: { x: 2, y: 1 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: INITIAL_FOOD, gold: 0, armySize: INITIAL_ARMY_SIZE, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
+    resources: makeResources({ food: INITIAL_FOOD, gold: 0, armySize: INITIAL_ARMY_SIZE }),
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }

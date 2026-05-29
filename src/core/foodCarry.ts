@@ -4,12 +4,12 @@ import { BEAST_CARRY_CAP_BONUS } from './constants'
 export type FoodCarryFields = {
   food: number
   armySize: number
-  hasTameBeast: boolean
+  party: readonly string[]
 }
 
-export function foodCarryCap(res: { armySize: number; hasTameBeast: boolean }): number {
+export function foodCarryCap(res: { armySize: number; party: readonly string[] }): number {
   const cap = 2 * Math.max(0, Math.trunc(res.armySize))
-  return res.hasTameBeast ? cap + BEAST_CARRY_CAP_BONUS : cap
+  return res.party.includes('mule') ? cap + BEAST_CARRY_CAP_BONUS : cap
 }
 
 export function clampFoodToCarryCap(res: FoodCarryFields): number {

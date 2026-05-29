@@ -150,11 +150,11 @@ function reduceFarmBuyBeast(prevState: State, farm: FarmCell): State {
   const prefix = farmPrefix(farm)
   const rnd = RNG.createRunCopyRandom(prevState)
 
-  if (prevState.resources.hasTameBeast) {
+  if (prevState.resources.party.includes('mule')) {
     return setEncounterMessage(prevState, prefix, rnd.perMoveLine(MULE_ALREADY_LINES, { cellId: farm.id }))
   }
 
-  const result = buy(prevState.resources, { gold: farm.beastGoldCost, gain: { hasTameBeast: true } })
+  const result = buy(prevState.resources, { gold: farm.beastGoldCost, gain: { party: ['mule'] } })
   if (result.outcome === 'noFunds') return noGoldResponse(prevState, prefix, farm.id)
 
   return applyDeltas(prevState, {

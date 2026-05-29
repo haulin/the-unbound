@@ -11,6 +11,7 @@ import {
 import { ACTION_CAMP_LEAVE, ACTION_CAMP_SEARCH } from '../../src/core/mechanics/defs/camp'
 import { gameOverMessage as expectedGameOverLine } from '../../src/core/gameOver'
 import type { DeltaAnim, State, World } from '../../src/core/types'
+import { makeResources } from './_helpers/makeResources'
 
 function makeWorld(): World {
   return {
@@ -33,14 +34,7 @@ function makeState(): State {
     world: w,
     player: { position: { x: 1, y: 0 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: {
-      food: INITIAL_FOOD,
-      gold: 0,
-      armySize: 1,
-      hasBronzeKey: false,
-      hasScout: false,
-      hasTameBeast: false,
-    },
+    resources: makeResources({ food: INITIAL_FOOD, gold: 0, armySize: 1 }),
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -65,7 +59,7 @@ describe('army + camps + game over', () => {
       world: w,
       player: { position: { x: 0, y: 0 } },
       run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-      resources: { food: 2, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
+      resources: makeResources({ food: 2, gold: 0, armySize: 5 }),
       encounter: null,
       ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
     }
@@ -93,7 +87,7 @@ describe('army + camps + game over', () => {
       world: w,
       player: { position: { x: 0, y: 0 } },
       run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-      resources: { food: 1, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
+      resources: makeResources({ food: 1, gold: 0, armySize: 5 }),
       encounter: null,
       ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
     }

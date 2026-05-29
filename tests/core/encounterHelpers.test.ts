@@ -9,6 +9,7 @@ import {
 import { TOWN_NO_GOLD_LINES } from '../../src/core/constants'
 import type { AnimSpec } from '../../src/core/mechanics/types'
 import type { Resources, State, Ui } from '../../src/core/types'
+import { makeResources } from './_helpers/makeResources'
 
 const baseUi: Ui = {
   message: 'before',
@@ -17,14 +18,7 @@ const baseUi: Ui = {
   anim: { nextId: 1, active: [] },
 }
 
-const baseResources: Resources = {
-  food: 5,
-  gold: 10,
-  armySize: 3,
-  hasBronzeKey: false,
-  hasScout: false,
-  hasTameBeast: false,
-}
+const baseResources: Resources = makeResources({ food: 5, gold: 10, armySize: 3 })
 
 function makeMinimalState(overrides: Partial<State> = {}): State {
   return {

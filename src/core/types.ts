@@ -22,6 +22,7 @@ export type FeatureKind =
   | 'gate'
   | 'gateOpen'
   | 'locksmith'
+  | 'lair'
   | 'signpost'
   | 'farm'
   | 'camp'
@@ -35,6 +36,7 @@ export type TerrainCell = { kind: TerrainKind }
 export type GateCell = { kind: 'gate' }
 export type GateOpenCell = { kind: 'gateOpen' }
 export type LocksmithCell = { kind: 'locksmith' }
+export type LairCell = { kind: 'lair'; id: number; isBled: boolean }
 export type SignpostCell = { kind: 'signpost' }
 export type FarmCell = { kind: 'farm'; id: number; name: string; beastGoldCost: number }
 export type CampCell = { kind: 'camp'; id: number; name: string; nextReadyStep: number }
@@ -56,6 +58,7 @@ export type Cell =
   | GateCell
   | GateOpenCell
   | LocksmithCell
+  | LairCell
   | SignpostCell
   | FarmCell
   | CampCell
@@ -143,9 +146,8 @@ export type Resources = {
   food: number
   gold: number
   armySize: number
-  hasBronzeKey: boolean
-  hasScout: boolean
-  hasTameBeast: boolean
+  inventory: string[]
+  party: string[]
 }
 
 export type CombatEncounter = {

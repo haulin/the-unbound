@@ -107,6 +107,40 @@ describe('signpost', () => {
     expect(msg).toBe('Ember Watch Camp\nSE, 5 leagues away.')
   })
 
+  it('prefers locksmith over lair on ties', () => {
+    // Both are distance 5; locksmith (rank 10) wins over lair (rank 15).
+    // Locks `wyrmMechanic.poiSignpost.rank > 10`.
+    const msg = formatNearestPoiSignpostMessage(
+      { x: 0, y: 0 },
+      {
+        width: 10,
+        height: 10,
+        cells: makeCells(10, 10, [
+          { x: 3, y: 2, cell: { kind: 'locksmith' } },
+          { x: 2, y: 3, cell: { kind: 'lair', id: 32, isBled: false } },
+        ]),
+      }
+    )
+    expect(msg).toBe('Locksmith of the Unbound\nSE, 5 leagues away.')
+  })
+
+  it('prefers lair over farm on ties', () => {
+    // Both are distance 5; lair (rank 15) wins over farm (rank 20).
+    // Locks `wyrmMechanic.poiSignpost.rank < 20`.
+    const msg = formatNearestPoiSignpostMessage(
+      { x: 0, y: 0 },
+      {
+        width: 10,
+        height: 10,
+        cells: makeCells(10, 10, [
+          { x: 3, y: 2, cell: { kind: 'lair', id: 23, isBled: false } },
+          { x: 2, y: 3, cell: { kind: 'farm', id: 32, name: 'Greyfield', beastGoldCost: 10 } },
+        ]),
+      }
+    )
+    expect(msg).toBe('Cave of the Long Wind\nSE, 5 leagues away.')
+  })
+
   it('prefers farm over town on ties', () => {
     const msg = formatNearestPoiSignpostMessage(
       { x: 0, y: 0 },

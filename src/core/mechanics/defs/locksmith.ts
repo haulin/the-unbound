@@ -1,13 +1,14 @@
 import {
-  GATE_LOCKSMITH_MIN_DISTANCE,
   LOCKSMITH_KEY_FOOD_COST,
   LOCKSMITH_KEY_GOLD_COST,
+  LOCKSMITH_LAIR_MIN_DISTANCE,
   TOWN_NO_GOLD_LINES,
 } from '../../constants'
 import { cellIdForPos, findCellByKind } from '../../cells'
 import {
   LOCKSMITH_ENTER_LINES,
   LOCKSMITH_NAME,
+  LOCKSMITH_NO_BLOOD_LINES,
   LOCKSMITH_NO_FOOD_LINES,
   LOCKSMITH_PURCHASE_LINES,
   LOCKSMITH_VISITED_LINES,
@@ -40,8 +41,13 @@ const onEnterLocksmith: OnEnterTile = ({ cell, world, pos, stepCount, resources 
 
   const r = RNG.createTileRandom({ world, stepCount, pos })
 
-  if (resources.hasBronzeKey) {
+  if (resources.inventory.includes('bronzeKey')) {
     const line = r.perMoveLine(LOCKSMITH_VISITED_LINES)
+    return { message: `${LOCKSMITH_NAME}\n${line}` }
+  }
+
+  if (!resources.inventory.includes('blood')) {
+    const line = r.perMoveLine(LOCKSMITH_NO_BLOOD_LINES)
     return { message: `${LOCKSMITH_NAME}\n${line}` }
   }
 
@@ -83,12 +89,12 @@ const reduceLocksmithAction: ReduceEncounterAction = (prevState, action) => {
 
 function reduceLocksmithPayGold(prevState: State, sourceCellId: number): State {
   const rnd = RNG.createRunCopyRandom(prevState)
-  const result = buy(prevState.resources, { gold: LOCKSMITH_KEY_GOLD_COST, gain: { hasBronzeKey: true } })
+  const result = buy(prevState.resources, { gold: LOCKSMITH_KEY_GOLD_COST, gain: { inventory: ['bronzeKey'] } })
   if (result.outcome === 'noFunds') {
     return setEncounterMessage(prevState, LOCKSMITH_NAME, rnd.perMoveLine(TOWN_NO_GOLD_LINES, { cellId: sourceCellId }))
   }
   return applyDeltas(prevState, {
-    resources: result.resources,
+    resources: consumeBlood(result.resources),
     message: `${LOCKSMITH_NAME}\n${rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)}`,
     deltas: result.deltas,
   })
@@ -96,18 +102,13 @@ function reduceLocksmithPayGold(prevState: State, sourceCellId: number): State {
 
 // ---- Worldgen placement ----
 
-// Peer-aware on gate: gate runs first in MECHANICS so its position is readable
-// here. We assert (rather than fall back to "no constraint") because a future
-// MECHANICS reorder that flipped the two would otherwise silently land the
-// pair adjacent and only the determinism snapshot would notice — and only
-// until someone re-snapshotted on autopilot.
 const placeLocksmith: PlaceWorldProvider = ({ cells, rngState }) => {
-  const gatePos = findCellByKind(cells, 'gate')
-  if (!gatePos) throw new Error('placeLocksmith: gate must be placed before locksmith')
+  const lairPos = findCellByKind(cells, 'lair')
+  if (!lairPos) throw new Error('placeLocksmith: wyrm lair must be placed before locksmith')
   const res = placeFeature(cells, rngState, {
     count: 1,
     canPlaceAt: (_x, _y, here) => isTerrainCell(here),
-    awayFrom: { pos: gatePos, minDistance: GATE_LOCKSMITH_MIN_DISTANCE },
+    awayFrom: { pos: lairPos, minDistance: LOCKSMITH_LAIR_MIN_DISTANCE },
     buildCell: () => ({ kind: 'locksmith' }),
   })
   return { rngState: res.rngState }
@@ -125,15 +126,20 @@ const locksmithPreviewPlate: PreviewPlateProvider = () => {
 
 function reduceLocksmithPayFood(prevState: State): State {
   const rnd = RNG.createRunCopyRandom(prevState)
-  const result = buy(prevState.resources, { food: LOCKSMITH_KEY_FOOD_COST, gain: { hasBronzeKey: true } })
+  const result = buy(prevState.resources, { food: LOCKSMITH_KEY_FOOD_COST, gain: { inventory: ['bronzeKey'] } })
   if (result.outcome === 'noFunds') {
     return setEncounterMessage(prevState, LOCKSMITH_NAME, rnd.perMoveLine(LOCKSMITH_NO_FOOD_LINES))
   }
   return applyDeltas(prevState, {
-    resources: result.resources,
+    resources: consumeBlood(result.resources),
     message: `${LOCKSMITH_NAME}\n${rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)}`,
     deltas: result.deltas,
   })
+}
+
+function consumeBlood(resources: State['resources']): State['resources'] {
+  if (!resources.inventory.includes('blood')) return resources
+  return { ...resources, inventory: resources.inventory.filter((slot) => slot !== 'blood') }
 }
 
 // ---- Mechanic registration ----

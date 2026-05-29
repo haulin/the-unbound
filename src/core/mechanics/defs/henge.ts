@@ -11,7 +11,7 @@ import { RNG } from '../../rng'
 import type { HengeCell } from '../../types'
 import type { MechanicDef, MoveEventPolicy, OnEnterTile, PlaceWorldProvider } from '../types'
 import { rollMoveEvent } from '../moveEvents'
-import { startCombatEncounter } from './combat'
+import { rolledEnemySpawn, STANDARD_COMBAT_VARIANT, startCombatEncounter } from './combat'
 import { cellId, isTerrainCell, placeNamedFeature } from '../../worldgen'
 
 const hengePolicy: MoveEventPolicy = { ambushPercent: 100, lostPercent: 0 }
@@ -35,7 +35,7 @@ const onEnterHenge: OnEnterTile = ({ cell, world, pos, stepCount, resources }) =
   const cellId = cellIdForPos(world, pos)
   const event = rollMoveEvent({
     policy: hengePolicy,
-    hasScout: !!resources.hasScout,
+    hasScout: resources.party.includes('scout'),
     source: 'henge',
     rngKeys: { seed: world.seed, stepCount, cellId },
   })
@@ -48,7 +48,7 @@ const onEnterHenge: OnEnterTile = ({ cell, world, pos, stepCount, resources }) =
   const result = startCombatEncounter({
     world,
     pos,
-    playerArmy: resources.armySize,
+    spawnEnemy: rolledEnemySpawn(resources.armySize),
     encounterMessage: HENGE_ENCOUNTER_LINE,
     restoreMessage: tileMessage,
   })
@@ -78,4 +78,5 @@ export const hengeMechanic: MechanicDef = {
     name: (cell) => `${(cell as HengeCell).name || 'A Henge'} Henge`,
   },
   placeWorld: placeHenges,
+  combatVariant: STANDARD_COMBAT_VARIANT,
 }

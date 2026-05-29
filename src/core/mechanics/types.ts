@@ -14,6 +14,7 @@ import type {
   World,
 } from '../types'
 import type { RightGridCellDef } from '../rightGrid'
+import type { CombatVariantConfig } from './defs/combat'
 
 // PoI signpost contribution. Ranks are conventionally multiples of 10 so new
 // PoIs can slot between existing ones without renumbering (e.g. Lair=15 between
@@ -135,4 +136,7 @@ export type MechanicDef = {
 
   poiSignpost?: PoiSignpostContribution
   placeWorld?: PlaceWorldProvider
+
+  combatVariant?: CombatVariantConfig
+  onCombatResolved?: (world: World, sourceCellId: number) => World
 }

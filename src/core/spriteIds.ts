@@ -12,6 +12,7 @@ export const SPRITES = {
     gravel: 10,
     farm: 34,
     lake: 36,
+    cave: 38,
     signpost: 42,
     rainbow: 76,
   },
@@ -44,10 +45,13 @@ export const SPRITES = {
   cosmetics: {
     farmBarn: 162,
     beastIllustration: 164,
+    wyrmIllustration: 166,
     rumorIllustration: 168,
     campfireIcon: 170,
     tombstoneIllustration: 174,
     locksmithKiln: 194,
+    heart: 196,
+    bloodVial: 198,
     marketStall: 200,
   },
 

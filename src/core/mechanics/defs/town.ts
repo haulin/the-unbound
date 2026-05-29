@@ -165,11 +165,11 @@ function reduceTownHireScout(prevState: State, town: TownCell): State {
   const prefix = townPrefix(town)
   const rnd = RNG.createRunCopyRandom(prevState)
 
-  if (prevState.resources.hasScout) {
+  if (prevState.resources.party.includes('scout')) {
     return setEncounterMessage(prevState, prefix, rnd.perMoveLine(TOWN_SCOUT_ALREADY_HAVE_LINES, { cellId: town.id }))
   }
 
-  const result = buy(prevState.resources, { gold: town.prices.scoutGold, gain: { hasScout: true } })
+  const result = buy(prevState.resources, { gold: town.prices.scoutGold, gain: { party: ['scout'] } })
   if (result.outcome === 'noFunds') return noGoldResponse(prevState, prefix, town.id)
 
   return applyDeltas(prevState, {

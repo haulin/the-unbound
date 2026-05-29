@@ -1,5 +1,5 @@
-import { GATE_LOCKED_LINES, GATE_NAME, GATE_OPEN_LINES } from '../../constants'
-import { setCellAt } from '../../cells'
+import { GATE_LOCKED_LINES, GATE_LOCKSMITH_MIN_DISTANCE, GATE_NAME, GATE_OPEN_LINES } from '../../constants'
+import { findCellByKind, setCellAt } from '../../cells'
 import { RNG } from '../../rng'
 import { isTerrainCell, placeFeature } from '../../worldgen'
 import type { MechanicDef, OnEnterTile, PlaceWorldProvider } from '../types'
@@ -9,7 +9,7 @@ const onEnterGate: OnEnterTile = ({ cell, world, pos, stepCount, resources }) =>
 
   const r = RNG.createTileRandom({ world, stepCount, pos })
 
-  if (!resources.hasBronzeKey) {
+  if (!resources.inventory.includes('bronzeKey')) {
     const line = r.perMoveLine(GATE_LOCKED_LINES)
     return { message: `${GATE_NAME}\n${line}` }
   }
@@ -19,12 +19,13 @@ const onEnterGate: OnEnterTile = ({ cell, world, pos, stepCount, resources }) =>
   return { world: nextWorld, hasWon: true, message: `${GATE_NAME}\n${line}` }
 }
 
-// Uniformly-random terrain cell. The gate-locksmith min-distance constraint is
-// enforced by the locksmith placer, not here.
 const placeGate: PlaceWorldProvider = ({ cells, rngState }) => {
+  const locksmithPos = findCellByKind(cells, 'locksmith')
+  if (!locksmithPos) throw new Error('placeGate: locksmith must be placed before gate')
   const res = placeFeature(cells, rngState, {
     count: 1,
     canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+    awayFrom: { pos: locksmithPos, minDistance: GATE_LOCKSMITH_MIN_DISTANCE },
     buildCell: () => ({ kind: 'gate' }),
   })
   return { rngState: res.rngState }

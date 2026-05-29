@@ -25,6 +25,8 @@ function cellSignature(cell: Cell): string {
       return `camp:${cell.id}:${cell.name}:ready=${cell.nextReadyStep}`
     case 'henge':
       return `henge:${cell.id}:${cell.name}:ready=${cell.nextReadyStep}`
+    case 'lair':
+      return `lair:${cell.id}:bled=${cell.isBled}`
     case 'town': {
       const offers = cell.offers.join(',')
       const p = cell.prices

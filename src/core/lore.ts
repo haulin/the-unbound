@@ -40,9 +40,7 @@ Mechanics index (keep this list current):
     - Locksmith modal: requires the Blood + pay-gold-or-food; skipped if you have the key.
     - Without the Blood: no modal opens; tile shows inline flavor only.
     - Gate opens only with the key.
-  - Wyrm Lair
-    - PoI placed on a mountain tile; modal combat.
-    - Buttons: Fight (draws Blood on win; wyrm survives) / Pay (gold bribe for Blood) / Flee.
+  - Wyrm Lair: mountain-tile PoI; modal combat (Fight / Pay / Flee) until bled, inline lore after.
   - The Crossing: sell-only PoI. Buttons show each held slot; tapping sells that slot for half its purchase price. 1–2 per map.
   - Fishing lakes: placed PoIs; grant 1-3 food when ready; cooldown 3; do not appear on the map.
   - Rainbow's End: placed PoIs; grant +30 gold once per end (then spent).
@@ -186,21 +184,19 @@ export const LOCKSMITH_BLOOD_READY_LINES = [
 // ----------------------------
 // The Wyrm / The Lair
 // ----------------------------
-export const WYRM_NAME = 'The Wyrm';
 
-export const LAIR_NAME_POOL = [
-  "The Long Wound",
-  "Snake's Roost",
-  "The Coiled Hall",
-  "Wyrm-Crag",
-  "The Sleeping Stone",
-  "The Hollow",
+export const LAIR_NAME = 'Cave of the Long Wind' as const;
+
+export const WYRM_NO_GOLD_LINES = [
+  "You count your purse. The wyrm watches. Not enough.",
+  "It huffs once. Patient men with empty hands learn nothing here.",
+  "Your gold is short. The wyrm settles back to wait you out.",
 ] as const;
 
-export const LAIR_FIRST_VISIT_LINES = [
-  "A cave mouth that does not echo. Something inside is breathing slowly.",
-  "The stone here is warm. Wind comes out of the dark in long, slow exhales.",
-  "You smell iron and old smoke. The cave goes back further than it should.",
+export const WYRM_BLED_LINES = [
+  "The cave breathes long and slow. The wyrm sleeps deeper now.",
+  "You took what you came for. Whatever else lives here is not for you.",
+  "The dark is quieter than it was. You leave it that way.",
 ] as const;
 
 export const WYRM_ENCOUNTER_LINES = [

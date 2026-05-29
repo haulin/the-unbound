@@ -8,6 +8,7 @@ import {
   ACTION_TOWN_LEAVE,
 } from '../../src/core/mechanics/defs/town'
 import type { Cell, State, World } from '../../src/core/types'
+import { makeResources } from './_helpers/makeResources'
 
 function makeWorld(): World {
   const grass = (): Cell => ({ kind: 'grass' })
@@ -41,7 +42,7 @@ function makeState(): State {
     world: makeWorld(),
     player: { position: { x: 1, y: 1 } },
     run: { stepCount: 1, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: 10, gold: 99, armySize: 5, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
+    resources: makeResources({ food: 10, gold: 99, armySize: 5 }),
     encounter: { kind: 'town', sourceCellId: 4, restoreMessage: 'x' },
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }

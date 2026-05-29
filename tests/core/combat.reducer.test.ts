@@ -16,6 +16,7 @@ import { ACTION_FIGHT, ACTION_RETURN, spawnEnemyArmy } from '../../src/core/mech
 import { RNG } from '../../src/core/rng'
 import { foodCarryCap } from '../../src/core/foodCarry'
 import type { DeltaAnim, State, World } from '../../src/core/types'
+import { makeResources } from './_helpers/makeResources'
 
 function makeWorld(opts: { seed: number; dstKind: 'henge' | 'woods'; rngState: number }): World {
   return {
@@ -41,7 +42,7 @@ function makeState(w: World): State {
     world: w,
     player: { position: { x: 1, y: 0 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: INITIAL_FOOD, gold: INITIAL_GOLD, armySize: 5, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
+    resources: makeResources({ food: INITIAL_FOOD, gold: INITIAL_GOLD, armySize: 5 }),
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -88,7 +89,7 @@ describe('combat reducer (v0.0.7)', () => {
 
     // Enter-cost still applies on the move that starts combat.
     expect(next.resources.food).toBe(
-      Math.min((INITIAL_FOOD | 0) - 1, foodCarryCap({ armySize: s.resources.armySize, hasTameBeast: false })),
+      Math.min((INITIAL_FOOD | 0) - 1, foodCarryCap({ armySize: s.resources.armySize, party: [] })),
     )
   })
 

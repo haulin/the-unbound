@@ -11,15 +11,15 @@ import { terrainHazardsMechanic } from './defs/terrainHazards'
 import { combatMechanic } from './defs/combat'
 import { fishingLakeMechanic } from './defs/fishingLake'
 import { rainbowEndMechanic } from './defs/rainbowEnd'
+import { wyrmMechanic } from './defs/wyrm'
 
 // Array order = worldgen order: `world.ts` calls each `placeWorld` in this
-// order, threading RNG state. Reordering changes the determinism golden. Gate
-// goes first, locksmith second (reads gate position for min-distance). Pure
-// encounter/event mechanics (terrainHazards, combat) have no `placeWorld` and
-// sit at the end.
+// order, threading RNG state. Peer-aware placers assert their predecessor's
+// presence; reordering them changes the determinism golden.
 export const MECHANICS: readonly MechanicDef[] = [
-  gateMechanic,
+  wyrmMechanic,
   locksmithMechanic,
+  gateMechanic,
   farmMechanic,
   campMechanic,
   townMechanic,

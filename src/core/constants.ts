@@ -18,6 +18,7 @@ export const SIGNPOST_COUNT = 6
 
 // Worldgen tuning
 export const GATE_LOCKSMITH_MIN_DISTANCE = 7
+export const LOCKSMITH_LAIR_MIN_DISTANCE = 4
 
 export const CAMP_COUNT = 3
 export const CAMP_COOLDOWN_MOVES = 3
@@ -77,11 +78,17 @@ export const BEAST_CARRY_CAP_BONUS = 50
 export const LOCKSMITH_KEY_FOOD_COST = 10
 export const LOCKSMITH_KEY_GOLD_COST = 20
 
+// v0.5 - Wyrm / Lair
+export const WYRM_PAY_GOLD_COST = 30
+export const WYRM_INITIAL_HEALTH = 30
+export const MAX_PARTY_SLOTS = 3
+
 export const TERRAIN_KINDS = ['grass', 'road', 'mountain', 'grass', 'swamp', 'woods', 'road'] as const satisfies readonly TerrainKind[]
 export const FEATURE_KINDS = [
   'gate',
   'gateOpen',
   'locksmith',
+  'lair',
   'signpost',
   'farm',
   'camp',
@@ -103,6 +110,7 @@ export const FEATURES: Record<FeatureKind, { spriteId: number }> = {
   gate: { spriteId: SPRITES.interactivePois.gate },
   gateOpen: { spriteId: SPRITES.interactivePois.gateOpen },
   locksmith: { spriteId: SPRITES.interactivePois.locksmith },
+  lair: { spriteId: SPRITES.tiles.cave },
   signpost: { spriteId: SPRITES.tiles.signpost },
   farm: { spriteId: SPRITES.tiles.farm },
   camp: { spriteId: SPRITES.interactivePois.camp },
@@ -123,6 +131,7 @@ export function spriteIdForKind(kind: CellKind): number {
     case 'gate':
     case 'gateOpen':
     case 'locksmith':
+    case 'lair':
     case 'signpost':
     case 'farm':
     case 'camp':
@@ -145,6 +154,7 @@ export function terrainLoreLinesForKind(kind: CellKind): readonly string[] {
     case 'gate':
     case 'gateOpen':
     case 'locksmith':
+    case 'lair':
     case 'signpost':
     case 'farm':
     case 'camp':

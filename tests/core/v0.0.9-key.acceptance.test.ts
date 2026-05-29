@@ -8,6 +8,7 @@ import {
 } from '../../src/core/constants'
 import { ACTION_LOCKSMITH_LEAVE, ACTION_LOCKSMITH_PAY_FOOD } from '../../src/core/mechanics/defs/locksmith'
 import type { State, World } from '../../src/core/types'
+import { makeResources } from './_helpers/makeResources'
 
 function newRun(seed = 1): State {
   const s = processAction(null, { type: ACTION_NEW_RUN, seed })
@@ -36,7 +37,7 @@ function makeState(): State {
     world: makeWorld(),
     player: { position: { x: 1, y: 0 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: INITIAL_FOOD, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
+    resources: makeResources({ food: INITIAL_FOOD, gold: 0, armySize: 5 }),
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -64,12 +65,17 @@ describe('v0.0.9 key acceptance', () => {
     expect(ontoGate.ui.message.length).toBeGreaterThan(0)
   })
 
-  it('buying key at locksmith costs 10 food and sets hasBronzeKey', () => {
+  it('buying key at locksmith costs 10 food and adds bronzeKey to inventory', () => {
     const s = makeState()
     s.resources.food = 12
+    // v0.5: locksmith requires Blood as a precondition; seeded directly to keep
+    // this test focused on the original food→key forge behavior.
+    s.resources.inventory.push('blood')
     const ontoLocksmith = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     const paid = processAction(ontoLocksmith, { type: ACTION_LOCKSMITH_PAY_FOOD })!
-    expect(paid.resources.hasBronzeKey).toBe(true)
+    expect(paid.resources.inventory).toContain('bronzeKey')
+    // v0.5: 'blood' is consumed as the quench when the key is forged.
+    expect(paid.resources.inventory).not.toContain('blood')
     // Move spends 1; carry cap clamps 11→10 before paying 10 for the key.
     expect(paid.resources.food).toBe(0)
   })
@@ -77,14 +83,16 @@ describe('v0.0.9 key acceptance', () => {
   it('cannot buy key without enough food', () => {
     const s = makeState()
     s.resources.food = 5
+    s.resources.inventory.push('blood')
     const ontoLocksmith = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     const tryBuy = processAction(ontoLocksmith, { type: ACTION_LOCKSMITH_PAY_FOOD })!
-    expect(tryBuy.resources.hasBronzeKey).toBe(false)
+    expect(tryBuy.resources.inventory).not.toContain('bronzeKey')
   })
 
   it('gate opens with key (win, and gate cell becomes gateOpen)', () => {
     let s = makeState()
     s.resources.food = 12
+    s.resources.inventory.push('blood')
     s = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     s = processAction(s, { type: ACTION_LOCKSMITH_PAY_FOOD })!
     s = processAction(s, { type: ACTION_LOCKSMITH_LEAVE })!

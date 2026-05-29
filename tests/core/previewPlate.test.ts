@@ -8,6 +8,7 @@ import {
 import { MECHANIC_INDEX } from '../../src/core/mechanics'
 import { SPRITES } from '../../src/core/spriteIds'
 import type { Cell, Encounter, EncounterKind, State, World } from '../../src/core/types'
+import { makeResources } from './_helpers/makeResources'
 
 function makeWorld(centerCell: Cell): World {
   const grass = (): Cell => ({ kind: 'grass' })
@@ -30,7 +31,7 @@ function makeState(centerCell: Cell, encounter: Encounter | null): State {
     world: makeWorld(centerCell),
     player: { position: { x: 1, y: 1 } },
     run: { stepCount: 1, hasWon: false, isGameOver: false, knowsPosition: true, path: [], lostBufferStartIndex: null },
-    resources: { food: 10, gold: 50, armySize: 5, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
+    resources: makeResources({ food: 10, gold: 50, armySize: 5 }),
     encounter,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -137,6 +138,36 @@ describe('previewPlate hooks', () => {
       const state = makeState({ kind: 'grass' }, null)
       const lines = lookup('combat')(state)
       expect(lines).toBeNull()
+    })
+
+    // Regression: pre-v0.5, combat right-grid + preview-plate ignored
+    // `sourceCellId`, so the renderer's placeholder preview encounter
+    // (`previewEncounter()` returns `sourceCellId: -1`) was always safe to
+    // pass through. v0.5's variant lookup dereferences `sourceCellId` to find
+    // the source mechanic, which crashed on the sentinel because
+    // `cells[Math.floor(-1 / width)]` is undefined. The providers must remain
+    // total functions on the synthesized preview — the renderer uses them to
+    // build the right-grid for grid-slide transitions before any real source
+    // cell exists.
+    it('preview-plate is total on the synthesized preview encounter (sourceCellId: -1)', () => {
+      const previewEncounter = MECHANIC_INDEX.previewEncounterByEncounterKind.combat?.()
+      expect(previewEncounter).toBeDefined()
+      const state = makeState({ kind: 'grass' }, previewEncounter ?? null)
+      const lines = lookup('combat')(state)
+      expect(lines).toEqual([{ spriteId: SPRITES.stats.enemy, text: '0' }])
+    })
+
+    it('right-grid is total on the synthesized preview encounter (sourceCellId: -1)', () => {
+      const previewEncounter = MECHANIC_INDEX.previewEncounterByEncounterKind.combat?.()
+      expect(previewEncounter).toBeDefined()
+      const state = makeState({ kind: 'grass' }, previewEncounter ?? null)
+      const provider = MECHANIC_INDEX.rightGridByEncounterKind.combat
+      if (!provider) throw new Error('No combat right-grid registered')
+      // Center cell falls through `combatVariantForEncounter`; sentinel must
+      // resolve to STANDARD_COMBAT_VARIANT, not crash on the missing cell.
+      const center = provider(state, 1, 1)
+      expect(center.spriteId).toBe(SPRITES.stats.enemy)
+      expect(center.action).toBeNull()
     })
   })
 })

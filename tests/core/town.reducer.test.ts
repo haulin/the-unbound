@@ -18,6 +18,7 @@ import {
 import { FOOD_CARRY_FULL_MESSAGE } from '../../src/core/foodCarry'
 import { RNG } from '../../src/core/rng'
 import type { Cell, DeltaAnim, GridTransitionAnim, State, TownCell, World } from '../../src/core/types'
+import { makeResources } from './_helpers/makeResources'
 
 function grass(): Cell {
   return { kind: 'grass' }
@@ -53,7 +54,7 @@ function makeState(seed = 7): State {
     world,
     player: { position: { x: 1, y: 1 } },
     run: { stepCount: 10, hasWon: false, isGameOver: false, knowsPosition: true, path: [], lostBufferStartIndex: null },
-    resources: { food: 0, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
+    resources: makeResources({ food: 0, gold: 0, armySize: 5 }),
     encounter: { kind: 'town', sourceCellId: 4, restoreMessage: 'restored' },
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -111,12 +112,12 @@ describe('town reducer', () => {
     expect(next.resources.armySize).toBe(7)
   })
 
-  it('hire scout: pays gold and sets hasScout', () => {
+  it('hire scout: pays gold and adds scout to party', () => {
     const s0 = makeState()
     s0.resources.gold = 12
 
     const next = processAction(s0, { type: ACTION_TOWN_HIRE_SCOUT })!
-    expect(next.resources.hasScout).toBe(true)
+    expect(next.resources.party).toContain('scout')
     expect(next.resources.gold).toBe(0)
 
     const expectedLine = RNG.createRunCopyRandom(s0).perMoveLine(TOWN_SCOUT_HIRE_LINES, { cellId: 4 })
@@ -126,7 +127,7 @@ describe('town reducer', () => {
   it('hire scout when already owned shows lore and changes nothing', () => {
     const s0 = makeState()
     s0.resources.gold = 999
-    s0.resources.hasScout = true
+    s0.resources.party = ['scout']
 
     const next = processAction(s0, { type: ACTION_TOWN_HIRE_SCOUT })!
     expect(next.resources).toEqual(s0.resources)

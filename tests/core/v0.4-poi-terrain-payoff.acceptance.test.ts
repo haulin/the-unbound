@@ -22,6 +22,7 @@ import {
 import { ACTION_TOWN_BUY_FOOD } from '../../src/core/mechanics/defs/town'
 import type { Cell, State, TownCell, World } from '../../src/core/types'
 import { FOOD_CARRY_FULL_MESSAGE } from '../../src/core/foodCarry'
+import { makeResources } from './_helpers/makeResources'
 
 function grass(): Cell {
   return { kind: 'grass' }
@@ -74,14 +75,7 @@ function makeState(world: World): State {
       lostBufferStartIndex: null,
       copyCursors: {},
     },
-    resources: {
-      food: 5,
-      gold: 0,
-      armySize: 5,
-      hasBronzeKey: false,
-      hasScout: false,
-      hasTameBeast: false,
-    },
+    resources: makeResources({ food: 5, gold: 0, armySize: 5 }),
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -135,14 +129,7 @@ describe('v0.4 POI + terrain payoff acceptance (harness)', () => {
     const s0: State = {
       ...makeState(w),
       player: { position: { x: 1, y: 1 } },
-      resources: {
-        food: 10,
-        gold: 99,
-        armySize: 5,
-        hasBronzeKey: false,
-        hasScout: false,
-        hasTameBeast: false,
-      },
+      resources: makeResources({ food: 10, gold: 99, armySize: 5 }),
       encounter: { kind: 'town', sourceCellId: town.id, restoreMessage: 'x' },
     }
     const after = processAction(s0, { type: ACTION_TOWN_BUY_FOOD })!
@@ -199,18 +186,18 @@ describe('v0.4 farm modal', () => {
     expect(rejected.ui.message).toContain(FOOD_CARRY_FULL_MESSAGE)
   })
 
-  it('buy beast spends farm-specific cost and sets hasTameBeast once', () => {
+  it('buy beast spends farm-specific cost and adds mule to party once', () => {
       const w = makeWorld({ kind: 'farm', id: 4, name: 'Greyfield', beastGoldCost: 10 })
     const s0 = makeState(w)
     s0.resources.gold = 10
 
     const onto = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     const beast = processAction(onto, { type: ACTION_FARM_BUY_BEAST })!
-    expect(beast.resources.hasTameBeast).toBe(true)
+    expect(beast.resources.party).toContain('mule')
     expect(beast.resources.gold).toBe(0)
 
     const again = processAction(beast, { type: ACTION_FARM_BUY_BEAST })!
-    expect(again.resources.hasTameBeast).toBe(true)
+    expect(again.resources.party).toContain('mule')
     expect(again.ui.message.length).toBeGreaterThan(0)
   })
 })
@@ -220,13 +207,17 @@ describe('v0.4 locksmith modal', () => {
     const w = makeWorld({ kind: 'locksmith' })
     const s0 = makeState(w)
     s0.resources.gold = LOCKSMITH_KEY_GOLD_COST
+    // v0.5: locksmith requires Blood as a precondition. v0.0.9/v0.4 acceptance
+    // tests seed it directly so they continue to validate the original
+    // forge-and-pay loop without re-running the whole wyrm arc.
+    s0.resources.inventory.push('blood')
 
     const onto = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     expect(onto.encounter?.kind).toBe('locksmith')
-    expect(onto.resources.hasBronzeKey).toBe(false)
+    expect(onto.resources.inventory).not.toContain('bronzeKey')
 
     const paid = processAction(onto, { type: ACTION_LOCKSMITH_PAY_GOLD })!
-    expect(paid.resources.hasBronzeKey).toBe(true)
+    expect(paid.resources.inventory).toContain('bronzeKey')
     expect(paid.resources.gold).toBe(0)
 
     const revisit = processAction(paid, { type: ACTION_LOCKSMITH_PAY_GOLD })!
@@ -239,16 +230,18 @@ describe('v0.4 locksmith modal', () => {
     const s0 = makeState(w)
     // Need to have enough after MOVE cost is paid on entry.
     s0.resources.food = LOCKSMITH_KEY_FOOD_COST + 1
+    s0.resources.inventory.push('blood')
 
     const onto = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     const paid = processAction(onto, { type: ACTION_LOCKSMITH_PAY_FOOD })!
-    expect(paid.resources.hasBronzeKey).toBe(true)
+    expect(paid.resources.inventory).toContain('bronzeKey')
     expect(paid.resources.food).toBe(0)
   })
 
   it('leave ends encounter and restores MOVE', () => {
     const w = makeWorld({ kind: 'locksmith' })
     const s0 = makeState(w)
+    s0.resources.inventory.push('blood')
     const onto = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     const left = processAction(onto, { type: ACTION_LOCKSMITH_LEAVE })!
     expect(left.encounter).toBe(null)

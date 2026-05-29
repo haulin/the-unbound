@@ -3,6 +3,7 @@ import { processAction } from '../../src/core/processAction'
 import { ACTION_MOVE, ENABLE_ANIMATIONS, MOVE_SLIDE_FRAMES } from '../../src/core/constants'
 import { ACTION_TOWN_LEAVE } from '../../src/core/mechanics/defs/town'
 import type { Cell, GridTransitionAnim, State, World } from '../../src/core/types'
+import { makeResources } from './_helpers/makeResources'
 
 function grass(): Cell {
   return { kind: 'grass' }
@@ -39,7 +40,7 @@ function makeState(world: World): State {
     world,
     player: { position: { x: 1, y: 0 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: 10, gold: 0, armySize: 5, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
+    resources: makeResources({ food: 10, gold: 0, armySize: 5 }),
     encounter: null,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }

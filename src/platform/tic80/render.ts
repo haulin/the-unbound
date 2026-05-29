@@ -240,7 +240,7 @@ function drawMap(s: State, x: number, y: number, sizePx: number) {
 
 function drawLeftPanel(s: State) {
   rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, UI.UI_COLOR_BG)
-  const frame = s.resources.hasBronzeKey ? SPRITES.ui8x8.panelBorderBronze : SPRITES.ui8x8.panelBorder
+  const frame = s.resources.inventory.includes('bronzeKey') ? SPRITES.ui8x8.panelBorderBronze : SPRITES.ui8x8.panelBorder
   drawNineSliceFrame(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, frame, {
     tilePx: 8,
     scale: 1,
@@ -361,13 +361,10 @@ function drawRightTopBar(s: State) {
   const iconY = y0 + 2
   const valueY = y0 + 11
 
-  // Right -> left status icons inside the bar.
+  // Right -> left status icons inside the bar. Order is display order.
   const iconGap = 2
-  let rightInset = 0
-  if (s.resources.hasBronzeKey) rightInset += 16 + iconGap
-  if (s.resources.hasScout) rightInset += 16 + iconGap
-  if (s.resources.hasTameBeast) rightInset += 16 + iconGap
-  if (rightInset) rightInset -= iconGap
+  const heldIcons = heldStatusIcons(s)
+  const rightInset = heldIcons.length ? heldIcons.length * (16 + iconGap) - iconGap : 0
 
   const statsMaxX = x0 + w - padX - rightInset
 
@@ -399,21 +396,30 @@ function drawRightTopBar(s: State) {
   drawStatItem(1, SPRITES.smallStats8x8.position, formatPositionLabel(s))
   drawStatItem(2, SPRITES.smallStats8x8.steps, `${s.run.stepCount}`)
 
-  // Right -> left status icons inside the bar.
   let xr = x0 + w - padX - 16
   const bigIconY = y0 + 1
-  if (s.resources.hasBronzeKey) {
-    spr(SPRITES.stats.key, xr, bigIconY, 0, 1, 0, 0, 2, 2)
+  for (const spriteId of heldIcons) {
+    spr(spriteId, xr, bigIconY, 0, 1, 0, 0, 2, 2)
     xr -= 16 + 2
   }
-  if (s.resources.hasScout) {
-    spr(SPRITES.stats.scout, xr, bigIconY, 0, 1, 0, 0, 2, 2)
-    xr -= 16 + 2
+}
+
+// Status-bar icon manifest: display order, predicate, sprite. Adding a new
+// held thing (e.g. silver key) is one row.
+type StatusIconSlot = { collection: 'inventory' | 'party'; id: string; spriteId: number }
+const STATUS_ICON_SLOTS: readonly StatusIconSlot[] = [
+  { collection: 'inventory', id: 'bronzeKey', spriteId: SPRITES.stats.key },
+  { collection: 'inventory', id: 'blood', spriteId: SPRITES.cosmetics.bloodVial },
+  { collection: 'party', id: 'scout', spriteId: SPRITES.stats.scout },
+  { collection: 'party', id: 'mule', spriteId: SPRITES.cosmetics.beastIllustration },
+]
+
+function heldStatusIcons(s: State): readonly number[] {
+  const out: number[] = []
+  for (const slot of STATUS_ICON_SLOTS) {
+    if (s.resources[slot.collection].includes(slot.id)) out.push(slot.spriteId)
   }
-  if (s.resources.hasTameBeast) {
-    spr(SPRITES.cosmetics.beastIllustration, xr, bigIconY, 0, 1, 0, 0, 2, 2)
-    xr -= 16 + 2
-  }
+  return out
 }
 
 function drawRightGridOps(ops: RightGridRenderOp[]) {

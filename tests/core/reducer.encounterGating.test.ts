@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
 import { ACTION_FIGHT, ACTION_RETURN } from '../../src/core/mechanics/defs/combat'
 import type { State, World } from '../../src/core/types'
+import { makeResources } from './_helpers/makeResources'
 
 // When the run is over (game-over or won), the encounter dispatcher must skip the
 // per-encounter handler entirely and return prevState unchanged. Mechanics rely on
@@ -24,7 +25,7 @@ function makeState(): State {
     world,
     player: { position: { x: 1, y: 1 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
-    resources: { food: 5, gold: 0, armySize: 3, hasBronzeKey: false, hasScout: false, hasTameBeast: false },
+    resources: makeResources({ food: 5, gold: 0, armySize: 3 }),
     encounter: { kind: 'combat', enemyArmySize: 4, sourceCellId: 4, restoreMessage: 'X' },
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }

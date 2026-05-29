@@ -1,27 +1,13 @@
 # Tentative roadmap (The Unbound)
 
-UI update intermezzo:
-- donkey overlaps steps stat. Need to reshuffle UI again.
+**v0.6 — Combat balance & UI intermezzo**
 
-**v0.5 — The Wyrm**
+- Fights rework — more enemies should yield bigger rewards; winning against 2× armies is sometimes impossible. Combo breaker candidate: guaranteed hit after missing 3–4× in a row.
+- The fight algo is a bit weird — long streaks of hit or miss.
+- UI: donkey overlaps the steps stat. Reshuffle the left panel.
+- Food carry cap: stop trimming food when army shrinks (combat losses, starvation). Rule shifts from "food ≤ cap" to "gains can't exceed cap, but existing food sticks through cap drops". Single-helper change in `src/core/foodCarry.ts` (`resourcesWithClampedFoodIfNeeded` → `applyFoodCapOnGain(prev, next)`); 5 callsites. No UI work — food is shown as a plain number, cap is invisible.
 
-Main-arc obstacle that gives a run its middle act. Lives in a cave in the mountains; bleeds when bested; the Locksmith needs the blood as the quench for the bronze key.
-
-- Lair PoI: cave-tile sprite; worldgen places it by replacing a mountain tile in a mountain cluster (once per map).
-- Wyrm encounter: combat with action buttons — Fight / Pay (bribe in gold to draw blood without combat) / Flee.
-- Non-lethal framing: combat ends when blood is drawn; the wyrm crawls back to recover. No death animation needed.
-- The Blood: new inventory state, like the bronze key. UI indicator alongside the key icon.
-- Pay button pattern debuts here in combat.
-- Fights rework - more enemies should yield bigger rewards, winning against 2x armies is sometimes impossible. Maybe introduce a combo breaker where player lands a guaraneed hit after missing 3-4x in a row.
-- The fight algo is a bit weird. Long streaks of hit or miss.
-- Locksmith change: additive — requires Blood + existing gold/food payment. Without Blood, no modal opens; tile shows inline flavor only (uses the planned "skip modal if nothing to do" pattern from Ideas).
-- Signpost wiring: Lair becomes a valid signpost target alongside Locksmith and Gate.
-- Barkeep tips: `wyrm` category added to existing town tip pool; `goal` category extended with quench/wyrm hints.
-- First-visit Lair lore.
-- Lore writing: `WYRM_*` line pools, `LAIR_*` pool, `LOCKSMITH_NO_BLOOD_LINES`, `LOCKSMITH_BLOOD_READY_LINES`, and updated `LOCKSMITH_PURCHASE_LINES` with quench beats.
-- Audit `lore.ts` mechanics index against final implementation.
-
-**v0.6 — Camps, Towns, Terrain & Henge Scaling**
+**v0.7 — Camps, Towns, Terrain & Henge Scaling**
 
 - Camps reworked: Search (food + troops, cooldown) / Local Map (fixed price, fixed radius, buyer beware) / Leave
 - Buy map features - add Cs, Fs, Ts, Rs, L/G for gold.
@@ -35,7 +21,7 @@ Main-arc obstacle that gives a run its middle act. Lives in a cave in the mounta
 
 - for everything we should audit lore.ts and make sure to update lines to reflect new mechanics.
 
-**v0.7 — Random Encounters & World Texture**
+**v0.8 — Random Encounters & World Texture**
 - Random encounter pool on any tile (5-6 types): loot find / lone soldier joins / cursed tile / traps / abandoned supplies / fellow traveller with rumor / something negative TBD
 - Healer specialty hire added to Town pool (replaces the original swamp-healer concept). P5 revive 1 wounded per combat + N9 -1 gold per Town visit (maintenance). Existing sprite. New lore pool `HEALER_*`. See `docs/2026-05-27-slot-system-design.md`.
 - Multiple flavor text variations per tile type (deterministic rotation by seed+step)
@@ -49,7 +35,7 @@ Polish for demo:
 - animations for left panel
 - more exciting win / lose
 
-**v0.8 — Slot System: Trading & Farm Animals**
+**v0.9 — Slot System: Trading & Farm Animals**
 
 See `docs/2026-05-27-slot-system-design.md` for the full design.
 
@@ -58,33 +44,33 @@ See `docs/2026-05-27-slot-system-design.md` for the full design.
 - Boar specialty added to Farm pool. P3' opening volley (~25% of enemy army at combat start) + N15 bidirectional Mule exclusion. New 16×16 sprite (low body, bristled back, tusks). Lore lines for `BOAR_*` and `*_REFUSED_LINES` already in `lore.ts`.
 - Mule update (paired with Boar): wire Mule end of the bidirectional exclusion. Mule N1 (-1 food per Camp Search) gets the sprite-flash treatment in passing.
 
-**v0.9 — Slot System: People & Economy**
+**v0.10 — Slot System: People & Economy**
 
 - Captain specialty added to Camp pool. P4 +10% combat odds + N7 +ambush% in woods/mountains. New 16×16 sprite (head + shoulders + flag-on-pole). New lore pool `CAPTAIN_*`.
 - Fisherman specialty added to Town pool. P8 double lake yields + N8 +1 troop loss per flee. New 16×16 sprite (rod-on-shoulder). New lore pool `FISHERMAN_*`.
 - Magpie specialty added to Farm pool. P probabilistic 30% refund on folk payments (Town food, Camp/Town hires, Locksmith fee); shows original price, gold check against original, refund visible. No demo negative; balanced by probability + higher purchase price. New 16×16 bird sprite. New lore pool `MAGPIE_*`.
 - Final slot-system audit against pairing rules in `the-unbound-learnings.md` (P+P slot exemptions, ledger consistency).
 
-**v0.10 — Taverns** (demo release milestone)
+**v0.11 — Taverns** (demo release milestone)
 - Tavern PoI (named, standalone, one or two per map)
 - Buy rumors: reveals one named PoI location for gold (locksmith, gate, lair, random landmark)
 - Gambling mini-game (bet gold, contextual buttons, slight house edge)
 - Tavern flavor text pool (warmer, unreliable narrator register)
 - Tavern rumors may reveal which Town carries which specialty hire (Scout / Healer / Fisherman).
 
-**v0.11 — Second Gate (Silver)**
+**v0.12 — Second Gate (Silver)**
 - Silver keyholder, silver gate, silver border
 - Map size increases (10×10)
 - Slot system carries over between gates (all seven slots persist).
 - Balance pass across full run arc: food, gold, army, run length
 
-**v0.12 — Polish & Teaching**
+**v0.13 — Polish & Teaching**
 - Game over messages per cause (starvation, combat, fleeing with 1 troop)
 - Win messages per gate tier
 - Full flavor text audit — tone consistency, missing tile types, first-visit teaching lines
 - Sprite audit and bank reshuffle if needed
 
-**v0.13 — Third Gate & Release Candidate**
+**v0.14 — Third Gate & Release Candidate**
 - Gold gate, gold border
 - Epic map size (15×15)
 - Full balance pass
@@ -109,7 +95,7 @@ This file captures ideas discussed during design, kept out of the current phase'
 - Reach three gates with three keys to win.
 - Replay of the steps at game end.
 - Event spawn probabilities influenced by player stats and time-since-visit (e.g., when poor, more likely to find a chest).
-- Pegasus / fast-travel: bought somewhere for gold, one-use jump to any visited tile. Unsolved: destination selection UI within the 4-button constraint. Was a v0.8 milestone item, deferred until the UI question is answered.
+- Pegasus / fast-travel: bought somewhere for gold, one-use jump to any visited tile. Unsolved: destination selection UI within the 4-button constraint.
 - Multi-criteria gate test for silver/gold gates: "the gate measures you." Bronze accepts the key alone; silver might accept key OR (key + army threshold); gold asks everything (key AND army AND gold AND something else). Gives runs alternate paths and reasons to over-build a stat.
 - Dynamic `GOAL_NARRATIVE` that rewrites itself as the player learns: prologue → "the forge has heat enough but lacks the quench" → "the smith is waiting" → "only the gate remains." Held back from demo so first-time players can discover the arc; revisit when most players have multiple runs under their belt.
 - Cross-run memory: persistent flags for "you bled the Wyrm in a prior run" and similar achievements. Lets returning players skip rediscovery and explore other corners of the world. Tone already supports it (lore says "this time might be different"); scope is large.

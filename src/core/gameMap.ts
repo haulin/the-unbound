@@ -88,7 +88,7 @@ export function computeGameMapView(s: State): { markers: GameMapMarker[]; showPl
     // Oriented:
     // - Scout adds global reveal for select POIs (F/C/H/T).
     // - Path contributes only committed (mapped) positions.
-    if (s.resources.hasScout) {
+    if (s.resources.party.includes('scout')) {
       for (let y = 0; y < s.world.height; y++) {
         for (let x = 0; x < s.world.width; x++) {
           const kind = s.world.cells[y]![x]!.kind
