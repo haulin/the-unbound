@@ -121,6 +121,40 @@ Animation should improve feel/legibility without infecting game logic.
 - **Choice prompts (ordering)**: when you need a decision, state your recommendation first (with 1–2 reasons), then present the options.
 - **Doc-as-contract during iteration**: once a tweak becomes the baseline, capture it in the relevant design/plan doc; avoid freezing volatile copy strings in docs.
 
+## Agent playtesting
+
+The terminal platform (`npm run play`) is, among other things, an agent-driveable surface. We use it to run *blind playtests* — an LLM agent plays a fresh seed with no access to source, docs, or prior context — to find out what the design teaches itself and what it doesn't.
+
+**When it's useful**: after a balance pass, after adding a mechanic that depends on a teaching chain (signpost → rumor → discovery → action), or when you suspect the game is asking too much of meta-knowledge.
+
+**The minimal recipe**:
+
+1. Pick a seed (`--seed=N`). Same seed = same world, useful for A/B comparing render changes against each other.
+2. Use `--blind` to suppress dev-only affordances (currently the minimap toggle).
+3. Launch a subagent with these absolute rules in its prompt:
+   - Only tool: Shell, only command: `npm run play -- --seed=N --blind --moves=<KEYS>`.
+   - No file reads, no web, no other shell commands, no `cat`/`ls`/`pwd`.
+   - Never press `3` (restart) while alive — it advances the seed and discards map memory.
+4. Each turn: agent narrates observation + hypothesis + intended next move + appends one key to the accumulating `<KEYS>` string.
+5. Stop on `[GAME OVER]`, `[YOU WIN]`, move budget, or strategic stop.
+
+**Reading the report**: take action sequences as ground truth. Prose narration is a mix of observation and confabulation — agents will describe map markers as "cottages and gardens" when the output is single-letter glyphs. Confidence outpaces sample size: a few lucky combat rolls can become a confidently-stated wrong "rule". The final action can also contradict the chain-of-thought directly above it — log what was *done*, not what was *thought*.
+
+**What to look for**:
+
+- *What does the agent figure out, and at what step?* If the locksmith → blood → lair chain takes 100+ LLM turns, that's data on how deep the inference is.
+- *What hypotheses do they try and reject?* Wrong hypotheses tell you what the design's flavor text *almost* points at.
+- *What never gets tried?* Agents that never visit a tile type are a signal that nothing in the world is pulling them toward it.
+- *Does the rumor pool carry teaching?* Plenty of mechanics in this game are taught by `BARKEEP_TIPS` lines bought at towns; a blind run reveals which ones land and which sit unread.
+
+**Limits**:
+
+- Prompt-trust isolation only — within Cursor, a subagent technically *can* read source. Honest agents flag their own slips at the end of the run.
+- ~30–60 s per LLM turn. An 80-move blind run is ~60–90 minutes of wall time.
+- The open-files panel in Cursor is visible to the subagent. For stricter isolation, run from a window with no relevant files open, or move the runner to the Cursor SDK with allow-listed tools.
+
+**More**: full architectural details and decision rationale are in [`docs/plans/2026-05-30-terminal-platform-design.md`](./plans/2026-05-30-terminal-platform-design.md).
+
 ## Refactor philosophy (boy scout rule)
 
 - **Code churn isn’t the enemy**: refactor freely when it improves clarity and reduces parallel bookkeeping.

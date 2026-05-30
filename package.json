@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit && node scripts/build-cart.mjs",
     "dev": "node scripts/dev.mjs",
+    "play": "node scripts/run-terminal.mjs",
     "test": "vitest run",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
     "verify": "npm run build && npm run typecheck:test && npm run test"

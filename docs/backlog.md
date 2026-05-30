@@ -1,19 +1,47 @@
 # Tentative roadmap (The Unbound)
 
+## Ideas
+- when map is toggled on we should highlight the button more - white border maybe
+- disabled buttons rendered with a checkerboard overlay?
+- skip modal if nothing to do (not enough money or cooldown - camp/farm/town)
+- maybe adjust worldgen as it feels like swamps & mountains are too common
+- make rainbows modals - if player chooses to not take gold, next visit it increases
+- Consider making roads cost food only ~50% of the time (mechanics/balance change; would require tests + tuning).
+- Collectibles to find. Maybe just getting one of each creatures (healer/scout/beast) - shows on home page instead of question marks. Another home page challenge icon is - not using a map the whole run.
+- buying scout shows animation - switch to show map, reveal tiles, hide map (if it was hidden)
+- active item that allows you to auto-win a fight or land a hit at least
+- passive item no food consumed for 10 steps
+- bank gives interest on deposits
+- an item that gives more gold from fights / selling
+- orchard get 5 free food
+- plant a tree to pick 5 free food every cooldown
+- morale modifying battle odds, +2, +5, +10% either way (curse could lower it, praying at altar could clear a curse)
+- every 28 days a plague comes that kills half your army
+- different types of enemies (magic/strength) or different loot drops
+
+UI intermezzo:
+- UI: donkey overlaps the steps stat. Adding 3rd companion makes it worse
+- ideas:
+    - try scaling down buttons to 1x
+    - could scale down stats with 8x8 sprites and stuff them all in one column
+    - some stats like seed number and steps are not that important, maybe show them only in map view
+    - currently only inventory item could be shown instead of "show goal" button
+
+
 **v0.6 — Combat balance & UI intermezzo**
 
 - Fights rework — more enemies should yield bigger rewards; winning against 2× armies is sometimes impossible. Combo breaker candidate: guaranteed hit after missing 3–4× in a row.
 - The fight algo is a bit weird — long streaks of hit or miss.
-- UI: donkey overlaps the steps stat. Reshuffle the left panel.
 - Food carry cap: stop trimming food when army shrinks (combat losses, starvation). Rule shifts from "food ≤ cap" to "gains can't exceed cap, but existing food sticks through cap drops". Single-helper change in `src/core/foodCarry.ts` (`resourcesWithClampedFoodIfNeeded` → `applyFoodCapOnGain(prev, next)`); 5 callsites. No UI work — food is shown as a plain number, cap is invisible.
+- goblin enemies ambush in woods, replace brigands, drop food
+- Henge fights scale harder (enemy = player×2..player×3 (min 10)), reward 10..25 gold+food
+- Maybe recruit button in fights that allows to pay gold for remaining troops - 1/1, 2/4, 3/9, 4/16, etc (reuses Wyrm's Pay pattern)
+- Rich enemies drop more loot
 
 **v0.7 — Camps, Towns, Terrain & Henge Scaling**
 
 - Camps reworked: Search (food + troops, cooldown) / Local Map (fixed price, fixed radius, buyer beware) / Leave
 - Buy map features - add Cs, Fs, Ts, Rs, L/G for gold.
-- Rich enemies drop more loot
-- Henge fights scale harder (enemy = player×2..player×3 (min 10)), reward 10..25 gold+food
-- Maybe recruit button in fights that allows to pay gold for remaining troops - 1/1, 2/4, 3/9, 4/16, etc (reuses Wyrm's Pay pattern)
 - Swamp upside: small chance of rare herb (food bonus or combat buff) or gold from a corpse
 - Mountains upside: small chance of cave loot (gold or food cache)
 - Slot system infrastructure (groundwork for later slot work): generalize the existing single-hire pattern at Camps/Towns into a per-PoI specialty (one of a small pool, fixed at worldgen by seed). Farms get the same pattern. Modal stays 3 buttons + Leave. See `docs/2026-05-27-slot-system-design.md`.
@@ -42,7 +70,7 @@ See `docs/2026-05-27-slot-system-design.md` for the full design.
 - The Crossing PoI: new sell-only PoI. Buttons show held slots' sprites; tapping sells that slot for half its purchase price. Instance name pool: Salt Crossing, Crow's, Brass, Three-Lane, Big Oak, Stoneford, Pilgrim's. Worldgen: 1–2 per map.
 - Sprite-flash animation primitive: pulse slot icon when event-triggered effect fires. Shared by all slots with event-driven P or N.
 - Boar specialty added to Farm pool. P3' opening volley (~25% of enemy army at combat start) + N15 bidirectional Mule exclusion. New 16×16 sprite (low body, bristled back, tusks). Lore lines for `BOAR_*` and `*_REFUSED_LINES` already in `lore.ts`.
-- Mule update (paired with Boar): wire Mule end of the bidirectional exclusion. Mule N1 (-1 food per Camp Search) gets the sprite-flash treatment in passing.
+- Mule update (paired with Boar): wire Mule end of the bidirectional exclusion. Mule N1 (-1 food per Camp Search) gets the sprite-flash treatment in passing. Also implement mule negative.
 
 **v0.10 — Slot System: People & Economy**
 
@@ -98,7 +126,6 @@ This file captures ideas discussed during design, kept out of the current phase'
 - Pegasus / fast-travel: bought somewhere for gold, one-use jump to any visited tile. Unsolved: destination selection UI within the 4-button constraint.
 - Multi-criteria gate test for silver/gold gates: "the gate measures you." Bronze accepts the key alone; silver might accept key OR (key + army threshold); gold asks everything (key AND army AND gold AND something else). Gives runs alternate paths and reasons to over-build a stat.
 - Dynamic `GOAL_NARRATIVE` that rewrites itself as the player learns: prologue → "the forge has heat enough but lacks the quench" → "the smith is waiting" → "only the gate remains." Held back from demo so first-time players can discover the arc; revisit when most players have multiple runs under their belt.
-- Cross-run memory: persistent flags for "you bled the Wyrm in a prior run" and similar achievements. Lets returning players skip rediscovery and explore other corners of the world. Tone already supports it (lore says "this time might be different"); scope is large.
 - Ordinary key as a learnable mistake: let the Locksmith forge a key without the Blood; the gate refuses it; player learns by failure. Brutal for first-timers, interesting for hard mode / repeat players.
 
 ## Slot system — deferred (post-demo)
@@ -184,37 +211,14 @@ Effects available to current or future slots. Includes both already-wired-to-dem
 **Negative — Constraint**
 - Cannot coexist with another named slot
 
-## Ideas
-- when map is toggled on we should highlight the button more - white border maybe
-- disabled buttons rendered with a checkerboard overlay?
-- skip modal if nothing to do (not enough money or cooldown - camp/farm/town)
-- maybe adjust worldgen as it feels like swamps & mountains are too common
-- Consider making roads cost food only ~50% of the time (mechanics/balance change; would require tests + tuning).
-- Collectibles to find. Maybe just getting one of each creatures (healer/scout/beast) - shows on home page instead of question marks. Another home page challenge icon is - not using a map the whole run.
-- buying scout shows animation - switch to show map, reveal tiles, hide map (if it was hidden)
-- active item that allows you to auto-win a fight or land a hit at least
-- passive item no food consumed for 10 steps
-- bank gives interest on deposits
-- an item that gives more gold from fights / selling
-- orchard get 5 free food
-- plant a tree to pick 5 free food every cooldown
-- morale modifying battle odds, +2, +5, +10% either way (curse could lower it, praying at altar could clear a curse)
-- every 28 days a plague comes that kills half your army
-- different types of enemies (magic/strength) or different loot drops
 
 ## Tech
 - Animation scheduling: consider extracting reducer-side animation enqueueing into a dedicated pure helper once iteration stabilizes.
 
 
-
-
 ## shop clarity (deferred)
 
 - Town offer UI: decide whether to show quantity, price, or both (e.g. `3/5`), and whether bundle sizes should vary per offer/town.
-
-## Tavern / rumors (deferred)
-
-- Tavern where you pay for rumors explaining game mechanics.
 
 ## Swamp opportunity
 
@@ -240,9 +244,7 @@ Note: the demo-tier slot system (see `docs/2026-05-27-slot-system-design.md`) co
 
 Instead of or alongside keys, each gate world contains a named companion who has been trapped longer than you. Finding and convincing them to join requires a meaningful quest (cost scales with gate tier). Each companion removes a persistent friction from the game:
 
-Cartographer — reveals unvisited landmarks on the coordinate view; "lost" events are shorter
 Healer — plagues and battle losses reduced; eats extra food as upkeep
-Tame beast — increases max food carry capacity beyond army_size×2
 
 With all three companions at the final gate, the ending changes. "You don't go alone."
 Companions make late-game feel like earned evolution rather than stat accumulation. Each stage can be designed with/without specific companions in mind. Requires per-stage progression redesign — defer until core loop is validated across all three gates.
