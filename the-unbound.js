@@ -1,6 +1,6 @@
-// title:  The Unbound (prototype 0.4.0)
+// title:  The Unbound (prototype 0.5.0)
 // author: haulin
-// desc:   Prototype 0.4.0 toward the North Star
+// desc:   Prototype 0.5.0 toward the North Star
 // script: js
 // input:  mouse
 
@@ -321,93 +321,77 @@
 
   // src/core/spriteIds.ts
   var SPRITES = {
-    tiles: {
-      // Terrain / tiles
-      mountains: 2,
-      woods: 4,
-      swamp: 6,
+    // 16x16 world tiles (player walks on these).
+    terrain: {
       plains: 8,
       gravel: 10,
-      farm: 34,
-      lake: 36,
-      cave: 38,
-      signpost: 42,
-      rainbow: 76
+      woods: 4,
+      swamp: 6,
+      mountains: 2,
+      cave: 38
     },
-    interactivePois: {
-      locksmith: 66,
-      henge: 68,
+    // 16x16 POI tiles (overworld placement + illustration).
+    poi: {
+      lake: 34,
+      farm: 66,
+      henge: 36,
+      locksmith: 68,
+      signpost: 42,
+      rainbow: 76,
       town: 72,
-      // castle/town
       camp: 74,
       gate: 78,
-      gateOpen: 206
+      gateOpen: 46
     },
-    buttons: {
-      gold: 98,
+    // 16x16 things the player accumulates (stats / plate labels / grid buttons).
+    inventory: {
+      food: 194,
+      bloodVial: 198,
+      beast: 226,
+      bronzeKey: 196,
+      troop: 200,
+      scout: 228,
+      gold: 204
+    },
+    // 16x16 opponent-side stats.
+    enemies: {
+      heart: 134,
+      enemy: 132
+    },
+    // 16x16 verbs with no real-world referent.
+    actions: {
+      return: 98,
       fight: 100,
       map: 102,
-      troop: 104,
-      return: 108,
-      goal: 110,
-      food: 130,
-      beast: 132,
-      scout: 134,
-      rumorTip: 136,
-      search: 138,
-      minimap: 140,
+      minimap: 104,
       // "debug map" in sheet notes; used as minimap toggle
-      restart: 142
+      search: 106,
+      restart: 108,
+      goal: 110,
+      rumor: 142
     },
-    cosmetics: {
+    // 16x16 decorative centerpieces for encounter grids (never actionable).
+    centers: {
       farmBarn: 162,
-      beastIllustration: 164,
-      wyrmIllustration: 166,
-      rumorIllustration: 168,
-      campfireIcon: 170,
-      tombstoneIllustration: 174,
-      locksmithKiln: 194,
-      heart: 196,
-      bloodVial: 198,
-      marketStall: 200
+      locksmithKiln: 164,
+      wyrm: 166,
+      marketStall: 168,
+      campfire: 170,
+      tombstone: 174
     },
-    stats: {
-      food: 226,
-      enemy: 228,
-      scout: 230,
-      troop: 232,
-      gold: 236,
-      key: 238
-    },
-    smallStats8x8: {
+    // 8x8 small stat icons (seed / position / steps band).
+    small: {
       seed: 234,
       position: 235,
       steps: 250
     },
-    ui8x8: {
-      // Nine-slice 3x3, arranged as 3 columns x 3 rows (row stride is +16 sprite ids).
-      panelBorder: {
-        tl: 258,
-        t: 259,
-        tr: 260,
-        l: 274,
-        c: 275,
-        r: 276,
-        bl: 290,
-        b: 291,
-        br: 292
-      },
-      panelBorderBronze: {
-        tl: 261,
-        t: 262,
-        tr: 263,
-        l: 277,
-        c: 278,
-        r: 279,
-        bl: 293,
-        b: 294,
-        br: 295
-      },
+    // 8x8 UI chrome (nine-slice borders, map markers, texture overlay).
+    ui: {
+      // Nine-slice top-left tile ids. Variants escalate with player progress:
+      // default → blood (vial held) → bronze (key forged).
+      panelBorder: 258,
+      panelBorderBlood: 261,
+      panelBorderBronze: 264,
       mapHereMarker: 306,
       mapBackground: 307,
       previewGrain: 308
@@ -479,24 +463,24 @@
     "rainbowEnd"
   ];
   var TERRAIN = {
-    grass: { spriteId: SPRITES.tiles.plains },
-    road: { spriteId: SPRITES.tiles.gravel },
-    mountain: { spriteId: SPRITES.tiles.mountains },
-    swamp: { spriteId: SPRITES.tiles.swamp },
-    woods: { spriteId: SPRITES.tiles.woods }
+    grass: { spriteId: SPRITES.terrain.plains },
+    road: { spriteId: SPRITES.terrain.gravel },
+    mountain: { spriteId: SPRITES.terrain.mountains },
+    swamp: { spriteId: SPRITES.terrain.swamp },
+    woods: { spriteId: SPRITES.terrain.woods }
   };
   var FEATURES = {
-    gate: { spriteId: SPRITES.interactivePois.gate },
-    gateOpen: { spriteId: SPRITES.interactivePois.gateOpen },
-    locksmith: { spriteId: SPRITES.interactivePois.locksmith },
-    lair: { spriteId: SPRITES.tiles.cave },
-    signpost: { spriteId: SPRITES.tiles.signpost },
-    farm: { spriteId: SPRITES.tiles.farm },
-    camp: { spriteId: SPRITES.interactivePois.camp },
-    henge: { spriteId: SPRITES.interactivePois.henge },
-    town: { spriteId: SPRITES.interactivePois.town },
-    fishingLake: { spriteId: SPRITES.tiles.lake },
-    rainbowEnd: { spriteId: SPRITES.tiles.rainbow }
+    gate: { spriteId: SPRITES.poi.gate },
+    gateOpen: { spriteId: SPRITES.poi.gateOpen },
+    locksmith: { spriteId: SPRITES.poi.locksmith },
+    lair: { spriteId: SPRITES.terrain.cave },
+    signpost: { spriteId: SPRITES.poi.signpost },
+    farm: { spriteId: SPRITES.poi.farm },
+    camp: { spriteId: SPRITES.poi.camp },
+    henge: { spriteId: SPRITES.poi.henge },
+    town: { spriteId: SPRITES.poi.town },
+    fishingLake: { spriteId: SPRITES.poi.lake },
+    rainbowEnd: { spriteId: SPRITES.poi.rainbow }
   };
   function spriteIdForKind(kind) {
     switch (kind) {
@@ -561,7 +545,7 @@
   var ACTION_TOGGLE_MAP = "TOGGLE_MAP";
   var ACTION_TICK = "TICK";
   var MOVE_SLIDE_FRAMES = 15;
-  var LORE_MAX_CHARS_PER_LINE = 19;
+  var LORE_MAX_CHARS_PER_LINE = 20;
 
   // src/core/math.ts
   function wrapIndex(i, size) {
@@ -1057,6 +1041,12 @@ ${line}` } };
     }
     return { ...baseNext, ui: uiWith };
   }
+  function applyDeltasAndClose(state2, args, fromGrid) {
+    const next = applyDeltas(state2, args);
+    if (!ENABLE_ANIMATIONS) return { ...next, encounter: null };
+    const uiWith = enqueueGridTransition(next.ui, { from: fromGrid, to: "overworld" });
+    return { ...next, encounter: null, ui: uiWith };
+  }
   function buy(resources, spec) {
     const goldCost = spec.gold ?? 0;
     const foodCost = spec.food ?? 0;
@@ -1094,6 +1084,29 @@ ${line}` } };
     if (party.length >= MAX_PARTY_SLOTS) return [...party];
     return [...party, slot];
   }
+  function resolveActionSlot(slot, s) {
+    if (!slot) return null;
+    return typeof slot === "function" ? slot(s) : slot;
+  }
+  function gridButton(table, action) {
+    return { spriteId: table[action].spriteId, action: { type: action } };
+  }
+  function makeRightGrid(spec) {
+    return (s, row, col) => {
+      if (row === 1 && col === 2) return { spriteId: SPRITES.actions.return, action: spec.leaveAction };
+      if (row === 1 && col === 1) {
+        const sid = typeof spec.centerSpriteId === "function" ? spec.centerSpriteId(s) : spec.centerSpriteId;
+        return { spriteId: sid, action: null };
+      }
+      if (row === 0 && col === 1) return resolveActionSlot(spec.top, s) ?? { action: null };
+      if (row === 1 && col === 0) return resolveActionSlot(spec.left, s) ?? { action: null };
+      if (row === 2 && col === 1) return resolveActionSlot(spec.bottom, s) ?? { action: null };
+      return { action: null };
+    };
+  }
+  function previewEncounterProvider(kind) {
+    return () => ({ kind, sourceCellId: -1, restoreMessage: "" });
+  }
   function applyEnterAnims(ui, anims, startFrame) {
     let next = ui;
     for (let i = 0; i < anims.length; i++) {
@@ -1108,6 +1121,10 @@ ${line}` } };
   var ACTION_LOCKSMITH_PAY_GOLD = "LOCKSMITH_PAY_GOLD";
   var ACTION_LOCKSMITH_PAY_FOOD = "LOCKSMITH_PAY_FOOD";
   var ACTION_LOCKSMITH_LEAVE = "LOCKSMITH_LEAVE";
+  var LOCKSMITH_ACTIONS = {
+    [ACTION_LOCKSMITH_PAY_GOLD]: { spriteId: SPRITES.inventory.gold, reduce: reduceLocksmithPayGold },
+    [ACTION_LOCKSMITH_PAY_FOOD]: { spriteId: SPRITES.inventory.food, reduce: reduceLocksmithPayFood }
+  };
   var onEnterLocksmith = ({ cell, world, pos, stepCount, resources }) => {
     if (cell.kind !== "locksmith") return {};
     const r = RNG.createTileRandom({ world, stepCount, pos });
@@ -1138,27 +1155,23 @@ ${line}`;
     return result;
   };
   var reduceLocksmithAction = (prevState, action) => {
-    if (action.type !== ACTION_LOCKSMITH_PAY_GOLD && action.type !== ACTION_LOCKSMITH_PAY_FOOD && action.type !== ACTION_LOCKSMITH_LEAVE) {
-      return null;
-    }
-    const enc = prevState.encounter;
-    if (!enc || enc.kind !== "locksmith") return prevState;
+    if (action.type !== ACTION_LOCKSMITH_LEAVE && !(action.type in LOCKSMITH_ACTIONS)) return null;
     if (action.type === ACTION_LOCKSMITH_LEAVE) return leaveEncounter(prevState, "locksmith");
-    if (action.type === ACTION_LOCKSMITH_PAY_GOLD) return reduceLocksmithPayGold(prevState, enc.sourceCellId);
-    return reduceLocksmithPayFood(prevState);
+    const enc = prevState.encounter;
+    return LOCKSMITH_ACTIONS[action.type].reduce(prevState, enc);
   };
-  function reduceLocksmithPayGold(prevState, sourceCellId) {
+  function reduceLocksmithPayGold(prevState, enc) {
     const rnd = RNG.createRunCopyRandom(prevState);
     const result = buy(prevState.resources, { gold: LOCKSMITH_KEY_GOLD_COST, gain: { inventory: ["bronzeKey"] } });
     if (result.outcome === "noFunds") {
-      return setEncounterMessage(prevState, LOCKSMITH_NAME, rnd.perMoveLine(TOWN_NO_GOLD_LINES, { cellId: sourceCellId }));
+      return setEncounterMessage(prevState, LOCKSMITH_NAME, rnd.perMoveLine(TOWN_NO_GOLD_LINES, { cellId: enc.sourceCellId }));
     }
-    return applyDeltas(prevState, {
+    return applyDeltasAndClose(prevState, {
       resources: consumeBlood(result.resources),
       message: `${LOCKSMITH_NAME}
 ${rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)}`,
       deltas: result.deltas
-    });
+    }, "locksmith");
   }
   var placeLocksmith = ({ cells, rngState }) => {
     const lairPos = findCellByKind(cells, "lair");
@@ -1171,25 +1184,22 @@ ${rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)}`,
     });
     return { rngState: res.rngState };
   };
-  var locksmithPreviewPlate = () => {
-    const lines = [
-      { spriteId: SPRITES.stats.gold, text: `-${LOCKSMITH_KEY_GOLD_COST}` },
-      { spriteId: SPRITES.stats.food, text: `-${LOCKSMITH_KEY_FOOD_COST}` }
-    ];
-    return lines;
-  };
-  function reduceLocksmithPayFood(prevState) {
+  var locksmithPreviewPlate = () => [
+    { spriteId: LOCKSMITH_ACTIONS[ACTION_LOCKSMITH_PAY_GOLD].spriteId, text: `-${LOCKSMITH_KEY_GOLD_COST}` },
+    { spriteId: LOCKSMITH_ACTIONS[ACTION_LOCKSMITH_PAY_FOOD].spriteId, text: `-${LOCKSMITH_KEY_FOOD_COST}` }
+  ];
+  function reduceLocksmithPayFood(prevState, _enc) {
     const rnd = RNG.createRunCopyRandom(prevState);
     const result = buy(prevState.resources, { food: LOCKSMITH_KEY_FOOD_COST, gain: { inventory: ["bronzeKey"] } });
     if (result.outcome === "noFunds") {
       return setEncounterMessage(prevState, LOCKSMITH_NAME, rnd.perMoveLine(LOCKSMITH_NO_FOOD_LINES));
     }
-    return applyDeltas(prevState, {
+    return applyDeltasAndClose(prevState, {
       resources: consumeBlood(result.resources),
       message: `${LOCKSMITH_NAME}
 ${rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)}`,
       deltas: result.deltas
-    });
+    }, "locksmith");
   }
   function consumeBlood(resources) {
     if (!resources.inventory.includes("blood")) return resources;
@@ -1209,17 +1219,13 @@ ${rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)}`,
       kind: "locksmith",
       reduceAction: reduceLocksmithAction,
       previewPlate: locksmithPreviewPlate,
-      previewEncounter: () => ({ kind: "locksmith", sourceCellId: -1, restoreMessage: "" }),
-      rightGrid: (_s, row, col) => {
-        if (row === 0 && col === 1)
-          return { spriteId: SPRITES.buttons.gold, action: { type: ACTION_LOCKSMITH_PAY_GOLD } };
-        if (row === 1 && col === 0)
-          return { spriteId: SPRITES.buttons.food, action: { type: ACTION_LOCKSMITH_PAY_FOOD } };
-        if (row === 1 && col === 2)
-          return { spriteId: SPRITES.buttons.return, action: { type: ACTION_LOCKSMITH_LEAVE } };
-        if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.locksmithKiln, action: null };
-        return { action: null };
-      }
+      previewEncounter: previewEncounterProvider("locksmith"),
+      rightGrid: makeRightGrid({
+        leaveAction: { type: ACTION_LOCKSMITH_LEAVE },
+        centerSpriteId: SPRITES.centers.locksmithKiln,
+        top: gridButton(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_GOLD),
+        left: gridButton(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_FOOD)
+      })
     }
   };
 
@@ -1306,6 +1312,10 @@ ${dir}, ${chosen.d} leagues away.`;
   var ACTION_FARM_BUY_FOOD = "FARM_BUY_FOOD";
   var ACTION_FARM_BUY_BEAST = "FARM_BUY_BEAST";
   var ACTION_FARM_LEAVE = "FARM_LEAVE";
+  var FARM_ACTIONS = {
+    [ACTION_FARM_BUY_FOOD]: { spriteId: SPRITES.inventory.food, reduce: reduceFarmBuyFood },
+    [ACTION_FARM_BUY_BEAST]: { spriteId: SPRITES.inventory.beast, reduce: reduceFarmBuyBeast }
+  };
   function farmPrefix(farm) {
     const name = farm.name || "A Farm";
     return `${name} Farm`;
@@ -1334,15 +1344,10 @@ ${line}`;
     return result;
   };
   var reduceFarmAction = (prevState, action) => {
-    if (action.type !== ACTION_FARM_BUY_FOOD && action.type !== ACTION_FARM_BUY_BEAST && action.type !== ACTION_FARM_LEAVE) {
-      return null;
-    }
-    const enc = prevState.encounter;
-    if (!enc || enc.kind !== "farm") return prevState;
+    if (action.type !== ACTION_FARM_LEAVE && !(action.type in FARM_ACTIONS)) return null;
     if (action.type === ACTION_FARM_LEAVE) return leaveEncounter(prevState, "farm");
     const farm = getCellAt(prevState.world, prevState.player.position);
-    if (action.type === ACTION_FARM_BUY_FOOD) return reduceFarmBuyFood(prevState, farm);
-    return reduceFarmBuyBeast(prevState, farm);
+    return FARM_ACTIONS[action.type].reduce(prevState, farm);
   };
   function reduceFarmBuyFood(prevState, farm) {
     const prefix = farmPrefix(farm);
@@ -1379,11 +1384,10 @@ ${pick.line}`,
   var farmPreviewPlate = (s) => {
     const here = getCellAt(s.world, s.player.position);
     if (!here || here.kind !== "farm") return null;
-    const lines = [
-      { spriteId: SPRITES.stats.food, text: `-${FARM_BUY_FOOD_GOLD_COST}` },
-      { spriteId: SPRITES.cosmetics.beastIllustration, text: `-${here.beastGoldCost}` }
+    return [
+      { spriteId: FARM_ACTIONS[ACTION_FARM_BUY_FOOD].spriteId, text: `-${FARM_BUY_FOOD_GOLD_COST}` },
+      { spriteId: FARM_ACTIONS[ACTION_FARM_BUY_BEAST].spriteId, text: `-${here.beastGoldCost}` }
     ];
-    return lines;
   };
   function reduceFarmBuyBeast(prevState, farm) {
     const prefix = farmPrefix(farm);
@@ -1414,23 +1418,22 @@ ${rnd.perMoveLine(MULE_BUY_LINES, { cellId: farm.id })}`,
       kind: "farm",
       reduceAction: reduceFarmAction,
       previewPlate: farmPreviewPlate,
-      previewEncounter: () => ({ kind: "farm", sourceCellId: -1, restoreMessage: "" }),
-      rightGrid: (_s, row, col) => {
-        if (row === 0 && col === 1)
-          return { spriteId: SPRITES.buttons.food, action: { type: ACTION_FARM_BUY_FOOD } };
-        if (row === 1 && col === 0)
-          return { spriteId: SPRITES.buttons.beast, action: { type: ACTION_FARM_BUY_BEAST } };
-        if (row === 1 && col === 2)
-          return { spriteId: SPRITES.buttons.return, action: { type: ACTION_FARM_LEAVE } };
-        if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.farmBarn, action: null };
-        return { action: null };
-      }
+      previewEncounter: previewEncounterProvider("farm"),
+      rightGrid: makeRightGrid({
+        leaveAction: { type: ACTION_FARM_LEAVE },
+        centerSpriteId: SPRITES.centers.farmBarn,
+        top: gridButton(FARM_ACTIONS, ACTION_FARM_BUY_FOOD),
+        left: gridButton(FARM_ACTIONS, ACTION_FARM_BUY_BEAST)
+      })
     }
   };
 
   // src/core/mechanics/defs/camp.ts
   var ACTION_CAMP_SEARCH = "CAMP_SEARCH";
   var ACTION_CAMP_LEAVE = "CAMP_LEAVE";
+  var CAMP_ACTIONS = {
+    [ACTION_CAMP_SEARCH]: { spriteId: SPRITES.actions.search, reduce: reduceCampSearch }
+  };
   function computeCampArmyGain(args) {
     return RNG.keyedIntInRange({ seed: args.seed, stepCount: args.stepCount, cellId: args.campId }, 1, 2);
   }
@@ -1450,8 +1453,8 @@ ${rnd.perMoveLine(MULE_BUY_LINES, { cellId: farm.id })}`,
     if (stepCount < (camp.nextReadyStep ?? 0)) return null;
     const armyGain = computeCampArmyGain({ seed: s.world.seed, campId: camp.id, stepCount });
     return [
-      { spriteId: SPRITES.stats.food, text: `+${CAMP_FOOD_GAIN}` },
-      { spriteId: SPRITES.stats.troop, text: `+${armyGain}` }
+      { spriteId: SPRITES.inventory.food, text: `+${CAMP_FOOD_GAIN}` },
+      { spriteId: SPRITES.inventory.troop, text: `+${armyGain}` }
     ];
   };
   var onEnterCamp = ({ cell, world, pos }) => {
@@ -1474,11 +1477,9 @@ ${rnd.perMoveLine(MULE_BUY_LINES, { cellId: farm.id })}`,
     return result;
   };
   var reduceCampAction = (prevState, action) => {
-    if (action.type !== ACTION_CAMP_LEAVE && action.type !== ACTION_CAMP_SEARCH) return null;
-    const enc = prevState.encounter;
-    if (!enc || enc.kind !== "camp") return prevState;
+    if (action.type !== ACTION_CAMP_LEAVE && !(action.type in CAMP_ACTIONS)) return null;
     if (action.type === ACTION_CAMP_LEAVE) return leaveEncounter(prevState, "camp");
-    return reduceCampSearch(prevState);
+    return CAMP_ACTIONS[action.type].reduce(prevState);
   };
   function reduceCampSearch(prevState) {
     const campCell = getCellAt(prevState.world, prevState.player.position);
@@ -1525,14 +1526,12 @@ ${line}`,
       kind: "camp",
       reduceAction: reduceCampAction,
       previewPlate: campPreviewPlate,
-      previewEncounter: () => ({ kind: "camp", sourceCellId: -1, restoreMessage: "" }),
-      rightGrid: (_s, row, col) => {
-        if (row === 0 && col === 1) return { action: null };
-        if (row === 1 && col === 0) return { spriteId: SPRITES.buttons.search, action: { type: ACTION_CAMP_SEARCH } };
-        if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_CAMP_LEAVE } };
-        if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.campfireIcon, action: null };
-        return { action: null };
-      }
+      previewEncounter: previewEncounterProvider("camp"),
+      rightGrid: makeRightGrid({
+        leaveAction: { type: ACTION_CAMP_LEAVE },
+        centerSpriteId: SPRITES.centers.campfire,
+        left: gridButton(CAMP_ACTIONS, ACTION_CAMP_SEARCH)
+      })
     }
   };
 
@@ -1559,6 +1558,11 @@ ${line}`,
   var ACTION_FIGHT = "FIGHT";
   var ACTION_COMBAT_PAY = "COMBAT_PAY";
   var ACTION_RETURN = "RETURN";
+  var COMBAT_ACTIONS = {
+    [ACTION_FIGHT]: { spriteId: SPRITES.actions.fight, reduce: reduceCombatFight },
+    [ACTION_COMBAT_PAY]: { spriteId: SPRITES.inventory.gold, reduce: reduceCombatPay },
+    [ACTION_RETURN]: { spriteId: SPRITES.actions.return, reduce: reduceCombatReturn }
+  };
   function spawnEnemyArmy(opts) {
     const playerArmy = Math.max(0, Math.trunc(opts.playerArmy));
     const r = RNG.createStreamRandom(opts.rngState);
@@ -1599,20 +1603,12 @@ ${line}`,
     if (!hook) return world;
     return hook(world, sourceCellId);
   }
-  var combatRightGrid = (s, row, col) => {
-    if (row === 1 && col === 0) return { spriteId: SPRITES.buttons.fight, action: { type: ACTION_FIGHT } };
-    if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_RETURN } };
-    if (row === 1 && col === 1) {
-      const variant = combatVariantForEncounter(s);
-      return { spriteId: variant.centerSpriteId, action: null };
-    }
-    if (row === 0 && col === 1) {
-      const variant = combatVariantForEncounter(s);
-      if (!variant.payment) return { action: null };
-      return { spriteId: SPRITES.buttons.gold, action: { type: ACTION_COMBAT_PAY } };
-    }
-    return { action: null };
-  };
+  var combatRightGrid = makeRightGrid({
+    leaveAction: { type: ACTION_RETURN },
+    centerSpriteId: (s) => combatVariantForEncounter(s).centerSpriteId,
+    left: gridButton(COMBAT_ACTIONS, ACTION_FIGHT),
+    top: (s) => combatVariantForEncounter(s).payment ? gridButton(COMBAT_ACTIONS, ACTION_COMBAT_PAY) : null
+  });
   var combatPreviewPlate = (s) => {
     const enc = s.encounter;
     if (!enc || enc.kind !== "combat") return null;
@@ -1620,10 +1616,8 @@ ${line}`,
     return variant.previewPlateLines(s);
   };
   var reduceCombatAction = (prevState, action) => {
-    if (action.type !== ACTION_FIGHT && action.type !== ACTION_RETURN && action.type !== ACTION_COMBAT_PAY) return null;
-    if (action.type === ACTION_RETURN) return reduceCombatReturn(prevState);
-    if (action.type === ACTION_COMBAT_PAY) return reduceCombatPay(prevState);
-    return reduceCombatFight(prevState);
+    if (!(action.type in COMBAT_ACTIONS)) return null;
+    return COMBAT_ACTIONS[action.type].reduce(prevState);
   };
   function reduceCombatPay(prevState) {
     const enc = prevState.encounter;
@@ -1803,11 +1797,11 @@ ${line}`,
     };
   }
   var STANDARD_COMBAT_VARIANT = {
-    centerSpriteId: SPRITES.stats.enemy,
+    centerSpriteId: SPRITES.enemies.enemy,
     previewPlateLines: (s) => {
       const enc = s.encounter;
       if (!enc || enc.kind !== "combat") return [];
-      return [{ spriteId: SPRITES.stats.enemy, text: `${enc.enemyArmySize}` }];
+      return [{ spriteId: SPRITES.enemies.enemy, text: `${enc.enemyArmySize}` }];
     },
     encounterLines: COMBAT_ENCOUNTER_LINES,
     victoryLines: COMBAT_VICTORY_EXIT_LINES,
@@ -1915,6 +1909,13 @@ ${r.perMoveLine(HENGE_LORE_LINES, { cellId: hengeCell.id })}`;
   var ACTION_TOWN_HIRE_SCOUT = "hireScout";
   var ACTION_TOWN_BUY_RUMOR = "buyRumors";
   var ACTION_TOWN_LEAVE = "TOWN_LEAVE";
+  var TOWN_OFFERS = {
+    [ACTION_TOWN_BUY_FOOD]: { spriteId: SPRITES.inventory.food, priceKey: "foodGold", reduce: reduceTownBuyFood },
+    [ACTION_TOWN_BUY_TROOPS]: { spriteId: SPRITES.inventory.troop, priceKey: "troopsGold", reduce: reduceTownBuyTroops },
+    [ACTION_TOWN_HIRE_SCOUT]: { spriteId: SPRITES.inventory.scout, priceKey: "scoutGold", reduce: reduceTownHireScout },
+    [ACTION_TOWN_BUY_RUMOR]: { spriteId: SPRITES.actions.rumor, priceKey: "rumorGold", reduce: reduceTownBuyRumor }
+  };
+  var BASE_OFFERS = Object.keys(TOWN_OFFERS);
   function townPrefix(town) {
     const name = town.name || "A Town";
     return `${name} Town`;
@@ -1952,17 +1953,10 @@ ${line}`;
     return result;
   };
   var reduceTownAction = (prevState, action) => {
-    if (action.type !== ACTION_TOWN_BUY_FOOD && action.type !== ACTION_TOWN_BUY_TROOPS && action.type !== ACTION_TOWN_HIRE_SCOUT && action.type !== ACTION_TOWN_BUY_RUMOR && action.type !== ACTION_TOWN_LEAVE) {
-      return null;
-    }
-    const enc = prevState.encounter;
-    if (!enc || enc.kind !== "town") return prevState;
+    if (action.type !== ACTION_TOWN_LEAVE && !(action.type in TOWN_OFFERS)) return null;
     if (action.type === ACTION_TOWN_LEAVE) return leaveEncounter(prevState, "town");
     const town = getCellAt(prevState.world, prevState.player.position);
-    if (action.type === ACTION_TOWN_BUY_FOOD) return reduceTownBuyFood(prevState, town);
-    if (action.type === ACTION_TOWN_BUY_TROOPS) return reduceTownBuyTroops(prevState, town);
-    if (action.type === ACTION_TOWN_HIRE_SCOUT) return reduceTownHireScout(prevState, town);
-    return reduceTownBuyRumor(prevState, town);
+    return TOWN_OFFERS[action.type].reduce(prevState, town);
   };
   function reduceTownBuyFood(prevState, town) {
     const prefix = townPrefix(town);
@@ -2012,13 +2006,7 @@ ${rnd.perMoveLine(TOWN_SCOUT_HIRE_LINES, { cellId: town.id })}`,
     });
   }
   var placeNamedTowns = ({ cells, rngState }) => {
-    const baseOffers = [
-      ACTION_TOWN_BUY_FOOD,
-      ACTION_TOWN_BUY_TROOPS,
-      ACTION_TOWN_HIRE_SCOUT,
-      ACTION_TOWN_BUY_RUMOR
-    ];
-    const omitNoScoutIndices = [0, 1, 3];
+    const omittableOffers = BASE_OFFERS.filter((o) => o !== ACTION_TOWN_HIRE_SCOUT);
     let townIndex = 0;
     const next = placeNamedFeature(cells, rngState, {
       count: TOWN_COUNT,
@@ -2026,14 +2014,9 @@ ${rnd.perMoveLine(TOWN_SCOUT_HIRE_LINES, { cellId: town.id })}`,
       fallbackName: "A Town",
       canPlaceAt: (_x, _y, here) => isTerrainCell(here),
       buildCell: ({ x, y, name, rng }) => {
-        let omitIdx;
-        if (townIndex === 0) {
-          const idx = rng.intExclusive(omitNoScoutIndices.length);
-          omitIdx = omitNoScoutIndices[idx];
-        } else {
-          omitIdx = rng.intExclusive(baseOffers.length);
-        }
-        const offers = baseOffers.filter((_k, idx) => idx !== omitIdx);
+        const pool = townIndex === 0 ? omittableOffers : BASE_OFFERS;
+        const omitOffer = pool[rng.intExclusive(pool.length)];
+        const offers = BASE_OFFERS.filter((o) => o !== omitOffer);
         const foodGold = rng.intInRange(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX);
         const troopsGold = rng.intInRange(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX);
         const scoutGold = rng.intInRange(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX);
@@ -2052,18 +2035,19 @@ ${rnd.perMoveLine(TOWN_SCOUT_HIRE_LINES, { cellId: town.id })}`,
     });
     return { rngState: next };
   };
+  function townOfferSlot(s, idx) {
+    const town = getCellAt(s.world, s.player.position);
+    const o = town.offers[idx];
+    return o ? gridButton(TOWN_OFFERS, o) : null;
+  }
   var townPreviewPlate = (s) => {
     const here = getCellAt(s.world, s.player.position);
     if (!here || here.kind !== "town") return null;
-    const lines = [];
-    for (let i = 0; i < here.offers.length; i++) {
-      const o = here.offers[i];
-      if (o === "buyFood") lines.push({ spriteId: SPRITES.stats.food, text: `-${here.prices.foodGold}` });
-      else if (o === "buyTroops") lines.push({ spriteId: SPRITES.stats.troop, text: `-${here.prices.troopsGold}` });
-      else if (o === "hireScout") lines.push({ spriteId: SPRITES.stats.scout, text: `-${here.prices.scoutGold}` });
-      else if (o === "buyRumors") lines.push({ spriteId: SPRITES.cosmetics.rumorIllustration, text: `-${here.prices.rumorGold}` });
-    }
-    return lines.length ? lines : null;
+    if (!here.offers.length) return null;
+    return here.offers.map((o) => {
+      const spec = TOWN_OFFERS[o];
+      return { spriteId: spec.spriteId, text: `-${here.prices[spec.priceKey]}` };
+    });
   };
   function reduceTownBuyRumor(prevState, town) {
     const prefix = townPrefix(town);
@@ -2093,31 +2077,14 @@ ${pick.line}`,
       kind: "town",
       reduceAction: reduceTownAction,
       previewPlate: townPreviewPlate,
-      previewEncounter: () => ({ kind: "town", sourceCellId: -1, restoreMessage: "" }),
-      rightGrid: (s, row, col) => {
-        const town = getCellAt(s.world, s.player.position);
-        function spriteIdForOffer(o) {
-          if (!o) return null;
-          if (o === "buyFood") return SPRITES.buttons.food;
-          if (o === "buyTroops") return SPRITES.buttons.troop;
-          if (o === "hireScout") return SPRITES.buttons.scout;
-          if (o === "buyRumors") return SPRITES.buttons.rumorTip;
-          return null;
-        }
-        const offerAt = (idx) => {
-          const o = town.offers[idx];
-          if (!o) return { action: null };
-          const spriteId = spriteIdForOffer(o);
-          if (spriteId == null) return { action: null };
-          return { spriteId, action: { type: o } };
-        };
-        if (row === 0 && col === 1) return offerAt(0);
-        if (row === 1 && col === 0) return offerAt(1);
-        if (row === 2 && col === 1) return offerAt(2);
-        if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_TOWN_LEAVE } };
-        if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.marketStall, action: null };
-        return { action: null };
-      }
+      previewEncounter: previewEncounterProvider("town"),
+      rightGrid: makeRightGrid({
+        leaveAction: { type: ACTION_TOWN_LEAVE },
+        centerSpriteId: SPRITES.centers.marketStall,
+        top: (s) => townOfferSlot(s, 0),
+        left: (s) => townOfferSlot(s, 1),
+        bottom: (s) => townOfferSlot(s, 2)
+      })
     }
   };
 
@@ -2329,13 +2296,13 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     return { rngState: res.rngState };
   };
   var wyrmCombatVariant = {
-    centerSpriteId: SPRITES.cosmetics.wyrmIllustration,
+    centerSpriteId: SPRITES.centers.wyrm,
     previewPlateLines: (s) => {
       const enc = s.encounter;
       if (!enc || enc.kind !== "combat") return [];
       return [
-        { spriteId: SPRITES.cosmetics.heart, text: `${enc.enemyArmySize}` },
-        { spriteId: SPRITES.stats.gold, text: `-${WYRM_PAY_GOLD_COST}` }
+        { spriteId: SPRITES.enemies.heart, text: `${enc.enemyArmySize}` },
+        { spriteId: SPRITES.inventory.gold, text: `-${WYRM_PAY_GOLD_COST}` }
       ];
     },
     encounterLines: WYRM_ENCOUNTER_LINES,
@@ -2626,7 +2593,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
   function reduceGoal(s) {
     const prevUi = s.ui;
     const prevLeftPanel = prevUi.leftPanel;
-    const nextLeftPanel = prevLeftPanel.kind === LEFT_PANEL_KIND_MINIMAP ? prevLeftPanel : { kind: LEFT_PANEL_KIND_SPRITE, spriteId: SPRITES.buttons.goal };
+    const nextLeftPanel = prevLeftPanel.kind === LEFT_PANEL_KIND_MINIMAP ? prevLeftPanel : { kind: LEFT_PANEL_KIND_SPRITE, spriteId: SPRITES.actions.goal };
     return {
       world: s.world,
       player: s.player,
@@ -2870,11 +2837,11 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
   // src/core/rightGrid.ts
   var { rightGridByEncounterKind } = MECHANIC_INDEX;
   function getRightGridCellDef(s, row, col) {
-    if (row === 0 && col === 0) return { spriteId: SPRITES.buttons.goal, action: { type: ACTION_SHOW_GOAL } };
-    if (row === 2 && col === 0) return { spriteId: SPRITES.buttons.minimap, action: { type: ACTION_TOGGLE_MINIMAP } };
-    if (row === 2 && col === 2) return { spriteId: SPRITES.buttons.restart, action: { type: ACTION_RESTART } };
+    if (row === 0 && col === 0) return { spriteId: SPRITES.actions.goal, action: { type: ACTION_SHOW_GOAL } };
+    if (row === 2 && col === 0) return { spriteId: SPRITES.actions.minimap, action: { type: ACTION_TOGGLE_MINIMAP } };
+    if (row === 2 && col === 2) return { spriteId: SPRITES.actions.restart, action: { type: ACTION_RESTART } };
     if (row === 0 && col === 2) {
-      return { spriteId: SPRITES.buttons.map, action: { type: ACTION_TOGGLE_MAP } };
+      return { spriteId: SPRITES.actions.map, action: { type: ACTION_TOGGLE_MAP } };
     }
     const isRunOver = !!(s.run.isGameOver || s.run.hasWon);
     if (s.encounter) {
@@ -2890,19 +2857,32 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
   }
 
   // src/platform/tic80/layout.ts
-  var SCREEN_WIDTH = 240;
   var SCREEN_HEIGHT = 136;
-  var PANEL_LEFT_WIDTH = 120;
-  var PANEL_RIGHT_WIDTH = SCREEN_WIDTH - PANEL_LEFT_WIDTH;
+  var PANEL_LEFT_WIDTH = 128;
+  var PANEL_RIGHT_WIDTH = 112;
+  var RIGHT_PANEL_X = PANEL_LEFT_WIDTH;
   var GRID_COLS = 3;
   var GRID_ROWS = 3;
-  var CELL_SIZE_PX = 32;
+  var CELL_SIZE_PX = 24;
   var CELL_GAP_PX = 4;
   var GRID_WIDTH_PX = GRID_COLS * CELL_SIZE_PX + (GRID_COLS - 1) * CELL_GAP_PX;
   var GRID_HEIGHT_PX = GRID_ROWS * CELL_SIZE_PX + (GRID_ROWS - 1) * CELL_GAP_PX;
-  var GRID_ORIGIN_X = PANEL_LEFT_WIDTH + Math.floor((PANEL_RIGHT_WIDTH - GRID_WIDTH_PX) / 2);
-  var RIGHT_PANEL_HEADER_H = 18;
-  var GRID_ORIGIN_Y = RIGHT_PANEL_HEADER_H + 4;
+  var GRID_ORIGIN_X = RIGHT_PANEL_X + Math.floor((PANEL_RIGHT_WIDTH - GRID_WIDTH_PX) / 2);
+  var PANEL_FRAME_TILE_PX = 8;
+  var RIGHT_PANEL_TOP_BAND_H = 8;
+  var RIGHT_PANEL_BOTTOM_BAND_H = 16;
+  var RIGHT_PANEL_BAND_BLEED_PX = 2;
+  var RIGHT_PANEL_TOP_BAND_Y = PANEL_FRAME_TILE_PX - RIGHT_PANEL_BAND_BLEED_PX;
+  var RIGHT_PANEL_TOP_DIVIDER_Y = PANEL_FRAME_TILE_PX + RIGHT_PANEL_TOP_BAND_H;
+  var RIGHT_PANEL_BOTTOM_BAND_Y = SCREEN_HEIGHT - PANEL_FRAME_TILE_PX - RIGHT_PANEL_BOTTOM_BAND_H + RIGHT_PANEL_BAND_BLEED_PX;
+  var RIGHT_PANEL_BOTTOM_DIVIDER_Y = SCREEN_HEIGHT - PANEL_FRAME_TILE_PX - RIGHT_PANEL_BOTTOM_BAND_H - 1;
+  var gridAvailTop = RIGHT_PANEL_TOP_DIVIDER_Y + 1;
+  var gridAvailH = RIGHT_PANEL_BOTTOM_DIVIDER_Y - gridAvailTop;
+  var GRID_ORIGIN_Y = gridAvailTop + Math.floor((gridAvailH - GRID_HEIGHT_PX) / 2);
+  var RIGHT_PANEL_INNER_X = RIGHT_PANEL_X + PANEL_FRAME_TILE_PX;
+  var RIGHT_PANEL_INNER_W = PANEL_RIGHT_WIDTH - PANEL_FRAME_TILE_PX * 2;
+  var LEFT_PANEL_INNER_X = PANEL_FRAME_TILE_PX;
+  var LEFT_PANEL_INNER_W = PANEL_LEFT_WIDTH - PANEL_FRAME_TILE_PX * 2;
   function hitTestGridCell(mouseX, mouseY) {
     if (mouseX < GRID_ORIGIN_X) return null;
     if (mouseX >= GRID_ORIGIN_X + GRID_WIDTH_PX) return null;
@@ -2952,6 +2932,13 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
   var UI_COLOR_POI_NAME = 11;
   var UI_COLOR_POI_DESC = 13;
   var UI_COLOR_GRID_HOVER_TINT = 15;
+  var UI_COLOR_GRID_CELL_BORDER = 14;
+  var UI_COLOR_GRID_CELL_BORDER_META = 15;
+  var UI_GRID_CELL_BORDER_DOUBLE_INSET = 2;
+  var UI_COLOR_RIGHT_PANEL_DIVIDER = 15;
+  var UI_STATS_BAND_ITEM_GAP_PX = 3;
+  var UI_STATS_BAND_ICON_VALUE_GAP_PX = 2;
+  var UI_HELD_BAND_ICON_GAP_PX = 2;
   var UI_ILLUSTRATION_SCALE = 4;
   var UI_TEXTURE_TILE_PX = 8;
   var UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR = 8;
@@ -2963,12 +2950,17 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
   var UI_PREVIEW_PLATE_PAD = 2;
   var UI_PREVIEW_PLATE_W = 42;
   var UI_PREVIEW_PLATE_INSET = 2;
-  var UI_RIGHT_GRID_SPRITE_SCALE = 2;
+  var UI_RIGHT_GRID_SPRITE_SCALE = 1;
   var UI_RIGHT_GRID_SPRITE_W = 2;
   var UI_RIGHT_GRID_SPRITE_H = 2;
   var UI_RIGHT_GRID_COLORKEY = 0;
-  var UI_LEFT_PANEL_PADDING = 7;
-  var UI_LEFT_PANEL_INNER_GAP = 6;
+  var UI_LEFT_PANEL_PADDING = 8;
+  var UI_LORE_PADDING_X = 9;
+  var UI_LEFT_PANEL_INNER_GAP = 12;
+  var UI_LEFT_PANEL_LORE_TOP_GAP = 7;
+  var UI_COLOR_LEFT_PANEL_DIVIDER = 15;
+  var UI_LEFT_PANEL_DIVIDER_GAP_PX = 5;
+  var UI_LEFT_PANEL_STATS_OPTICAL_LIFT_PX = 3;
   var UI_STATUS_ICON_SIZE = 8;
   var UI_HERO_RESOURCE_GAP_PX = 2;
   var UI_AFTER_RESOURCES_GAP_PX = 2;
@@ -3008,7 +3000,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
   function drawTiledVert(spriteId, x, y, h, stepPx, colorkey, scale) {
     for (let dy = 0; dy < h; dy += stepPx) spr(spriteId, x, y + dy, colorkey, scale);
   }
-  function drawNineSliceFrame(x, y, w, h, sprites, opts = {}) {
+  function drawNineSliceFrame(x, y, w, h, topLeftSpriteId, opts = {}) {
     const tilePx = clampInt(opts.tilePx ?? 8, 1);
     const scale = clampInt(opts.scale ?? 1, 1);
     const colorkey = opts.colorkey ?? 0;
@@ -3028,21 +3020,24 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     const y1 = y0 + hPx - tileScreenPx;
     const innerW = wPx - tileScreenPx * 2;
     const innerH = hPx - tileScreenPx * 2;
-    spr(sprites.tl, x0, y0, colorkey, scale);
-    spr(sprites.tr, x1, y0, colorkey, scale);
-    spr(sprites.bl, x0, y1, colorkey, scale);
-    spr(sprites.br, x1, y1, colorkey, scale);
+    const topRowStart = topLeftSpriteId;
+    const midRowStart = topLeftSpriteId + 16;
+    const botRowStart = topLeftSpriteId + 32;
+    spr(topRowStart, x0, y0, colorkey, scale);
+    spr(topRowStart + 2, x1, y0, colorkey, scale);
+    spr(botRowStart, x0, y1, colorkey, scale);
+    spr(botRowStart + 2, x1, y1, colorkey, scale);
     withClip(x0 + tileScreenPx, y0, innerW, tileScreenPx, () => {
-      drawTiledHoriz(sprites.t, x0 + tileScreenPx, y0, innerW, tileScreenPx, colorkey, scale);
+      drawTiledHoriz(topRowStart + 1, x0 + tileScreenPx, y0, innerW, tileScreenPx, colorkey, scale);
     });
     withClip(x0 + tileScreenPx, y1, innerW, tileScreenPx, () => {
-      drawTiledHoriz(sprites.b, x0 + tileScreenPx, y1, innerW, tileScreenPx, colorkey, scale);
+      drawTiledHoriz(botRowStart + 1, x0 + tileScreenPx, y1, innerW, tileScreenPx, colorkey, scale);
     });
     withClip(x0, y0 + tileScreenPx, tileScreenPx, innerH, () => {
-      drawTiledVert(sprites.l, x0, y0 + tileScreenPx, innerH, tileScreenPx, colorkey, scale);
+      drawTiledVert(midRowStart, x0, y0 + tileScreenPx, innerH, tileScreenPx, colorkey, scale);
     });
     withClip(x1, y0 + tileScreenPx, tileScreenPx, innerH, () => {
-      drawTiledVert(sprites.r, x1, y0 + tileScreenPx, innerH, tileScreenPx, colorkey, scale);
+      drawTiledVert(midRowStart + 2, x1, y0 + tileScreenPx, innerH, tileScreenPx, colorkey, scale);
     });
   }
 
@@ -3055,51 +3050,56 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     if (row === 1 && col === 1) return 4;
     return -1;
   }
-  function spriteIdForModeCrossCell(s, mode, row, col) {
-    if (mode === "blank") return null;
-    const pos = s.player.position;
-    const provider = mode === "overworld" ? null : MECHANIC_INDEX.previewEncounterByEncounterKind[mode];
-    const s2 = { ...s, encounter: provider ? provider() : null };
-    const def = getRightGridCellDef(s2, row, col);
-    if (def.spriteId != null) return def.spriteId;
-    if (def.tilePreview && def.tilePreview.kind === "relativeToPlayer") {
-      return getSpriteIdAt(s.world, pos.x + def.tilePreview.dx, pos.y + def.tilePreview.dy);
+  function findGridTransitionAnim(s) {
+    if (!ENABLE_ANIMATIONS) return null;
+    const anims = s.ui.anim.active;
+    for (let i = 0; i < anims.length; i++) {
+      const a = anims[i];
+      if (a.kind === "gridTransition") return a;
     }
     return null;
   }
-  function previewSpriteIdForCell(s, row, col) {
-    let transition = null;
-    if (ENABLE_ANIMATIONS) {
-      const anims = s.ui.anim.active;
-      for (let i = 0; i < anims.length; i++) {
-        const a = anims[i];
-        if (a.kind === "gridTransition") {
-          transition = a;
-          break;
-        }
-      }
-    }
-    if (transition) {
-      const frame = s.ui.clock.frame | 0;
-      const start = transition.startFrame | 0;
-      if (frame >= start) {
-        const stepFrames = Math.max(1, GRID_TRANSITION_STEP_FRAMES | 0);
-        const t = Math.max(0, frame - start);
-        const phase = Math.floor(t / stepFrames);
-        const idx = crossRevealIndex(row, col);
-        if (idx >= 0) {
-          const mode = phase >= idx ? transition.params.to : transition.params.from;
-          return spriteIdForModeCrossCell(s, mode, row, col);
-        }
-      }
-    }
-    const def = getRightGridCellDef(s, row, col);
-    if (def.spriteId != null) return def.spriteId;
+  function transitionModeForCell(s, row, col) {
+    const transition = findGridTransitionAnim(s);
+    if (!transition) return null;
+    const idx = crossRevealIndex(row, col);
+    if (idx < 0) return null;
+    const frame = s.ui.clock.frame | 0;
+    const start = transition.startFrame | 0;
+    if (frame < start) return transition.params.from;
+    const stepFrames = Math.max(1, GRID_TRANSITION_STEP_FRAMES | 0);
+    const phase = Math.floor((frame - start) / stepFrames);
+    return phase >= idx ? transition.params.to : transition.params.from;
+  }
+  function synthesizeStateForMode(s, mode) {
+    if (mode === "overworld") return { ...s, encounter: null };
+    if (s.encounter && s.encounter.kind === mode) return s;
+    const provider = MECHANIC_INDEX.previewEncounterByEncounterKind[mode];
+    return { ...s, encounter: provider ? provider() : null };
+  }
+  function viewFromDef(def, s) {
     if (def.tilePreview && def.tilePreview.kind === "relativeToPlayer") {
       const p = s.player.position;
-      return getSpriteIdAt(s.world, p.x + def.tilePreview.dx, p.y + def.tilePreview.dy);
+      return {
+        spriteId: getSpriteIdAt(s.world, p.x + def.tilePreview.dx, p.y + def.tilePreview.dy),
+        category: "terrain"
+      };
     }
-    return null;
+    if (def.spriteId != null) return { spriteId: def.spriteId, category: "action" };
+    return { spriteId: null, category: "empty" };
+  }
+  function viewForCell(s, row, col) {
+    if (isMetaCornerCell({ row, col })) {
+      const def2 = getRightGridCellDef(s, row, col);
+      return { spriteId: def2.spriteId ?? null, category: "meta" };
+    }
+    const mode = transitionModeForCell(s, row, col);
+    if (mode === "blank") return { spriteId: null, category: "empty" };
+    const stateAt = mode != null ? synthesizeStateForMode(s, mode) : s;
+    const def = getRightGridCellDef(stateAt, row, col);
+    const view = viewFromDef(def, stateAt);
+    if (row === 1 && col === 1) return { spriteId: view.spriteId, category: "empty" };
+    return view;
   }
   function cellOriginPx(row, col) {
     const pitch = CELL_SIZE_PX + CELL_GAP_PX;
@@ -3113,6 +3113,35 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
   }
   function rectOp(x, y, w, h, color) {
     return { kind: "rect", x, y, w, h, color };
+  }
+  function rectbOp(x, y, w, h, color) {
+    return { kind: "rectb", x, y, w, h, color };
+  }
+  function borderOpsForCell(row, col, category) {
+    if (category === "empty") return [];
+    const o = cellOriginPx(row, col);
+    const size = CELL_SIZE_PX;
+    if (category === "meta") {
+      return [rectbOp(o.x, o.y, size, size, UI_COLOR_GRID_CELL_BORDER_META)];
+    }
+    if (category === "action") {
+      return [rectbOp(o.x, o.y, size, size, UI_COLOR_GRID_CELL_BORDER)];
+    }
+    const inset = UI_GRID_CELL_BORDER_DOUBLE_INSET;
+    const color = UI_COLOR_GRID_CELL_BORDER;
+    return [
+      rectbOp(o.x, o.y, size, size, color),
+      rectbOp(o.x + inset, o.y + inset, size - inset * 2, size - inset * 2, color)
+    ];
+  }
+  function cellBorderOps(s) {
+    const ops = [];
+    for (let row = 0; row < GRID_ROWS; row++) {
+      for (let col = 0; col < GRID_COLS; col++) {
+        ops.push(...borderOpsForCell(row, col, viewForCell(s, row, col).category));
+      }
+    }
+    return ops;
   }
   function sprOp(spriteId, x, y) {
     return {
@@ -3152,7 +3181,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
   }
   function rightPanelBoundsPx() {
     return {
-      x: PANEL_LEFT_WIDTH,
+      x: RIGHT_PANEL_X,
       y: 0,
       w: PANEL_RIGHT_WIDTH,
       h: SCREEN_HEIGHT
@@ -3208,12 +3237,13 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     for (let row = 0; row < GRID_ROWS; row++) {
       for (let col = 0; col < GRID_COLS; col++) {
         if (hover && hover.row === row && hover.col === col) ops.push(...drawHoverTintOps({ row, col }));
-        const spriteId = previewSpriteIdForCell(s, row, col);
-        if (spriteId == null) continue;
+        const view = viewForCell(s, row, col);
+        if (view.spriteId == null) continue;
         const o = spriteOriginInCellPx(row, col);
-        ops.push(sprOp(spriteId, o.x, o.y));
+        ops.push(sprOp(view.spriteId, o.x, o.y));
       }
     }
+    ops.push(...cellBorderOps(s));
     return { ops };
   }
   function buildMoveSlidePlan(s, anim, hover) {
@@ -3253,10 +3283,10 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     }
     ops.push(...maskOutsideGridOps(), ...maskGridGapsOps());
     const corners = [
-      { row: 0, col: 0, spriteId: SPRITES.buttons.goal },
-      { row: 2, col: 0, spriteId: SPRITES.buttons.minimap },
-      { row: 2, col: 2, spriteId: SPRITES.buttons.restart },
-      { row: 0, col: 2, spriteId: SPRITES.buttons.map }
+      { row: 0, col: 0, spriteId: SPRITES.actions.goal },
+      { row: 2, col: 0, spriteId: SPRITES.actions.minimap },
+      { row: 2, col: 2, spriteId: SPRITES.actions.restart },
+      { row: 0, col: 2, spriteId: SPRITES.actions.map }
     ];
     for (let i = 0; i < corners.length; i++) {
       const c = corners[i];
@@ -3268,6 +3298,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
         ops.push(sprOp(c.spriteId, o.x, o.y));
       }
     }
+    ops.push(...cellBorderOps(s));
     return { ops };
   }
   function buildRightGridRenderPlan(s, hints) {
@@ -3283,6 +3314,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     drawRightPanel(s, hints);
     drawLeftPanel(s);
   }
+  var FONT_CHAR_PX = 6;
   function formatA1(position) {
     const col = String.fromCharCode("A".charCodeAt(0) + position.x);
     const row = String(position.y + 1);
@@ -3327,7 +3359,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     const illPx = 16 * UI_ILLUSTRATION_SCALE;
     for (let oy = 0; oy < illPx; oy += UI_TEXTURE_TILE_PX) {
       for (let ox = 0; ox < illPx; ox += UI_TEXTURE_TILE_PX) {
-        spr(SPRITES.ui8x8.previewGrain, x + ox, y + oy, UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR, 1);
+        spr(SPRITES.ui.previewGrain, x + ox, y + oy, UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR, 1);
       }
     }
   }
@@ -3386,7 +3418,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
       const dy = UI_DELTA_OFFSET_Y - Math.floor(p * UI_DELTA_RISE_PX);
       const xCursor = cursorByTarget[a.params.target] ?? anchor.x + UI_DELTA_OFFSET_X;
       print(label, xCursor, anchor.y + dy, color);
-      cursorByTarget[a.params.target] = xCursor + label.length * 6 + UI_DELTA_GAP_PX;
+      cursorByTarget[a.params.target] = xCursor + label.length * FONT_CHAR_PX + UI_DELTA_GAP_PX;
     }
   }
   function drawMap(s, x, y, sizePx) {
@@ -3404,7 +3436,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     const py = s.player.position.y;
     for (let vy = -radius; vy <= radius; vy++) {
       for (let vx = -radius; vx <= radius; vx++) {
-        spr(SPRITES.ui8x8.mapBackground, centerX + vx * pitch, centerY + vy * pitch, 0);
+        spr(SPRITES.ui.mapBackground, centerX + vx * pitch, centerY + vy * pitch, 0);
       }
     }
     for (let i = 0; i < markers.length; i++) {
@@ -3415,15 +3447,17 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
       const color = m.isMapped ? UI_MAP_POI_TEXT_COLOR : UI_MAP_POI_UNCOMMITTED_TEXT_COLOR;
       print(m.label, centerX + dx * pitch + UI_MAP_POI_TEXT_OFFSET_X_PX, centerY + dy * pitch, color);
     }
-    spr(SPRITES.ui8x8.mapHereMarker, centerX - 1, centerY - 1, 0);
+    spr(SPRITES.ui.mapHereMarker, centerX - 1, centerY - 1, 0);
+  }
+  function panelFrameTopLeftFor(s) {
+    const inv = s.resources.inventory;
+    if (inv.includes("bronzeKey")) return SPRITES.ui.panelBorderBronze;
+    if (inv.includes("blood")) return SPRITES.ui.panelBorderBlood;
+    return SPRITES.ui.panelBorder;
   }
   function drawLeftPanel(s) {
     rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, UI_COLOR_BG);
-    const frame = s.resources.inventory.includes("bronzeKey") ? SPRITES.ui8x8.panelBorderBronze : SPRITES.ui8x8.panelBorder;
-    drawNineSliceFrame(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, frame, {
-      tilePx: 8,
-      scale: 1,
-      colorkey: 0,
+    drawNineSliceFrame(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, panelFrameTopLeftFor(s), {
       fallbackBorderColor: UI_COLOR_DIM
     });
     const encounterKind = s.encounter?.kind ?? null;
@@ -3440,7 +3474,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     } else if (leftPanel.kind === LEFT_PANEL_KIND_SPRITE) {
       drawIllustrationWithTextureOverlay(leftPanel.spriteId, illX, illY);
     } else if (s.run.isGameOver) {
-      drawIllustrationWithTextureOverlay(SPRITES.cosmetics.tombstoneIllustration, illX, illY);
+      drawIllustrationWithTextureOverlay(SPRITES.centers.tombstone, illX, illY);
     } else {
       drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY);
       if (encounterKind) {
@@ -3456,26 +3490,30 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
       }
     }
     const statusX = illX + illSize + UI_LEFT_PANEL_INNER_GAP;
-    const statusY = illY;
     const fontH = 6;
     const messageLineH = fontH + 1;
+    const headerBandBottomY = illY + illSize;
+    const horizontalDividerY = headerBandBottomY + Math.floor((UI_LEFT_PANEL_LORE_TOP_GAP - 1) / 2);
+    const statusBlockH = 3 * UI_ARMY_ICON_H_PX + 2 * UI_HERO_RESOURCE_GAP_PX;
+    const statusCenteredY = illY + Math.ceil((horizontalDividerY - illY - statusBlockH) / 2);
+    const statusY = Math.max(illY, statusCenteredY - UI_LEFT_PANEL_STATS_OPTICAL_LIFT_PX);
     const armyX = statusX;
     const armyY = statusY;
-    spr(SPRITES.stats.troop, armyX, armyY, -1, 1, 0, 0, 2, 2);
+    spr(SPRITES.inventory.troop, armyX, armyY, -1, 1, 0, 0, 2, 2);
     const armyValueX = armyX + UI_ARMY_VALUE_OFFSET_X;
     const armyValueY = armyY + UI_ARMY_VALUE_OFFSET_Y;
     const armyColor = s.resources.armySize < 6 ? UI_COLOR_WARN : UI_COLOR_TEXT;
     print(`${s.resources.armySize}`, armyValueX, armyValueY, armyColor);
     const foodX = statusX;
     const foodY = armyY + UI_ARMY_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX;
-    spr(SPRITES.stats.food, foodX, foodY, -1, 1, 0, 0, 2, 2);
+    spr(SPRITES.inventory.food, foodX, foodY, -1, 1, 0, 0, 2, 2);
     const foodValueX = foodX + UI_ICON_VALUE_OFFSET_X;
     const foodValueY = foodY + UI_ICON_VALUE_OFFSET_Y;
     const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? UI_COLOR_WARN : UI_COLOR_TEXT;
     print(`${s.resources.food}`, foodValueX, foodValueY, foodColor);
     const goldX = statusX;
     const goldY = foodY + UI_FOOD_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX;
-    spr(SPRITES.stats.gold, goldX, goldY, -1, 1, 0, 0, 2, 2);
+    spr(SPRITES.inventory.gold, goldX, goldY, -1, 1, 0, 0, 2, 2);
     const goldValueX = goldX + UI_GOLD_VALUE_OFFSET_X;
     const goldValueY = goldY + UI_GOLD_VALUE_OFFSET_Y;
     print(`${s.resources.gold}`, goldValueX, goldValueY, UI_COLOR_TEXT);
@@ -3485,74 +3523,90 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
       gold: { x: goldX, y: goldY }
     });
     const statusBottomY = goldY + UI_GOLD_ICON_H_PX + UI_AFTER_RESOURCES_GAP_PX;
-    const headerBottomY = Math.max(illY + illSize, statusBottomY);
-    const msgY = headerBottomY + 4;
+    const headerBottomY = Math.max(headerBandBottomY, statusBottomY);
+    drawLeftPanelDividers(illX, illY, illSize, horizontalDividerY);
+    const msgY = headerBottomY + UI_LEFT_PANEL_LORE_TOP_GAP;
     const headline = s.run.isGameOver ? { text: "GAME OVER", color: UI_COLOR_BAD } : s.run.hasWon ? { text: "YOU WIN", color: UI_COLOR_GOOD } : null;
     const headlineRows = headline ? 1 : 0;
     const maxLines = Math.max(0, Math.floor((SCREEN_HEIGHT - msgY - 4) / messageLineH) - headlineRows);
     const lore = loreLinesForMessage(s.ui.message, LORE_MAX_CHARS_PER_LINE);
     const textStartY = headline ? msgY + messageLineH : msgY;
-    if (headline) print(headline.text, UI_LEFT_PANEL_PADDING, msgY, headline.color);
+    if (headline) print(headline.text, UI_LORE_PADDING_X, msgY, headline.color);
     let printed = 0;
     for (let i = 0; i < lore.length && printed < maxLines; i++) {
       const line = lore[i];
-      print(line.text, UI_LEFT_PANEL_PADDING, textStartY + printed * messageLineH, line.color);
+      print(line.text, UI_LORE_PADDING_X, textStartY + printed * messageLineH, line.color);
       printed++;
     }
   }
   function drawRightPanel(s, hints) {
     const plan = buildRightGridRenderPlan(s, hints);
     drawRightGridOps(plan.ops);
-    drawRightTopBar(s);
+    drawRightStatsBand(s);
+    drawRightHeldBand(s);
+    drawRightPanelDividers();
+    drawRightPanelFrame(s);
   }
-  function drawRightTopBar(s) {
-    const x0 = GRID_ORIGIN_X;
-    const y0 = 0;
-    const w = GRID_WIDTH_PX;
-    const h = RIGHT_PANEL_HEADER_H;
-    rect(x0, y0, w, h, UI_COLOR_BG);
-    rectb(x0, y0, w, h, UI_COLOR_DIM);
-    const padX = 2;
-    const iconY = y0 + 2;
-    const valueY = y0 + 11;
-    const iconGap = 2;
-    const heldIcons = heldStatusIcons(s);
-    const rightInset = heldIcons.length ? heldIcons.length * (16 + iconGap) - iconGap : 0;
-    const statsMaxX = x0 + w - padX - rightInset;
-    const itemW = 18;
-    const itemGap = 2;
-    const valueMaxChars = 3;
-    const formatValue = (raw) => {
-      const s2 = String(raw || "");
-      if (s2.length <= valueMaxChars) return s2;
-      return s2.slice(-valueMaxChars);
-    };
-    const drawStatItem = (idx, iconSpriteId, rawValue) => {
-      const xItem = x0 + padX + idx * (itemW + itemGap);
-      if (xItem + itemW > statsMaxX) return;
-      const value = formatValue(rawValue);
-      const valueW = value.length * 6;
-      const xRight = xItem + itemW;
-      const valueX = xRight - valueW;
-      const iconX = xRight - UI_STATUS_ICON_SIZE;
-      spr(iconSpriteId, iconX, iconY, -1);
-      print(value, valueX, valueY, UI_COLOR_TEXT);
-    };
-    drawStatItem(0, SPRITES.smallStats8x8.seed, `${s.world.seed}`);
-    drawStatItem(1, SPRITES.smallStats8x8.position, formatPositionLabel(s));
-    drawStatItem(2, SPRITES.smallStats8x8.steps, `${s.run.stepCount}`);
-    let xr = x0 + w - padX - 16;
-    const bigIconY = y0 + 1;
-    for (const spriteId of heldIcons) {
-      spr(spriteId, xr, bigIconY, 0, 1, 0, 0, 2, 2);
-      xr -= 16 + 2;
+  function drawRightPanelFrame(s) {
+    drawNineSliceFrame(RIGHT_PANEL_X, 0, PANEL_RIGHT_WIDTH, SCREEN_HEIGHT, panelFrameTopLeftFor(s), {
+      fallbackBorderColor: UI_COLOR_DIM
+    });
+  }
+  function drawRightStatsBand(s) {
+    const items = [
+      { iconSpriteId: SPRITES.small.seed, value: `${s.world.seed}` },
+      { iconSpriteId: SPRITES.small.position, value: formatPositionLabel(s) },
+      { iconSpriteId: SPRITES.small.steps, value: `${s.run.stepCount}` }
+    ];
+    const iconSize = UI_STATUS_ICON_SIZE;
+    const iconValueGap = UI_STATS_BAND_ICON_VALUE_GAP_PX;
+    const itemGap = UI_STATS_BAND_ITEM_GAP_PX;
+    let contentW = 0;
+    for (let i = 0; i < items.length; i++) {
+      contentW += iconSize + iconValueGap + items[i].value.length * FONT_CHAR_PX;
+    }
+    contentW += (items.length - 1) * itemGap;
+    const bandY = RIGHT_PANEL_TOP_BAND_Y;
+    const iconY = bandY + Math.floor((RIGHT_PANEL_TOP_BAND_H - iconSize) / 2);
+    const textY = bandY + Math.floor((RIGHT_PANEL_TOP_BAND_H - FONT_CHAR_PX) / 2);
+    let x = RIGHT_PANEL_INNER_X + Math.floor((RIGHT_PANEL_INNER_W - contentW) / 2);
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      spr(item.iconSpriteId, x, iconY, -1);
+      x += iconSize + iconValueGap;
+      print(item.value, x, textY, UI_COLOR_TEXT);
+      x += item.value.length * FONT_CHAR_PX + itemGap;
     }
   }
+  function drawRightHeldBand(s) {
+    const heldIcons = heldStatusIcons(s);
+    if (heldIcons.length === 0) return;
+    const iconSize = 16;
+    const iconGap = UI_HELD_BAND_ICON_GAP_PX;
+    const contentW = heldIcons.length * iconSize + (heldIcons.length - 1) * iconGap;
+    const bandY = RIGHT_PANEL_BOTTOM_BAND_Y;
+    const iconY = bandY + Math.floor((RIGHT_PANEL_BOTTOM_BAND_H - iconSize) / 2);
+    let x = RIGHT_PANEL_INNER_X + Math.floor((RIGHT_PANEL_INNER_W - contentW) / 2);
+    for (const spriteId of heldIcons) {
+      spr(spriteId, x, iconY, 0, 1, 0, 0, 2, 2);
+      x += iconSize + iconGap;
+    }
+  }
+  function drawRightPanelDividers() {
+    rect(RIGHT_PANEL_INNER_X, RIGHT_PANEL_TOP_DIVIDER_Y, RIGHT_PANEL_INNER_W, 1, UI_COLOR_RIGHT_PANEL_DIVIDER);
+    rect(RIGHT_PANEL_INNER_X, RIGHT_PANEL_BOTTOM_DIVIDER_Y, RIGHT_PANEL_INNER_W, 1, UI_COLOR_RIGHT_PANEL_DIVIDER);
+  }
+  function drawLeftPanelDividers(illX, illY, illSize, horizontalY) {
+    const verticalX = illX + illSize + Math.floor(UI_LEFT_PANEL_INNER_GAP / 2);
+    const verticalH = Math.max(0, horizontalY - illY - UI_LEFT_PANEL_DIVIDER_GAP_PX);
+    rect(verticalX, illY, 1, verticalH, UI_COLOR_LEFT_PANEL_DIVIDER);
+    rect(LEFT_PANEL_INNER_X, horizontalY, LEFT_PANEL_INNER_W, 1, UI_COLOR_LEFT_PANEL_DIVIDER);
+  }
   var STATUS_ICON_SLOTS = [
-    { collection: "inventory", id: "bronzeKey", spriteId: SPRITES.stats.key },
-    { collection: "inventory", id: "blood", spriteId: SPRITES.cosmetics.bloodVial },
-    { collection: "party", id: "scout", spriteId: SPRITES.stats.scout },
-    { collection: "party", id: "mule", spriteId: SPRITES.cosmetics.beastIllustration }
+    { collection: "inventory", id: "bronzeKey", spriteId: SPRITES.inventory.bronzeKey },
+    { collection: "inventory", id: "blood", spriteId: SPRITES.inventory.bloodVial },
+    { collection: "party", id: "scout", spriteId: SPRITES.inventory.scout },
+    { collection: "party", id: "mule", spriteId: SPRITES.inventory.beast }
   ];
   function heldStatusIcons(s) {
     const out = [];
@@ -3565,6 +3619,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     for (let i = 0; i < ops.length; i++) {
       const op = ops[i];
       if (op.kind === "rect") rect(op.x, op.y, op.w, op.h, op.color);
+      else if (op.kind === "rectb") rectb(op.x, op.y, op.w, op.h, op.color);
       else spr(op.spriteId, op.x, op.y, op.colorkey, op.scale, op.flip, op.rotate, op.w, op.h);
     }
   }
@@ -3647,9 +3702,9 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
   globalThis.TIC = TIC;
 })();
 
-// title:  The Unbound (prototype 0.4.0)
+// title:  The Unbound (prototype 0.5.0)
 // author: haulin
-// desc:   Prototype 0.4.0 toward the North Star
+// desc:   Prototype 0.5.0 toward the North Star
 // script: js
 // input:  mouse
 

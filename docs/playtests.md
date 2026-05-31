@@ -68,8 +68,10 @@ v0.4: a/f/g/t/s
 v0.5: s/a/f/g/t
 47/11/17/18/50 - pretty good ride, lot of money, paid off both wyrm and locksmith, used map
 48/14/0/1/68 - on spawn point there was a rainbow and lair, hard to find locksmith, used map
+49/10/0/3/19 - spawned next to rainbow, lair, gate, stumbled upon locksmith, pacifist run
 
 agent playtest s48,s49,s50:
+--moves=79688884466222222222466266484822268424644468484884688844444222462266224688448846882448886444842626444448664866681684446222462266266246244486688638984464422222222644622444442226666888888668468888884462464848846422722226444642266862424692622439422224444668668664648446448444622266824424446246226244846424444444246244444422426244444662266866666468466 6866
 - Positions like J1/J10/J9 look like ID codes rather than Cartesian coords (otherwise moving N consistently should change the number monotonically; J1→J10→J9 doesn't). They might be region IDs. -> ah, a different seed yields different hypothesis, I like that
 - Step 21, F6 road. A second gate spotted at (7,0) — bottom-left! Also another henge at (2,0). Camp directly N 2 steps. Food 5. Hypothesis: Multiple gates likely exist (key might open any). -> I hope that's a bad hypothesis due to confusing map and not a bug
 - Observation: COMBAT IS NOT 1:1! After one fight: my army still 17, enemy dropped 19 → 9. I dealt 10 damage with no losses! -> thank you RNG god for this gift, so we can stop watching the agent just wander aimlessly and not engage with one of the core mechanics

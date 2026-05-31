@@ -20,8 +20,11 @@ import type { FarmCell, FarmEncounter, State } from '../../types'
 import {
   applyDeltas,
   buy,
+  gridButton,
   leaveEncounter,
+  makeRightGrid,
   noGoldResponse,
+  previewEncounterProvider,
   setEncounterMessage,
 } from '../encounterHelpers'
 import { cellId, isTerrainCell, placeNamedFeature } from '../../worldgen'
@@ -29,7 +32,6 @@ import type {
   MechanicDef,
   OnEnterTile,
   PlaceWorldProvider,
-  PreviewPlateLine,
   PreviewPlateProvider,
   ReduceEncounterAction,
   TileEnterResult,
@@ -38,9 +40,16 @@ import type {
 export const ACTION_FARM_BUY_FOOD = 'FARM_BUY_FOOD' as const
 export const ACTION_FARM_BUY_BEAST = 'FARM_BUY_BEAST' as const
 export const ACTION_FARM_LEAVE = 'FARM_LEAVE' as const
+
+type FarmActionSpec = { spriteId: number; reduce: (s: State, farm: FarmCell) => State }
+
+const FARM_ACTIONS = {
+  [ACTION_FARM_BUY_FOOD]:  { spriteId: SPRITES.inventory.food,  reduce: reduceFarmBuyFood  },
+  [ACTION_FARM_BUY_BEAST]: { spriteId: SPRITES.inventory.beast, reduce: reduceFarmBuyBeast },
+} as const satisfies Record<string, FarmActionSpec>
+
 export type FarmAction =
-  | { type: typeof ACTION_FARM_BUY_FOOD }
-  | { type: typeof ACTION_FARM_BUY_BEAST }
+  | { type: keyof typeof FARM_ACTIONS }
   | { type: typeof ACTION_FARM_LEAVE }
 
 function farmPrefix(farm: FarmCell): string {
@@ -77,23 +86,11 @@ const onEnterFarm: OnEnterTile = ({ cell, world, pos, stepCount }) => {
 // ---- Encounter actions ----
 
 const reduceFarmAction: ReduceEncounterAction = (prevState, action) => {
-  if (
-    action.type !== ACTION_FARM_BUY_FOOD &&
-    action.type !== ACTION_FARM_BUY_BEAST &&
-    action.type !== ACTION_FARM_LEAVE
-  ) {
-    return null
-  }
-
-  const enc = prevState.encounter
-  if (!enc || enc.kind !== 'farm') return prevState
-
+  if (action.type !== ACTION_FARM_LEAVE && !(action.type in FARM_ACTIONS)) return null
   if (action.type === ACTION_FARM_LEAVE) return leaveEncounter(prevState, 'farm')
 
   const farm = getCellAt(prevState.world, prevState.player.position) as FarmCell
-
-  if (action.type === ACTION_FARM_BUY_FOOD) return reduceFarmBuyFood(prevState, farm)
-  return reduceFarmBuyBeast(prevState, farm)
+  return FARM_ACTIONS[action.type as keyof typeof FARM_ACTIONS].reduce(prevState, farm)
 }
 
 function reduceFarmBuyFood(prevState: State, farm: FarmCell): State {
@@ -139,11 +136,10 @@ const placeNamedFarms: PlaceWorldProvider = ({ cells, rngState }) => {
 const farmPreviewPlate: PreviewPlateProvider = (s) => {
   const here = getCellAt(s.world, s.player.position)
   if (!here || here.kind !== 'farm') return null
-  const lines: PreviewPlateLine[] = [
-    { spriteId: SPRITES.stats.food, text: `-${FARM_BUY_FOOD_GOLD_COST}` },
-    { spriteId: SPRITES.cosmetics.beastIllustration, text: `-${here.beastGoldCost}` },
+  return [
+    { spriteId: FARM_ACTIONS[ACTION_FARM_BUY_FOOD].spriteId, text: `-${FARM_BUY_FOOD_GOLD_COST}` },
+    { spriteId: FARM_ACTIONS[ACTION_FARM_BUY_BEAST].spriteId, text: `-${here.beastGoldCost}` },
   ]
-  return lines
 }
 
 function reduceFarmBuyBeast(prevState: State, farm: FarmCell): State {
@@ -180,16 +176,12 @@ export const farmMechanic: MechanicDef = {
     kind: 'farm',
     reduceAction: reduceFarmAction,
     previewPlate: farmPreviewPlate,
-    previewEncounter: (): FarmEncounter => ({ kind: 'farm', sourceCellId: -1, restoreMessage: '' }),
-    rightGrid: (_s, row, col) => {
-      if (row === 0 && col === 1)
-        return { spriteId: SPRITES.buttons.food, action: { type: ACTION_FARM_BUY_FOOD } }
-      if (row === 1 && col === 0)
-        return { spriteId: SPRITES.buttons.beast, action: { type: ACTION_FARM_BUY_BEAST } }
-      if (row === 1 && col === 2)
-        return { spriteId: SPRITES.buttons.return, action: { type: ACTION_FARM_LEAVE } }
-      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.farmBarn, action: null }
-      return { action: null }
-    },
+    previewEncounter: previewEncounterProvider('farm'),
+    rightGrid: makeRightGrid({
+      leaveAction: { type: ACTION_FARM_LEAVE },
+      centerSpriteId: SPRITES.centers.farmBarn,
+      top: gridButton(FARM_ACTIONS, ACTION_FARM_BUY_FOOD),
+      left: gridButton(FARM_ACTIONS, ACTION_FARM_BUY_BEAST),
+    }),
   },
 }

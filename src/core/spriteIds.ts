@@ -1,102 +1,86 @@
-// Sprite ID registry (TIC-80 sprite sheet).
-//
-// Goal: keep all numeric IDs in one place so future sprite shuffles are cheap.
+// Sprite ID registry (TIC-80 sprite sheet). Organized by what the sprite
+// depicts, not where it renders. See docs/plans/2026-05-30-ui-intermezzo-design.md.
 
 export const SPRITES = {
-  tiles: {
-    // Terrain / tiles
-    mountains: 2,
-    woods: 4,
-    swamp: 6,
+  // 16x16 world tiles (player walks on these).
+  terrain: {
     plains: 8,
     gravel: 10,
-    farm: 34,
-    lake: 36,
+    woods: 4,
+    swamp: 6,
+    mountains: 2,
     cave: 38,
+  },
+
+  // 16x16 POI tiles (overworld placement + illustration).
+  poi: {
+    lake: 34,
+    farm: 66,
+    henge: 36,
+    locksmith: 68,
     signpost: 42,
     rainbow: 76,
-  },
-
-  interactivePois: {
-    locksmith: 66,
-    henge: 68,
-    town: 72, // castle/town
+    town: 72,
     camp: 74,
     gate: 78,
-    gateOpen: 206,
+    gateOpen: 46,
   },
 
-  buttons: {
-    gold: 98,
+  // 16x16 things the player accumulates (stats / plate labels / grid buttons).
+  inventory: {
+    food: 194,
+    bloodVial: 198,
+    beast: 226,
+    bronzeKey: 196,
+    troop: 200,
+    scout: 228,
+    gold: 204,
+  },
+
+  // 16x16 opponent-side stats.
+  enemies: {
+    heart: 134,
+    enemy: 132,
+  },
+
+  // 16x16 verbs with no real-world referent.
+  actions: {
+    return: 98,
     fight: 100,
     map: 102,
-    troop: 104,
-    return: 108,
+    minimap: 104, // "debug map" in sheet notes; used as minimap toggle
+    search: 106,
+    restart: 108,
     goal: 110,
-    food: 130,
-    beast: 132,
-    scout: 134,
-    rumorTip: 136,
-    search: 138,
-    minimap: 140, // "debug map" in sheet notes; used as minimap toggle
-    restart: 142,
+    rumor: 142,
   },
 
-  cosmetics: {
+  // 16x16 decorative centerpieces for encounter grids (never actionable).
+  centers: {
     farmBarn: 162,
-    beastIllustration: 164,
-    wyrmIllustration: 166,
-    rumorIllustration: 168,
-    campfireIcon: 170,
-    tombstoneIllustration: 174,
-    locksmithKiln: 194,
-    heart: 196,
-    bloodVial: 198,
-    marketStall: 200,
+    locksmithKiln: 164,
+    wyrm: 166,
+    marketStall: 168,
+    campfire: 170,
+    tombstone: 174,
   },
 
-  stats: {
-    food: 226,
-    enemy: 228,
-    scout: 230,
-    troop: 232,
-    gold: 236,
-    key: 238,
-  },
-
-  smallStats8x8: {
+  // 8x8 small stat icons (seed / position / steps band).
+  small: {
     seed: 234,
     position: 235,
     steps: 250,
   },
 
-  ui8x8: {
-    // Nine-slice 3x3, arranged as 3 columns x 3 rows (row stride is +16 sprite ids).
-    panelBorder: {
-      tl: 258,
-      t: 259,
-      tr: 260,
-      l: 274,
-      c: 275,
-      r: 276,
-      bl: 290,
-      b: 291,
-      br: 292,
-    },
-    panelBorderBronze: {
-      tl: 261,
-      t: 262,
-      tr: 263,
-      l: 277,
-      c: 278,
-      r: 279,
-      bl: 293,
-      b: 294,
-      br: 295,
-    },
+  // 8x8 UI chrome (nine-slice borders, map markers, texture overlay).
+  ui: {
+    // Nine-slice top-left tile ids. Variants escalate with player progress:
+    // default → blood (vial held) → bronze (key forged).
+    panelBorder: 258,
+    panelBorderBlood: 261,
+    panelBorderBronze: 264,
     mapHereMarker: 306,
     mapBackground: 307,
     previewGrain: 308,
   },
 } as const
-

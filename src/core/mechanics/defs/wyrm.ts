@@ -48,13 +48,13 @@ const placeWyrm: PlaceWorldProvider = ({ cells, rngState }) => {
 }
 
 const wyrmCombatVariant: CombatVariantConfig = {
-  centerSpriteId: SPRITES.cosmetics.wyrmIllustration,
+  centerSpriteId: SPRITES.centers.wyrm,
   previewPlateLines: (s) => {
     const enc = s.encounter
     if (!enc || enc.kind !== 'combat') return []
     return [
-      { spriteId: SPRITES.cosmetics.heart, text: `${enc.enemyArmySize}` },
-      { spriteId: SPRITES.stats.gold, text: `-${WYRM_PAY_GOLD_COST}` },
+      { spriteId: SPRITES.enemies.heart, text: `${enc.enemyArmySize}` },
+      { spriteId: SPRITES.inventory.gold, text: `-${WYRM_PAY_GOLD_COST}` },
     ]
   },
   encounterLines: WYRM_ENCOUNTER_LINES,

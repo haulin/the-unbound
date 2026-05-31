@@ -21,11 +21,11 @@ export type RightGridCellDef = {
 
 export function getRightGridCellDef(s: State, row: number, col: number): RightGridCellDef {
   // Corners: goal/minimap/restart/disabled
-  if (row === 0 && col === 0) return { spriteId: SPRITES.buttons.goal, action: { type: ACTION_SHOW_GOAL } }
-  if (row === 2 && col === 0) return { spriteId: SPRITES.buttons.minimap, action: { type: ACTION_TOGGLE_MINIMAP } }
-  if (row === 2 && col === 2) return { spriteId: SPRITES.buttons.restart, action: { type: ACTION_RESTART } }
+  if (row === 0 && col === 0) return { spriteId: SPRITES.actions.goal, action: { type: ACTION_SHOW_GOAL } }
+  if (row === 2 && col === 0) return { spriteId: SPRITES.actions.minimap, action: { type: ACTION_TOGGLE_MINIMAP } }
+  if (row === 2 && col === 2) return { spriteId: SPRITES.actions.restart, action: { type: ACTION_RESTART } }
   if (row === 0 && col === 2) {
-    return { spriteId: SPRITES.buttons.map, action: { type: ACTION_TOGGLE_MAP } }
+    return { spriteId: SPRITES.actions.map, action: { type: ACTION_TOGGLE_MAP } }
   }
 
   const isRunOver = !!(s.run.isGameOver || s.run.hasWon)

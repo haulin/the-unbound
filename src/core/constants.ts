@@ -11,7 +11,7 @@ export const SCOUT_GLOBAL_REVEAL_KINDS: readonly CellKind[] = ['farm', 'camp', '
 
 export const WORLD_WIDTH = 10
 export const WORLD_HEIGHT = 10
-export const INITIAL_SEED = 47
+export const INITIAL_SEED = 47 // Don't go higher than 4 digits because of UI limitations.
 export const ENABLE_ANIMATIONS = true
 
 export const SIGNPOST_COUNT = 6
@@ -47,10 +47,6 @@ export const MAP_GEN_NOISE = 'NOISE' as const
 export const MAP_GEN_ALGORITHM = MAP_GEN_NOISE
 export const NOISE_SMOOTH_PASSES = 2
 export const NOISE_VALUE_MAX = 10000
-
-// v0.0.9 - Gate + Key
-export const BRONZE_KEY_FOOD_COST = 10
-
 
 export const INITIAL_FOOD = 15
 export const INITIAL_GOLD = 15
@@ -99,25 +95,25 @@ export const FEATURE_KINDS = [
 ] as const satisfies readonly FeatureKind[]
 
 export const TERRAIN: Record<TerrainKind, { spriteId: number }> = {
-  grass: { spriteId: SPRITES.tiles.plains },
-  road: { spriteId: SPRITES.tiles.gravel },
-  mountain: { spriteId: SPRITES.tiles.mountains },
-  swamp: { spriteId: SPRITES.tiles.swamp },
-  woods: { spriteId: SPRITES.tiles.woods },
+  grass: { spriteId: SPRITES.terrain.plains },
+  road: { spriteId: SPRITES.terrain.gravel },
+  mountain: { spriteId: SPRITES.terrain.mountains },
+  swamp: { spriteId: SPRITES.terrain.swamp },
+  woods: { spriteId: SPRITES.terrain.woods },
 }
 
 export const FEATURES: Record<FeatureKind, { spriteId: number }> = {
-  gate: { spriteId: SPRITES.interactivePois.gate },
-  gateOpen: { spriteId: SPRITES.interactivePois.gateOpen },
-  locksmith: { spriteId: SPRITES.interactivePois.locksmith },
-  lair: { spriteId: SPRITES.tiles.cave },
-  signpost: { spriteId: SPRITES.tiles.signpost },
-  farm: { spriteId: SPRITES.tiles.farm },
-  camp: { spriteId: SPRITES.interactivePois.camp },
-  henge: { spriteId: SPRITES.interactivePois.henge },
-  town: { spriteId: SPRITES.interactivePois.town },
-  fishingLake: { spriteId: SPRITES.tiles.lake },
-  rainbowEnd: { spriteId: SPRITES.tiles.rainbow },
+  gate: { spriteId: SPRITES.poi.gate },
+  gateOpen: { spriteId: SPRITES.poi.gateOpen },
+  locksmith: { spriteId: SPRITES.poi.locksmith },
+  lair: { spriteId: SPRITES.terrain.cave },
+  signpost: { spriteId: SPRITES.poi.signpost },
+  farm: { spriteId: SPRITES.poi.farm },
+  camp: { spriteId: SPRITES.poi.camp },
+  henge: { spriteId: SPRITES.poi.henge },
+  town: { spriteId: SPRITES.poi.town },
+  fishingLake: { spriteId: SPRITES.poi.lake },
+  rainbowEnd: { spriteId: SPRITES.poi.rainbow },
 }
 
 export function spriteIdForKind(kind: CellKind): number {
@@ -197,5 +193,5 @@ export const ACTION_TOGGLE_MAP = 'TOGGLE_MAP' as const
 export const ACTION_TICK = 'TICK' as const
 
 export const MOVE_SLIDE_FRAMES = 15
-export const LORE_MAX_CHARS_PER_LINE = 19
+export const LORE_MAX_CHARS_PER_LINE = 20
 

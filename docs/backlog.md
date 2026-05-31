@@ -1,8 +1,6 @@
 # Tentative roadmap (The Unbound)
 
 ## Ideas
-- when map is toggled on we should highlight the button more - white border maybe
-- disabled buttons rendered with a checkerboard overlay?
 - skip modal if nothing to do (not enough money or cooldown - camp/farm/town)
 - maybe adjust worldgen as it feels like swamps & mountains are too common
 - make rainbows modals - if player chooses to not take gold, next visit it increases
@@ -18,15 +16,6 @@
 - morale modifying battle odds, +2, +5, +10% either way (curse could lower it, praying at altar could clear a curse)
 - every 28 days a plague comes that kills half your army
 - different types of enemies (magic/strength) or different loot drops
-
-UI intermezzo:
-- UI: donkey overlaps the steps stat. Adding 3rd companion makes it worse
-- ideas:
-    - try scaling down buttons to 1x
-    - could scale down stats with 8x8 sprites and stuff them all in one column
-    - some stats like seed number and steps are not that important, maybe show them only in map view
-    - currently only inventory item could be shown instead of "show goal" button
-
 
 **v0.6 — Combat balance & UI intermezzo**
 
@@ -70,7 +59,7 @@ See `docs/2026-05-27-slot-system-design.md` for the full design.
 - The Crossing PoI: new sell-only PoI. Buttons show held slots' sprites; tapping sells that slot for half its purchase price. Instance name pool: Salt Crossing, Crow's, Brass, Three-Lane, Big Oak, Stoneford, Pilgrim's. Worldgen: 1–2 per map.
 - Sprite-flash animation primitive: pulse slot icon when event-triggered effect fires. Shared by all slots with event-driven P or N.
 - Boar specialty added to Farm pool. P3' opening volley (~25% of enemy army at combat start) + N15 bidirectional Mule exclusion. New 16×16 sprite (low body, bristled back, tusks). Lore lines for `BOAR_*` and `*_REFUSED_LINES` already in `lore.ts`.
-- Mule update (paired with Boar): wire Mule end of the bidirectional exclusion. Mule N1 (-1 food per Camp Search) gets the sprite-flash treatment in passing. Also implement mule negative.
+- Mule update (paired with Boar): wire Mule end of the bidirectional exclusion. Mule N1 (-1 food per Camp Search) gets the sprite-flash treatment in passing. Also implement mule negative. Mule upside is not communicated well enough. Only one lore line spells it out.
 
 **v0.10 — Slot System: People & Economy**
 
@@ -117,6 +106,15 @@ See `docs/2026-05-27-slot-system-design.md` for the full design.
 # Deferred backlog
 
 This file captures ideas discussed during design, kept out of the current phase's implementation plan. Nothing here is committed to; it is a parking lot for later phases.
+
+## UI polish — deferred (post-demo)
+
+Items considered during the v0.5 UI intermezzo and intentionally left for later. The intermezzo had a clear scope (panel structure, sprite-scale, sprite-sheet reshuffle, encounter close fix); these are smaller affordance/legibility improvements that didn't fit.
+
+- **Map-toggle highlighted state.** When the map is open, the (0,2) map button should look pressed (white border or similar) rather than identical to its closed state. Same idea for the minimap toggle at (2,0).
+- **Disabled-button overlay.** Buttons that are non-actionable in the current state (e.g. movement during end-of-game) look the same as active ones. A checkerboard or stipple overlay would communicate "this exists but you can't use it" without removing the affordance.
+- **Goals-button replacement.** The (0,0) corner is `show_goal`, which is useful early and decorative once the player knows the layout. Candidate replacement: a held-inventory hero slot, freeing the bottom band for something else.
+- **Textured preview-plate background.** Tried during the intermezzo with a checkerboard sprite at `SPRITES.ui.previewPlateBackground` (#309) and 8 retouched plate-eligible icons (food/gold/troop/scout/beast/rumor/enemy/heart) keyed off color #8. Plates looked good, but those same icons reused as right-grid buttons made the hover tint inconsistent — outlined sprites highlighted "everything except the outline", non-outlined sprites highlighted only the 8 px cell padding. The correct fix is to keep base sprites unmodified and draw separate outline-frame sprites on top *inside the plate only* (so buttons stay flat). Cost is one extra outline sprite per plate-eligible concept (8 today, growing as healer/boar/brigand/etc. arrive). Revisit once the encounter roster settles and the sprite-sheet cost is known.
 
 ## After demo wishlist
 - Map size presets (example): quick 7×7, normal 10×10, epic 15×15.

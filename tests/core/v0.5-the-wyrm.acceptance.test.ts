@@ -14,7 +14,6 @@ import {
   ACTION_RETURN,
 } from '../../src/core/mechanics/defs/combat'
 import {
-  ACTION_LOCKSMITH_LEAVE,
   ACTION_LOCKSMITH_PAY_FOOD,
   ACTION_LOCKSMITH_PAY_GOLD,
 } from '../../src/core/mechanics/defs/locksmith'
@@ -134,17 +133,17 @@ describe('v0.5 the wyrm acceptance', () => {
     // Variant lookup wires center sprite + Pay button via the source-cell kind.
     const rightGrid = MECHANIC_INDEX.rightGridByEncounterKind.combat
     if (!rightGrid) throw new Error('no combat right-grid registered')
-    expect(rightGrid(after, 0, 1)).toEqual({ spriteId: SPRITES.buttons.gold, action: { type: ACTION_COMBAT_PAY } })
-    expect(rightGrid(after, 1, 0)).toEqual({ spriteId: SPRITES.buttons.fight, action: { type: ACTION_FIGHT } })
-    expect(rightGrid(after, 1, 1)).toEqual({ spriteId: SPRITES.cosmetics.wyrmIllustration, action: null })
-    expect(rightGrid(after, 1, 2)).toEqual({ spriteId: SPRITES.buttons.return, action: { type: ACTION_RETURN } })
+    expect(rightGrid(after, 0, 1)).toEqual({ spriteId: SPRITES.inventory.gold, action: { type: ACTION_COMBAT_PAY } })
+    expect(rightGrid(after, 1, 0)).toEqual({ spriteId: SPRITES.actions.fight, action: { type: ACTION_FIGHT } })
+    expect(rightGrid(after, 1, 1)).toEqual({ spriteId: SPRITES.centers.wyrm, action: null })
+    expect(rightGrid(after, 1, 2)).toEqual({ spriteId: SPRITES.actions.return, action: { type: ACTION_RETURN } })
 
     // Preview plate: 2 lines — heart + remaining wyrm health, gold + pay cost.
     const previewPlate = MECHANIC_INDEX.previewPlateByEncounterKind.combat
     if (!previewPlate) throw new Error('no combat preview-plate registered')
     expect(previewPlate(after)).toEqual([
-      { spriteId: SPRITES.cosmetics.heart, text: `${WYRM_INITIAL_HEALTH}` },
-      { spriteId: SPRITES.stats.gold, text: `-${WYRM_PAY_GOLD_COST}` },
+      { spriteId: SPRITES.enemies.heart, text: `${WYRM_INITIAL_HEALTH}` },
+      { spriteId: SPRITES.inventory.gold, text: `-${WYRM_PAY_GOLD_COST}` },
     ])
   })
 
@@ -227,19 +226,17 @@ describe('v0.5 the wyrm acceptance', () => {
     expect(paid.resources.gold).toBe(0)
     expect(LOCKSMITH_PURCHASE_LINES.some((line) => paid.ui.message.includes(line))).toBe(true)
 
-    // The locksmith reducer leaves the encounter open after pay-success; the
-    // player closes it explicitly via LEAVE. (This is pre-v0.5 behavior; the
-    // design's spec H "Then the encounter closes" is imprecise — see the
-    // post-implementation note in the design doc.)
-    expect(paid.encounter?.kind).toBe('locksmith')
-    const left = processAction(paid, { type: ACTION_LOCKSMITH_LEAVE })!
-    expect(left.encounter).toBe(null)
+    // The locksmith pay-success path auto-closes the encounter (v0.5 UI
+    // intermezzo: `applyDeltasAndClose`) — no explicit LEAVE needed. The
+    // success purchase line is preserved on exit (not replaced with the
+    // tile-enter message the way LEAVE would do).
+    expect(paid.encounter).toBe(null)
 
     // Spec S11: revisiting the locksmith after the key is forged routes
     // through the bronzeKey-held arm of `onEnterLocksmith` — inline
     // `LOCKSMITH_VISITED_LINES`, no modal. The blood was consumed on
     // purchase, so re-entry must NOT fall back to the no-blood arm.
-    const off = processAction(left, { type: ACTION_MOVE, dx: 0, dy: -1 })!
+    const off = processAction(paid, { type: ACTION_MOVE, dx: 0, dy: -1 })!
     const back = processAction(off, moveSouth)!
     expect(back.encounter).toBe(null)
     expect(LOCKSMITH_VISITED_LINES.some((line) => back.ui.message.includes(line))).toBe(true)
@@ -257,10 +254,9 @@ describe('v0.5 the wyrm acceptance', () => {
     expect(paid.resources.food).toBe(0)
     expect(LOCKSMITH_PURCHASE_LINES.some((line) => paid.ui.message.includes(line))).toBe(true)
 
-    // Same encounter-stays-open + visited-lines re-entry as spec H.
-    expect(paid.encounter?.kind).toBe('locksmith')
-    const left = processAction(paid, { type: ACTION_LOCKSMITH_LEAVE })!
-    const off = processAction(left, { type: ACTION_MOVE, dx: 0, dy: -1 })!
+    // Same auto-close + visited-lines re-entry as spec H.
+    expect(paid.encounter).toBe(null)
+    const off = processAction(paid, { type: ACTION_MOVE, dx: 0, dy: -1 })!
     const back = processAction(off, moveSouth)!
     expect(back.encounter).toBe(null)
     expect(LOCKSMITH_VISITED_LINES.some((line) => back.ui.message.includes(line))).toBe(true)

@@ -34,7 +34,9 @@ export function renderFrame(s: State, hints: RenderHints) {
 // ----------------------------
 // Rendering constants (TIC-80)
 // ----------------------------
-// Split into a separate file to keep this module readable.
+// Most tunables live in `uiConstants.ts`; these two are font geometry that
+// every text-positioning helper in this file needs.
+const FONT_CHAR_PX = 6
 
 // ----------------------------
 // Pure rendering helpers
@@ -101,7 +103,7 @@ function drawIllustrationWithTextureOverlay(spriteId: number, x: number, y: numb
   const illPx = 16 * UI.UI_ILLUSTRATION_SCALE
   for (let oy = 0; oy < illPx; oy += UI.UI_TEXTURE_TILE_PX) {
     for (let ox = 0; ox < illPx; ox += UI.UI_TEXTURE_TILE_PX) {
-      spr(SPRITES.ui8x8.previewGrain, x + ox, y + oy, UI.UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR, 1)
+      spr(SPRITES.ui.previewGrain, x + ox, y + oy, UI.UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR, 1)
     }
   }
 }
@@ -197,7 +199,7 @@ function drawDeltaOverlays(s: State, anchors: Partial<Record<DeltaAnimTarget, De
 
     const xCursor = cursorByTarget[a.params.target] ?? anchor.x + UI.UI_DELTA_OFFSET_X
     print(label, xCursor, anchor.y + dy, color)
-    cursorByTarget[a.params.target] = xCursor + label.length * 6 + UI.UI_DELTA_GAP_PX
+    cursorByTarget[a.params.target] = xCursor + label.length * FONT_CHAR_PX + UI.UI_DELTA_GAP_PX
   }
 }
 
@@ -220,7 +222,7 @@ function drawMap(s: State, x: number, y: number, sizePx: number) {
   // Tile background: stamp the 8x8 map background sprite (visible area is 6x6), aligned top-left.
   for (let vy = -radius; vy <= radius; vy++) {
     for (let vx = -radius; vx <= radius; vx++) {
-      spr(SPRITES.ui8x8.mapBackground, centerX + vx * pitch, centerY + vy * pitch, 0)
+      spr(SPRITES.ui.mapBackground, centerX + vx * pitch, centerY + vy * pitch, 0)
     }
   }
 
@@ -235,16 +237,21 @@ function drawMap(s: State, x: number, y: number, sizePx: number) {
 
   // Player marker never disappears on the rolling map.
   // 8x8 outline sprite, inset -1,-1 so it surrounds the full pitch cell.
-  spr(SPRITES.ui8x8.mapHereMarker, centerX - 1, centerY - 1, 0)
+  spr(SPRITES.ui.mapHereMarker, centerX - 1, centerY - 1, 0)
+}
+
+// Visual reward escalation: bronze > blood > default. Ordered so the chrome
+// always reflects the most-recent advance even if both tokens are held.
+function panelFrameTopLeftFor(s: State): number {
+  const inv = s.resources.inventory
+  if (inv.includes('bronzeKey')) return SPRITES.ui.panelBorderBronze
+  if (inv.includes('blood')) return SPRITES.ui.panelBorderBlood
+  return SPRITES.ui.panelBorder
 }
 
 function drawLeftPanel(s: State) {
   rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, UI.UI_COLOR_BG)
-  const frame = s.resources.inventory.includes('bronzeKey') ? SPRITES.ui8x8.panelBorderBronze : SPRITES.ui8x8.panelBorder
-  drawNineSliceFrame(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, frame, {
-    tilePx: 8,
-    scale: 1,
-    colorkey: 0,
+  drawNineSliceFrame(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, panelFrameTopLeftFor(s), {
     fallbackBorderColor: UI.UI_COLOR_DIM,
   })
 
@@ -265,8 +272,7 @@ function drawLeftPanel(s: State) {
   } else if (leftPanel.kind === LEFT_PANEL_KIND_SPRITE) {
     drawIllustrationWithTextureOverlay(leftPanel.spriteId, illX, illY)
   } else if (s.run.isGameOver) {
-    // Game over: use a fixed tombstone illustration.
-    drawIllustrationWithTextureOverlay(SPRITES.cosmetics.tombstoneIllustration, illX, illY)
+    drawIllustrationWithTextureOverlay(SPRITES.centers.tombstone, illX, illY)
   } else {
     drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
 
@@ -284,14 +290,21 @@ function drawLeftPanel(s: State) {
   }
 
   const statusX = illX + illSize + UI.UI_LEFT_PANEL_INNER_GAP
-  const statusY = illY
   const fontH = 6
   const messageLineH = fontH + 1
 
-  // Army gets the hero slot in v0.0.6.
+  // Header band runs from illustration top to horizontal divider; stats column
+  // is shorter than the illustration so we center it inside the band.
+  const headerBandBottomY = illY + illSize
+  const horizontalDividerY =
+    headerBandBottomY + Math.floor((UI.UI_LEFT_PANEL_LORE_TOP_GAP - 1) / 2)
+  const statusBlockH = 3 * UI.UI_ARMY_ICON_H_PX + 2 * UI.UI_HERO_RESOURCE_GAP_PX
+  const statusCenteredY = illY + Math.ceil(((horizontalDividerY - illY) - statusBlockH) / 2)
+  const statusY = Math.max(illY, statusCenteredY - UI.UI_LEFT_PANEL_STATS_OPTICAL_LIFT_PX)
+
   const armyX = statusX
   const armyY = statusY
-  spr(SPRITES.stats.troop, armyX, armyY, -1, 1, 0, 0, 2, 2) // 16x16
+  spr(SPRITES.inventory.troop, armyX, armyY, -1, 1, 0, 0, 2, 2)
   const armyValueX = armyX + UI.UI_ARMY_VALUE_OFFSET_X
   const armyValueY = armyY + UI.UI_ARMY_VALUE_OFFSET_Y
   const armyColor = s.resources.armySize < 6 ? UI.UI_COLOR_WARN : UI.UI_COLOR_TEXT
@@ -299,7 +312,7 @@ function drawLeftPanel(s: State) {
 
   const foodX = statusX
   const foodY = armyY + UI.UI_ARMY_ICON_H_PX + UI.UI_HERO_RESOURCE_GAP_PX
-  spr(SPRITES.stats.food, foodX, foodY, -1, 1, 0, 0, 2, 2) // 16x16
+  spr(SPRITES.inventory.food, foodX, foodY, -1, 1, 0, 0, 2, 2)
   const foodValueX = foodX + UI.UI_ICON_VALUE_OFFSET_X
   const foodValueY = foodY + UI.UI_ICON_VALUE_OFFSET_Y
   const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? UI.UI_COLOR_WARN : UI.UI_COLOR_TEXT
@@ -307,7 +320,7 @@ function drawLeftPanel(s: State) {
 
   const goldX = statusX
   const goldY = foodY + UI.UI_FOOD_ICON_H_PX + UI.UI_HERO_RESOURCE_GAP_PX
-  spr(SPRITES.stats.gold, goldX, goldY, -1, 1, 0, 0, 2, 2) // 16x16
+  spr(SPRITES.inventory.gold, goldX, goldY, -1, 1, 0, 0, 2, 2)
   const goldValueX = goldX + UI.UI_GOLD_VALUE_OFFSET_X
   const goldValueY = goldY + UI.UI_GOLD_VALUE_OFFSET_Y
   print(`${s.resources.gold}`, goldValueX, goldValueY, UI.UI_COLOR_TEXT)
@@ -319,8 +332,9 @@ function drawLeftPanel(s: State) {
   })
 
   const statusBottomY = goldY + UI.UI_GOLD_ICON_H_PX + UI.UI_AFTER_RESOURCES_GAP_PX
-  const headerBottomY = Math.max(illY + illSize, statusBottomY)
-  const msgY = headerBottomY + 4
+  const headerBottomY = Math.max(headerBandBottomY, statusBottomY)
+  drawLeftPanelDividers(illX, illY, illSize, horizontalDividerY)
+  const msgY = headerBottomY + UI.UI_LEFT_PANEL_LORE_TOP_GAP
   const headline = s.run.isGameOver
     ? ({ text: 'GAME OVER', color: UI.UI_COLOR_BAD } as const)
     : s.run.hasWon
@@ -330,11 +344,11 @@ function drawLeftPanel(s: State) {
   const maxLines = Math.max(0, Math.floor((SCREEN_HEIGHT - msgY - 4) / messageLineH) - headlineRows)
   const lore = loreLinesForMessage(s.ui.message, LORE_MAX_CHARS_PER_LINE)
   const textStartY = headline ? msgY + messageLineH : msgY
-  if (headline) print(headline.text, UI.UI_LEFT_PANEL_PADDING, msgY, headline.color)
+  if (headline) print(headline.text, UI.UI_LORE_PADDING_X, msgY, headline.color)
   let printed = 0
   for (let i = 0; i < lore.length && printed < maxLines; i++) {
     const line = lore[i]!
-    print(line.text, UI.UI_LEFT_PANEL_PADDING, textStartY + printed * messageLineH, line.color)
+    print(line.text, UI.UI_LORE_PADDING_X, textStartY + printed * messageLineH, line.color)
     printed++
   }
 }
@@ -345,73 +359,91 @@ function drawLeftPanel(s: State) {
 function drawRightPanel(s: State, hints: RenderHints) {
   const plan = buildRightGridRenderPlan(s, hints)
   drawRightGridOps(plan.ops)
-  drawRightTopBar(s)
+  drawRightStatsBand(s)
+  drawRightHeldBand(s)
+  drawRightPanelDividers()
+  drawRightPanelFrame(s)
 }
 
-function drawRightTopBar(s: State) {
-  const x0 = Layout.GRID_ORIGIN_X
-  const y0 = 0
-  const w = Layout.GRID_WIDTH_PX
-  const h = Layout.RIGHT_PANEL_HEADER_H
+function drawRightPanelFrame(s: State) {
+  drawNineSliceFrame(Layout.RIGHT_PANEL_X, 0, Layout.PANEL_RIGHT_WIDTH, SCREEN_HEIGHT, panelFrameTopLeftFor(s), {
+    fallbackBorderColor: UI.UI_COLOR_DIM,
+  })
+}
 
-  rect(x0, y0, w, h, UI.UI_COLOR_BG)
-  rectb(x0, y0, w, h, UI.UI_COLOR_DIM)
+type StatItem = { iconSpriteId: number; value: string }
 
-  const padX = 2
-  const iconY = y0 + 2
-  const valueY = y0 + 11
+function drawRightStatsBand(s: State) {
+  const items: StatItem[] = [
+    { iconSpriteId: SPRITES.small.seed, value: `${s.world.seed}` },
+    { iconSpriteId: SPRITES.small.position, value: formatPositionLabel(s) },
+    { iconSpriteId: SPRITES.small.steps, value: `${s.run.stepCount}` },
+  ]
 
-  // Right -> left status icons inside the bar. Order is display order.
-  const iconGap = 2
+  const iconSize = UI.UI_STATUS_ICON_SIZE
+  const iconValueGap = UI.UI_STATS_BAND_ICON_VALUE_GAP_PX
+  const itemGap = UI.UI_STATS_BAND_ITEM_GAP_PX
+
+  let contentW = 0
+  for (let i = 0; i < items.length; i++) {
+    contentW += iconSize + iconValueGap + items[i]!.value.length * FONT_CHAR_PX
+  }
+  contentW += (items.length - 1) * itemGap
+
+  const bandY = Layout.RIGHT_PANEL_TOP_BAND_Y
+  const iconY = bandY + Math.floor((Layout.RIGHT_PANEL_TOP_BAND_H - iconSize) / 2)
+  const textY = bandY + Math.floor((Layout.RIGHT_PANEL_TOP_BAND_H - FONT_CHAR_PX) / 2)
+  let x = Layout.RIGHT_PANEL_INNER_X + Math.floor((Layout.RIGHT_PANEL_INNER_W - contentW) / 2)
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]!
+    spr(item.iconSpriteId, x, iconY, -1)
+    x += iconSize + iconValueGap
+    print(item.value, x, textY, UI.UI_COLOR_TEXT)
+    x += item.value.length * FONT_CHAR_PX + itemGap
+  }
+}
+
+function drawRightHeldBand(s: State) {
   const heldIcons = heldStatusIcons(s)
-  const rightInset = heldIcons.length ? heldIcons.length * (16 + iconGap) - iconGap : 0
+  if (heldIcons.length === 0) return
 
-  const statsMaxX = x0 + w - padX - rightInset
+  const iconSize = 16
+  const iconGap = UI.UI_HELD_BAND_ICON_GAP_PX
+  const contentW = heldIcons.length * iconSize + (heldIcons.length - 1) * iconGap
 
-  const itemW = 18 // 3 chars @ 6px, right-aligned
-  const itemGap = 2
-  const valueMaxChars = 3
+  const bandY = Layout.RIGHT_PANEL_BOTTOM_BAND_Y
+  const iconY = bandY + Math.floor((Layout.RIGHT_PANEL_BOTTOM_BAND_H - iconSize) / 2)
+  let x = Layout.RIGHT_PANEL_INNER_X + Math.floor((Layout.RIGHT_PANEL_INNER_W - contentW) / 2)
 
-  const formatValue = (raw: string) => {
-    const s = String(raw || '')
-    if (s.length <= valueMaxChars) return s
-    return s.slice(-valueMaxChars)
-  }
-
-  const drawStatItem = (idx: number, iconSpriteId: number, rawValue: string) => {
-    const xItem = x0 + padX + idx * (itemW + itemGap)
-    if (xItem + itemW > statsMaxX) return
-
-    const value = formatValue(rawValue)
-    const valueW = value.length * 6
-    const xRight = xItem + itemW
-    const valueX = xRight - valueW
-    const iconX = xRight - UI.UI_STATUS_ICON_SIZE
-
-    spr(iconSpriteId, iconX, iconY, -1)
-    print(value, valueX, valueY, UI.UI_COLOR_TEXT)
-  }
-
-  drawStatItem(0, SPRITES.smallStats8x8.seed, `${s.world.seed}`)
-  drawStatItem(1, SPRITES.smallStats8x8.position, formatPositionLabel(s))
-  drawStatItem(2, SPRITES.smallStats8x8.steps, `${s.run.stepCount}`)
-
-  let xr = x0 + w - padX - 16
-  const bigIconY = y0 + 1
   for (const spriteId of heldIcons) {
-    spr(spriteId, xr, bigIconY, 0, 1, 0, 0, 2, 2)
-    xr -= 16 + 2
+    spr(spriteId, x, iconY, 0, 1, 0, 0, 2, 2)
+    x += iconSize + iconGap
   }
+}
+
+function drawRightPanelDividers() {
+  rect(Layout.RIGHT_PANEL_INNER_X, Layout.RIGHT_PANEL_TOP_DIVIDER_Y, Layout.RIGHT_PANEL_INNER_W, 1, UI.UI_COLOR_RIGHT_PANEL_DIVIDER)
+  rect(Layout.RIGHT_PANEL_INNER_X, Layout.RIGHT_PANEL_BOTTOM_DIVIDER_Y, Layout.RIGHT_PANEL_INNER_W, 1, UI.UI_COLOR_RIGHT_PANEL_DIVIDER)
+}
+
+// Left-panel chrome dividers. Vertical stops short of the horizontal so the
+// negative space matches the inset the horizontal keeps from the frame.
+function drawLeftPanelDividers(illX: number, illY: number, illSize: number, horizontalY: number) {
+  const verticalX = illX + illSize + Math.floor(UI.UI_LEFT_PANEL_INNER_GAP / 2)
+  const verticalH = Math.max(0, horizontalY - illY - UI.UI_LEFT_PANEL_DIVIDER_GAP_PX)
+  rect(verticalX, illY, 1, verticalH, UI.UI_COLOR_LEFT_PANEL_DIVIDER)
+  rect(Layout.LEFT_PANEL_INNER_X, horizontalY, Layout.LEFT_PANEL_INNER_W, 1, UI.UI_COLOR_LEFT_PANEL_DIVIDER)
 }
 
 // Status-bar icon manifest: display order, predicate, sprite. Adding a new
 // held thing (e.g. silver key) is one row.
 type StatusIconSlot = { collection: 'inventory' | 'party'; id: string; spriteId: number }
 const STATUS_ICON_SLOTS: readonly StatusIconSlot[] = [
-  { collection: 'inventory', id: 'bronzeKey', spriteId: SPRITES.stats.key },
-  { collection: 'inventory', id: 'blood', spriteId: SPRITES.cosmetics.bloodVial },
-  { collection: 'party', id: 'scout', spriteId: SPRITES.stats.scout },
-  { collection: 'party', id: 'mule', spriteId: SPRITES.cosmetics.beastIllustration },
+  { collection: 'inventory', id: 'bronzeKey', spriteId: SPRITES.inventory.bronzeKey },
+  { collection: 'inventory', id: 'blood', spriteId: SPRITES.inventory.bloodVial },
+  { collection: 'party', id: 'scout', spriteId: SPRITES.inventory.scout },
+  { collection: 'party', id: 'mule', spriteId: SPRITES.inventory.beast },
 ]
 
 function heldStatusIcons(s: State): readonly number[] {
@@ -426,6 +458,7 @@ function drawRightGridOps(ops: RightGridRenderOp[]) {
   for (let i = 0; i < ops.length; i++) {
     const op = ops[i]!
     if (op.kind === 'rect') rect(op.x, op.y, op.w, op.h, op.color)
+    else if (op.kind === 'rectb') rectb(op.x, op.y, op.w, op.h, op.color)
     else spr(op.spriteId, op.x, op.y, op.colorkey, op.scale, op.flip, op.rotate, op.w, op.h)
   }
 }

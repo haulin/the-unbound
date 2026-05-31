@@ -35,11 +35,11 @@ function makeState(): State {
 describe('rightGrid camp layout', () => {
   it('maps camp cross actions (map corner enabled)', () => {
     const s = makeState()
-    expect(getRightGridCellDef(s, 0, 1).action).toBe(null) // North disabled
-    expect(getRightGridCellDef(s, 1, 0).action).toEqual({ type: ACTION_CAMP_SEARCH }) // West
+    expect(getRightGridCellDef(s, 0, 1).action).toBe(null) // North unused
+    expect(getRightGridCellDef(s, 1, 0).action).toEqual({ type: ACTION_CAMP_SEARCH }) // West (camp's only action slot)
     expect(getRightGridCellDef(s, 1, 2).action).toEqual({ type: ACTION_CAMP_LEAVE }) // East
     expect(getRightGridCellDef(s, 1, 1).action).toBe(null) // Center no-op
-    expect(getRightGridCellDef(s, 2, 1).action).toBe(null) // South disabled
+    expect(getRightGridCellDef(s, 2, 1).action).toBe(null) // South unused
     expect(getRightGridCellDef(s, 0, 2).action).toEqual({ type: ACTION_TOGGLE_MAP }) // Map corner available during encounter
   })
 

@@ -99,7 +99,7 @@ function reduceGoal(s: State): State {
   const nextLeftPanel: LeftPanel =
     prevLeftPanel.kind === LEFT_PANEL_KIND_MINIMAP
       ? prevLeftPanel
-      : { kind: LEFT_PANEL_KIND_SPRITE, spriteId: SPRITES.buttons.goal }
+      : { kind: LEFT_PANEL_KIND_SPRITE, spriteId: SPRITES.actions.goal }
   return {
     world: s.world,
     player: s.player,

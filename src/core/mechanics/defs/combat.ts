@@ -14,11 +14,11 @@ import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
 import type { Action, CombatEncounter, Encounter, Resources, State, Ui, Vec2, World } from '../../types'
 import { enqueueDeltas, enqueueGridTransition } from '../../uiAnim'
+import { gridButton, makeRightGrid } from '../encounterHelpers'
 import type {
   MechanicDef,
   PreviewPlateProvider,
   ReduceEncounterAction,
-  RightGridProvider,
   TileEnterResult,
 } from '../types'
 // Lazy circular: `mechanics/index.ts` builds MECHANIC_INDEX from this file's
@@ -29,10 +29,16 @@ import { MECHANIC_INDEX } from '../index'
 export const ACTION_FIGHT = 'FIGHT' as const
 export const ACTION_COMBAT_PAY = 'COMBAT_PAY' as const
 export const ACTION_RETURN = 'RETURN' as const
-export type CombatAction =
-  | { type: typeof ACTION_FIGHT }
-  | { type: typeof ACTION_COMBAT_PAY }
-  | { type: typeof ACTION_RETURN }
+
+type CombatActionSpec = { spriteId: number; reduce: (s: State) => State }
+
+const COMBAT_ACTIONS = {
+  [ACTION_FIGHT]:      { spriteId: SPRITES.actions.fight,  reduce: reduceCombatFight  },
+  [ACTION_COMBAT_PAY]: { spriteId: SPRITES.inventory.gold, reduce: reduceCombatPay    },
+  [ACTION_RETURN]:     { spriteId: SPRITES.actions.return, reduce: reduceCombatReturn },
+} as const satisfies Record<string, CombatActionSpec>
+
+export type CombatAction = { type: keyof typeof COMBAT_ACTIONS }
 
 // ---- Pure combat math -------------------------------------------------------------
 
@@ -97,28 +103,17 @@ function applyCombatResolved(world: World, sourceCellId: number): World {
   return hook(world, sourceCellId)
 }
 
-const combatRightGrid: RightGridProvider = (s, row, col) => {
-  if (row === 1 && col === 0) return { spriteId: SPRITES.buttons.fight, action: { type: ACTION_FIGHT } }
-  if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_RETURN } }
-  if (row === 1 && col === 1) {
-    const variant = combatVariantForEncounter(s)
-    return { spriteId: variant.centerSpriteId, action: null }
-  }
-  // Pay button (top-row middle): only rendered when the active variant declares
-  // a `payment` config (e.g. wyrm bribe). Standard combat leaves this slot empty.
-  if (row === 0 && col === 1) {
-    const variant = combatVariantForEncounter(s)
-    if (!variant.payment) return { action: null }
-    return { spriteId: SPRITES.buttons.gold, action: { type: ACTION_COMBAT_PAY } }
-  }
-  return { action: null }
-}
+// Top slot (pay button) only renders when the active variant declares a
+// `payment` config (e.g. wyrm bribe); standard combat leaves it empty.
+const combatRightGrid = makeRightGrid({
+  leaveAction: { type: ACTION_RETURN },
+  centerSpriteId: (s) => combatVariantForEncounter(s).centerSpriteId,
+  left: gridButton(COMBAT_ACTIONS, ACTION_FIGHT),
+  top: (s) => (combatVariantForEncounter(s).payment ? gridButton(COMBAT_ACTIONS, ACTION_COMBAT_PAY) : null),
+})
 
-// Combat preview plate is the static enemy-army count (and any variant-specific
-// extra lines, e.g. the wyrm pay cost). Animated +/- popups are regular
-// `enqueueDeltas({ target: 'enemyArmy', ... })` calls — same path as food/gold/
-// army — rendered by the platform's shared `drawDeltaOverlays` anchored to the
-// plate's first-line icon.
+// Plate shows enemy-army count + any variant-specific lines (e.g. wyrm pay
+// cost). Animated +/- popups are normal `enqueueDeltas` with target 'enemyArmy'.
 const combatPreviewPlate: PreviewPlateProvider = (s) => {
   const enc = s.encounter
   if (!enc || enc.kind !== 'combat') return null
@@ -127,11 +122,8 @@ const combatPreviewPlate: PreviewPlateProvider = (s) => {
 }
 
 const reduceCombatAction: ReduceEncounterAction = (prevState: State, action: Action): State | null => {
-  if (action.type !== ACTION_FIGHT && action.type !== ACTION_RETURN && action.type !== ACTION_COMBAT_PAY) return null
-
-  if (action.type === ACTION_RETURN) return reduceCombatReturn(prevState)
-  if (action.type === ACTION_COMBAT_PAY) return reduceCombatPay(prevState)
-  return reduceCombatFight(prevState)
+  if (!(action.type in COMBAT_ACTIONS)) return null
+  return COMBAT_ACTIONS[action.type as keyof typeof COMBAT_ACTIONS].reduce(prevState)
 }
 
 // Pay-button reducer (variant-driven). Standard combat has no `payment` config
@@ -405,11 +397,11 @@ export type CombatVariantConfig = {
 }
 
 export const STANDARD_COMBAT_VARIANT: CombatVariantConfig = {
-  centerSpriteId: SPRITES.stats.enemy,
+  centerSpriteId: SPRITES.enemies.enemy,
   previewPlateLines: (s) => {
     const enc = s.encounter
     if (!enc || enc.kind !== 'combat') return []
-    return [{ spriteId: SPRITES.stats.enemy, text: `${enc.enemyArmySize}` }]
+    return [{ spriteId: SPRITES.enemies.enemy, text: `${enc.enemyArmySize}` }]
   },
   encounterLines: COMBAT_ENCOUNTER_LINES,
   victoryLines: COMBAT_VICTORY_EXIT_LINES,

@@ -1,12 +1,15 @@
-// Shared helpers used by encounter mechanic defs (camp, town, farm, locksmith).
-// Must NOT import MECHANIC_INDEX or any def-level module — would create a cycle, since
-// MECHANIC_INDEX itself is built from the defs that import this file.
+// Shared helpers used by encounter mechanic defs.
+// Must NOT import MECHANIC_INDEX or any def-level module (cycle: the index is
+// built from defs that import this file).
 
 import { ENABLE_ANIMATIONS, MAX_PARTY_SLOTS, TOWN_NO_GOLD_LINES } from '../constants'
 import { RNG } from '../rng'
+import { SPRITES } from '../spriteIds'
 import type {
+  Action,
   DeltaAnimTarget,
   Encounter,
+  EncounterKind,
   GridFromKind,
   Resources,
   Run,
@@ -14,7 +17,7 @@ import type {
   Ui,
 } from '../types'
 import { enqueueDeltas, enqueueGridTransition } from '../uiAnim'
-import type { AnimSpec } from './types'
+import type { AnimSpec, RightGridProvider } from './types'
 
 // ---- Message + encounter scaffolding ------------------------------------------
 
@@ -35,9 +38,9 @@ export function noGoldResponse(state: State, prefix: string, cellId: number): St
 
 // ---- Leave-encounter -----------------------------------------------------------
 
-// Standard "leave the encounter": restores the saved tile-enter message,
-// clears state.encounter, and (if animations enabled) enqueues a grid transition
-// back to the overworld. Used by camp/town/farm/locksmith ACTION_*_LEAVE handlers.
+// Standard "leave the encounter": restores the tile-enter message, clears
+// state.encounter, and (if animations enabled) enqueues a grid transition
+// back to the overworld.
 export function leaveEncounter(state: State, fromGrid: GridFromKind): State {
   const enc: Encounter | null = state.encounter
   const restore = enc?.restoreMessage ?? state.ui.message
@@ -85,13 +88,25 @@ export function applyDeltas(state: State, args: ApplyDeltasArgs): State {
   return { ...baseNext, ui: uiWith }
 }
 
+// `applyDeltas` + close + grid transition back to overworld. Use for one-shot
+// purchases that complete the encounter (e.g. locksmith key); unlike
+// `leaveEncounter`, the success message you pass is preserved.
+export function applyDeltasAndClose(
+  state: State,
+  args: ApplyDeltasArgs,
+  fromGrid: GridFromKind,
+): State {
+  const next = applyDeltas(state, args)
+  if (!ENABLE_ANIMATIONS) return { ...next, encounter: null }
+  const uiWith = enqueueGridTransition(next.ui, { from: fromGrid, to: 'overworld' })
+  return { ...next, encounter: null, ui: uiWith }
+}
+
 // ---- Buy primitive --------------------------------------------------------------
 
-// What the player gains. Numeric fields are added; slot tokens are appended
-// (idempotent — already-held slots are no-ops; party respects `MAX_PARTY_SLOTS`
-// via `appendPartySlot`). Food gain is NOT clamped here — caller clamps via
-// `resourcesWithClampedFoodIfNeeded` and rebuilds the food delta from the
-// applied diff if needed.
+// What the player gains. Numeric fields add; slot tokens append (idempotent;
+// party respects `MAX_PARTY_SLOTS` via `appendPartySlot`). Food gain is NOT
+// clamped here — caller clamps via `resourcesWithClampedFoodIfNeeded`.
 export type BuyGain = Partial<{
   food: number
   armySize: number
@@ -146,23 +161,82 @@ export function buy(
 
 // ---- Party-slot append --------------------------------------------------------
 
-// Idempotent on duplicates and silently no-ops once `party` reaches
-// `MAX_PARTY_SLOTS`. Single-hire callsites (town hireScout, farm hireBeast)
-// already gate on the slot not being held; this guard lives here so the cap is
-// enforced once.
+// Idempotent on duplicates; silently no-ops once `party` reaches `MAX_PARTY_SLOTS`.
 export function appendPartySlot(party: readonly string[], slot: string): string[] {
   if (party.includes(slot)) return [...party]
   if (party.length >= MAX_PARTY_SLOTS) return [...party]
   return [...party, slot]
 }
 
+// ---- Right-grid factory --------------------------------------------------------
+
+// Builds a `RightGridProvider` for the shared encounter-grid shape: leave
+// button SE, decorative center, and 0–3 action cells at named slots
+// (top/left/bottom). Any slot accepts a value or `(s) => value` for
+// state-dependent content.
+export type RightGridActionCell = { spriteId: number; action: Action }
+
+export type RightGridActionSlot =
+  | RightGridActionCell
+  | ((s: State) => RightGridActionCell | null)
+
+export type RightGridCenterSprite = number | ((s: State) => number)
+
+export type RightGridSpec = {
+  leaveAction: Action
+  centerSpriteId: RightGridCenterSprite
+  top?: RightGridActionSlot
+  left?: RightGridActionSlot
+  bottom?: RightGridActionSlot
+}
+
+function resolveActionSlot(slot: RightGridActionSlot | undefined, s: State): RightGridActionCell | null {
+  if (!slot) return null
+  return typeof slot === 'function' ? slot(s) : slot
+}
+
+// Build a grid button from an entry in a mechanic's action table. Keeps the
+// grid declaration in lockstep with the table — the spriteId comes from the
+// same row that owns the reducer.
+export function gridButton<K extends Action['type']>(
+  table: Record<K, { spriteId: number }>,
+  action: K,
+): RightGridActionCell {
+  return { spriteId: table[action].spriteId, action: { type: action } as Action }
+}
+
+export function makeRightGrid(spec: RightGridSpec): RightGridProvider {
+  return (s, row, col) => {
+    if (row === 1 && col === 2) return { spriteId: SPRITES.actions.return, action: spec.leaveAction }
+    if (row === 1 && col === 1) {
+      const sid = typeof spec.centerSpriteId === 'function' ? spec.centerSpriteId(s) : spec.centerSpriteId
+      return { spriteId: sid, action: null }
+    }
+    if (row === 0 && col === 1) return resolveActionSlot(spec.top, s) ?? { action: null }
+    if (row === 1 && col === 0) return resolveActionSlot(spec.left, s) ?? { action: null }
+    if (row === 2 && col === 1) return resolveActionSlot(spec.bottom, s) ?? { action: null }
+    return { action: null }
+  }
+}
+
+// ---- previewEncounter factory --------------------------------------------------
+
+// Returns a previewEncounter provider for kinds whose only runtime data is the
+// kind itself. The grid renderer uses these placeholders to pre-paint cross
+// layouts during transitions. Kinds with extra fields (combat) build inline.
+type SimpleEncounterKind = Exclude<EncounterKind, 'combat'>
+
+export function previewEncounterProvider<K extends SimpleEncounterKind>(
+  kind: K,
+): () => Extract<Encounter, { kind: K }> {
+  return () => ({ kind, sourceCellId: -1, restoreMessage: '' }) as Extract<Encounter, { kind: K }>
+}
+
 // ---- Apply enter-anims --------------------------------------------------------
 
-// Translates a mechanic's `TileEnterResult.enterAnims` into actual UI anim enqueues.
-// `startFrame` is the frame at which the post-move-slide reveal begins; each spec's
-// `afterFrames` (default 0) offsets further relative to that, so a def returning
-// `{kind: 'gridTransition', from: 'overworld', to: 'camp'}` fires its grid transition
-// exactly when the move-slide reveal completes.
+// Translates a mechanic's `TileEnterResult.enterAnims` into UI enqueues.
+// `startFrame` anchors the post-move-slide reveal; each spec's `afterFrames`
+// (default 0) offsets relative to that.
 export function applyEnterAnims(ui: Ui, anims: readonly AnimSpec[], startFrame: number): Ui {
   let next = ui
   for (let i = 0; i < anims.length; i++) {

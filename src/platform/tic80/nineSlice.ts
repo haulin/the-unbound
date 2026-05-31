@@ -1,15 +1,3 @@
-export type NineSlice3x3 = {
-  tl: number
-  t: number
-  tr: number
-  l: number
-  c: number
-  r: number
-  bl: number
-  b: number
-  br: number
-}
-
 export type DrawNineSliceFrameOptions = {
   tilePx?: number
   scale?: number
@@ -39,12 +27,21 @@ function drawTiledVert(spriteId: number, x: number, y: number, h: number, stepPx
   for (let dy = 0; dy < h; dy += stepPx) spr(spriteId, x, y + dy, colorkey, scale)
 }
 
+// Tile a 3x3 9-slice frame anchored at `topLeftSpriteId`. The frame is
+// assumed to occupy a contiguous 3-wide x 3-tall block on the TIC-80 sprite
+// sheet, so all 8 painted tiles follow positionally from the top-left and
+// callers only ever need to pass that one id (center is left transparent for
+// content):
+//   tl  t  tr     -> tl+0,  tl+1,  tl+2
+//   l   .  r      -> tl+16,        tl+18
+//   bl  b  br     -> tl+32, tl+33, tl+34
+// (+16 is the TIC-80 sprite-page width; each row stride is one sheet row.)
 export function drawNineSliceFrame(
   x: number,
   y: number,
   w: number,
   h: number,
-  sprites: NineSlice3x3,
+  topLeftSpriteId: number,
   opts: DrawNineSliceFrameOptions = {}
 ) {
   const tilePx = clampInt(opts.tilePx ?? 8, 1)
@@ -72,30 +69,34 @@ export function drawNineSliceFrame(
   const innerW = wPx - tileScreenPx * 2
   const innerH = hPx - tileScreenPx * 2
 
+  const topRowStart = topLeftSpriteId
+  const midRowStart = topLeftSpriteId + 16
+  const botRowStart = topLeftSpriteId + 32
+
   // Corners
-  spr(sprites.tl, x0, y0, colorkey, scale)
-  spr(sprites.tr, x1, y0, colorkey, scale)
-  spr(sprites.bl, x0, y1, colorkey, scale)
-  spr(sprites.br, x1, y1, colorkey, scale)
+  spr(topRowStart, x0, y0, colorkey, scale)
+  spr(topRowStart + 2, x1, y0, colorkey, scale)
+  spr(botRowStart, x0, y1, colorkey, scale)
+  spr(botRowStart + 2, x1, y1, colorkey, scale)
 
   // Top edge
   withClip(x0 + tileScreenPx, y0, innerW, tileScreenPx, () => {
-    drawTiledHoriz(sprites.t, x0 + tileScreenPx, y0, innerW, tileScreenPx, colorkey, scale)
+    drawTiledHoriz(topRowStart + 1, x0 + tileScreenPx, y0, innerW, tileScreenPx, colorkey, scale)
   })
 
   // Bottom edge
   withClip(x0 + tileScreenPx, y1, innerW, tileScreenPx, () => {
-    drawTiledHoriz(sprites.b, x0 + tileScreenPx, y1, innerW, tileScreenPx, colorkey, scale)
+    drawTiledHoriz(botRowStart + 1, x0 + tileScreenPx, y1, innerW, tileScreenPx, colorkey, scale)
   })
 
   // Left edge
   withClip(x0, y0 + tileScreenPx, tileScreenPx, innerH, () => {
-    drawTiledVert(sprites.l, x0, y0 + tileScreenPx, innerH, tileScreenPx, colorkey, scale)
+    drawTiledVert(midRowStart, x0, y0 + tileScreenPx, innerH, tileScreenPx, colorkey, scale)
   })
 
   // Right edge
   withClip(x1, y0 + tileScreenPx, tileScreenPx, innerH, () => {
-    drawTiledVert(sprites.r, x1, y0 + tileScreenPx, innerH, tileScreenPx, colorkey, scale)
+    drawTiledVert(midRowStart + 2, x1, y0 + tileScreenPx, innerH, tileScreenPx, colorkey, scale)
   })
 }
 

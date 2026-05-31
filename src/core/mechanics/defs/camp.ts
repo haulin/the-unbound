@@ -13,7 +13,10 @@ import { SPRITES } from '../../spriteIds'
 import type { CampCell, CampEncounter, Resources, State } from '../../types'
 import {
   applyDeltas,
+  gridButton,
   leaveEncounter,
+  makeRightGrid,
+  previewEncounterProvider,
   setEncounterMessage,
 } from '../encounterHelpers'
 import { cellId, isTerrainCell, placeNamedFeature } from '../../worldgen'
@@ -28,8 +31,15 @@ import type {
 
 export const ACTION_CAMP_SEARCH = 'CAMP_SEARCH' as const
 export const ACTION_CAMP_LEAVE = 'CAMP_LEAVE' as const
+
+type CampActionSpec = { spriteId: number; reduce: (s: State) => State }
+
+const CAMP_ACTIONS = {
+  [ACTION_CAMP_SEARCH]: { spriteId: SPRITES.actions.search, reduce: reduceCampSearch },
+} as const satisfies Record<string, CampActionSpec>
+
 export type CampAction =
-  | { type: typeof ACTION_CAMP_SEARCH }
+  | { type: keyof typeof CAMP_ACTIONS }
   | { type: typeof ACTION_CAMP_LEAVE }
 
 // ---- Public helpers ----
@@ -57,8 +67,8 @@ const campPreviewPlate: PreviewPlateProvider = (s) => {
   if (stepCount < (camp.nextReadyStep ?? 0)) return null
   const armyGain = computeCampArmyGain({ seed: s.world.seed, campId: camp.id, stepCount })
   return [
-    { spriteId: SPRITES.stats.food, text: `+${CAMP_FOOD_GAIN}` },
-    { spriteId: SPRITES.stats.troop, text: `+${armyGain}` },
+    { spriteId: SPRITES.inventory.food, text: `+${CAMP_FOOD_GAIN}` },
+    { spriteId: SPRITES.inventory.troop, text: `+${armyGain}` },
   ]
 }
 
@@ -85,17 +95,12 @@ const onEnterCamp: OnEnterTile = ({ cell, world, pos }) => {
   return result
 }
 
-// ---- Encounter actions: ACTION_CAMP_LEAVE / ACTION_CAMP_SEARCH ----
+// ---- Encounter actions ----
 
 const reduceCampAction: ReduceEncounterAction = (prevState, action) => {
-  if (action.type !== ACTION_CAMP_LEAVE && action.type !== ACTION_CAMP_SEARCH) return null
-
-  const enc = prevState.encounter
-  if (!enc || enc.kind !== 'camp') return prevState
-
+  if (action.type !== ACTION_CAMP_LEAVE && !(action.type in CAMP_ACTIONS)) return null
   if (action.type === ACTION_CAMP_LEAVE) return leaveEncounter(prevState, 'camp')
-
-  return reduceCampSearch(prevState)
+  return CAMP_ACTIONS[action.type as keyof typeof CAMP_ACTIONS].reduce(prevState)
 }
 
 function reduceCampSearch(prevState: State): State {
@@ -149,13 +154,11 @@ export const campMechanic: MechanicDef = {
     kind: 'camp',
     reduceAction: reduceCampAction,
     previewPlate: campPreviewPlate,
-    previewEncounter: (): CampEncounter => ({ kind: 'camp', sourceCellId: -1, restoreMessage: '' }),
-    rightGrid: (_s, row, col) => {
-      if (row === 0 && col === 1) return { action: null } // North disabled
-      if (row === 1 && col === 0) return { spriteId: SPRITES.buttons.search, action: { type: ACTION_CAMP_SEARCH } }
-      if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_CAMP_LEAVE } }
-      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.campfireIcon, action: null }
-      return { action: null }
-    },
+    previewEncounter: previewEncounterProvider('camp'),
+    rightGrid: makeRightGrid({
+      leaveAction: { type: ACTION_CAMP_LEAVE },
+      centerSpriteId: SPRITES.centers.campfire,
+      left: gridButton(CAMP_ACTIONS, ACTION_CAMP_SEARCH),
+    }),
   },
 }

@@ -3,7 +3,7 @@ import {
   GRID_TRANSITION_STEP_FRAMES,
 } from '../../core/constants'
 import { MECHANIC_INDEX } from '../../core/mechanics'
-import { getRightGridCellDef } from '../../core/rightGrid'
+import { getRightGridCellDef, type RightGridCellDef } from '../../core/rightGrid'
 import { getSpriteIdAt } from '../../core/cells'
 import type { GridFromKind, GridTransitionAnim, MoveSlideAnim, State } from '../../core/types'
 import { SPRITES } from '../../core/spriteIds'
@@ -16,6 +16,7 @@ type Rect = { x: number; y: number; w: number; h: number }
 
 export type RightGridRenderOp =
   | { kind: 'rect'; x: number; y: number; w: number; h: number; color: number }
+  | { kind: 'rectb'; x: number; y: number; w: number; h: number; color: number }
   | {
       kind: 'spr'
       spriteId: number
@@ -43,66 +44,83 @@ function crossRevealIndex(row: number, col: number): number {
   return -1
 }
 
-function spriteIdForModeCrossCell(
-  s: State,
-  mode: GridFromKind,
-  row: number,
-  col: number,
-): number | null {
-  if (mode === 'blank') return null
-
-  const pos = s.player.position
-
-  // Synthesize the state the right-grid sprite resolver expects: `overworld`
-  // clears the encounter; an encounter mode uses that mechanic's placeholder.
-  const provider = mode === 'overworld' ? null : MECHANIC_INDEX.previewEncounterByEncounterKind[mode]
-  const s2: State = { ...s, encounter: provider ? provider() : null }
-
-  const def = getRightGridCellDef(s2, row, col)
-  if (def.spriteId != null) return def.spriteId
-  if (def.tilePreview && def.tilePreview.kind === 'relativeToPlayer') {
-    return getSpriteIdAt(s.world, pos.x + def.tilePreview.dx, pos.y + def.tilePreview.dy)
+function findGridTransitionAnim(s: State): GridTransitionAnim | null {
+  if (!ENABLE_ANIMATIONS) return null
+  const anims = s.ui.anim.active
+  for (let i = 0; i < anims.length; i++) {
+    const a = anims[i]!
+    if (a.kind === 'gridTransition') return a as GridTransitionAnim
   }
   return null
 }
 
-function previewSpriteIdForCell(s: State, row: number, col: number): number | null {
-  // During a grid transition, we render a hybrid from-mode -> to-mode layout.
-  let transition: GridTransitionAnim | null = null
-  if (ENABLE_ANIMATIONS) {
-    const anims = s.ui.anim.active
-    for (let i = 0; i < anims.length; i++) {
-      const a = anims[i]!
-      if (a.kind === 'gridTransition') {
-        transition = a as GridTransitionAnim
-        break
-      }
-    }
-  }
+// Returns the from/to mode for this cell at the current spiral reveal phase,
+// or null if no transition is active or the cell isn't part of the cross.
+function transitionModeForCell(s: State, row: number, col: number): GridFromKind | null {
+  const transition = findGridTransitionAnim(s)
+  if (!transition) return null
+  const idx = crossRevealIndex(row, col)
+  if (idx < 0) return null
+  const frame = s.ui.clock.frame | 0
+  const start = transition.startFrame | 0
+  if (frame < start) return transition.params.from
+  const stepFrames = Math.max(1, GRID_TRANSITION_STEP_FRAMES | 0)
+  const phase = Math.floor((frame - start) / stepFrames)
+  return phase >= idx ? transition.params.to : transition.params.from
+}
 
-  if (transition) {
-    const frame = s.ui.clock.frame | 0
-    const start = transition.startFrame | 0
-    if (frame >= start) {
-      const stepFrames = Math.max(1, GRID_TRANSITION_STEP_FRAMES | 0)
-      const t = Math.max(0, frame - start)
-      const phase = Math.floor(t / stepFrames)
+// Builds the State the grid should evaluate against for a given mode. Overworld
+// clears the encounter; encounter modes use the live one if it matches (so the
+// reveal sees variant-specific cells like the wyrm's Pay button) and otherwise
+// fall back to the mechanic's preview placeholder. Callers must filter `blank`.
+function synthesizeStateForMode(s: State, mode: Exclude<GridFromKind, 'blank'>): State {
+  if (mode === 'overworld') return { ...s, encounter: null }
+  if (s.encounter && s.encounter.kind === mode) return s
+  const provider = MECHANIC_INDEX.previewEncounterByEncounterKind[mode]
+  return { ...s, encounter: provider ? provider() : null }
+}
 
-      const idx = crossRevealIndex(row, col)
-      if (idx >= 0) {
-        const mode = phase >= idx ? transition.params.to : transition.params.from
-        return spriteIdForModeCrossCell(s, mode, row, col)
-      }
-    }
-  }
+type CellCategory = 'meta' | 'action' | 'terrain' | 'empty'
 
-  const def = getRightGridCellDef(s, row, col)
-  if (def.spriteId != null) return def.spriteId
+type CellView = {
+  spriteId: number | null
+  category: CellCategory
+}
+
+// Resolves the def-derived view (sprite + category) for one cell against a state.
+// Sprite and category share the same def lookup so they cannot drift apart.
+function viewFromDef(def: RightGridCellDef, s: State): CellView {
   if (def.tilePreview && def.tilePreview.kind === 'relativeToPlayer') {
     const p = s.player.position
-    return getSpriteIdAt(s.world, p.x + def.tilePreview.dx, p.y + def.tilePreview.dy)
+    return {
+      spriteId: getSpriteIdAt(s.world, p.x + def.tilePreview.dx, p.y + def.tilePreview.dy),
+      category: 'terrain',
+    }
   }
-  return null
+  if (def.spriteId != null) return { spriteId: def.spriteId, category: 'action' }
+  return { spriteId: null, category: 'empty' }
+}
+
+// The full per-cell view for this frame: handles meta corners, the center
+// no-border rule, and the cross-reveal animation in one place. Border ops and
+// sprite ops downstream both read from this single source so they animate in
+// lockstep.
+function viewForCell(s: State, row: number, col: number): CellView {
+  if (isMetaCornerCell({ row, col })) {
+    const def = getRightGridCellDef(s, row, col)
+    return { spriteId: def.spriteId ?? null, category: 'meta' }
+  }
+
+  const mode = transitionModeForCell(s, row, col)
+  if (mode === 'blank') return { spriteId: null, category: 'empty' }
+
+  const stateAt = mode != null ? synthesizeStateForMode(s, mode) : s
+  const def = getRightGridCellDef(stateAt, row, col)
+  const view = viewFromDef(def, stateAt)
+
+  // Center is never a button: it shows content but draws no border.
+  if (row === 1 && col === 1) return { spriteId: view.spriteId, category: 'empty' }
+  return view
 }
 
 function cellOriginPx(row: number, col: number) {
@@ -119,6 +137,40 @@ function spriteOriginInCellPx(row: number, col: number) {
 
 function rectOp(x: number, y: number, w: number, h: number, color: number): RightGridRenderOp {
   return { kind: 'rect', x, y, w, h, color }
+}
+
+function rectbOp(x: number, y: number, w: number, h: number, color: number): RightGridRenderOp {
+  return { kind: 'rectb', x, y, w, h, color }
+}
+
+function borderOpsForCell(row: number, col: number, category: CellCategory): RightGridRenderOp[] {
+  if (category === 'empty') return []
+  const o = cellOriginPx(row, col)
+  const size = Layout.CELL_SIZE_PX
+
+  if (category === 'meta') {
+    return [rectbOp(o.x, o.y, size, size, UI.UI_COLOR_GRID_CELL_BORDER_META)]
+  }
+  if (category === 'action') {
+    return [rectbOp(o.x, o.y, size, size, UI.UI_COLOR_GRID_CELL_BORDER)]
+  }
+  // terrain: double border (outer + inner with 1px gap)
+  const inset = UI.UI_GRID_CELL_BORDER_DOUBLE_INSET
+  const color = UI.UI_COLOR_GRID_CELL_BORDER
+  return [
+    rectbOp(o.x, o.y, size, size, color),
+    rectbOp(o.x + inset, o.y + inset, size - inset * 2, size - inset * 2, color),
+  ]
+}
+
+function cellBorderOps(s: State): RightGridRenderOp[] {
+  const ops: RightGridRenderOp[] = []
+  for (let row = 0; row < Layout.GRID_ROWS; row++) {
+    for (let col = 0; col < Layout.GRID_COLS; col++) {
+      ops.push(...borderOpsForCell(row, col, viewForCell(s, row, col).category))
+    }
+  }
+  return ops
 }
 
 function sprOp(spriteId: number, x: number, y: number): RightGridRenderOp {
@@ -166,7 +218,7 @@ function isMetaCornerCell(cell: Cell): boolean {
 
 function rightPanelBoundsPx(): Rect {
   return {
-    x: Layout.PANEL_LEFT_WIDTH,
+    x: Layout.RIGHT_PANEL_X,
     y: 0,
     w: Layout.PANEL_RIGHT_WIDTH,
     h: Layout.SCREEN_HEIGHT,
@@ -243,14 +295,15 @@ function buildStaticPlan(s: State, hover: Cell | null): RightGridRenderPlan {
     for (let col = 0; col < Layout.GRID_COLS; col++) {
       if (hover && hover.row === row && hover.col === col) ops.push(...drawHoverTintOps({ row, col }))
 
-      const spriteId = previewSpriteIdForCell(s, row, col)
-      if (spriteId == null) continue
+      const view = viewForCell(s, row, col)
+      if (view.spriteId == null) continue
 
       const o = spriteOriginInCellPx(row, col)
-      ops.push(sprOp(spriteId, o.x, o.y))
+      ops.push(sprOp(view.spriteId, o.x, o.y))
     }
   }
 
+  ops.push(...cellBorderOps(s))
   return { ops }
 }
 
@@ -303,10 +356,10 @@ function buildMoveSlidePlan(s: State, anim: MoveSlideAnim, hover: Cell | null): 
 
   // Keep corners stable UI (mask + redraw icons).
   const corners: Array<{ row: number; col: number; spriteId: number | null }> = [
-    { row: 0, col: 0, spriteId: SPRITES.buttons.goal },
-    { row: 2, col: 0, spriteId: SPRITES.buttons.minimap },
-    { row: 2, col: 2, spriteId: SPRITES.buttons.restart },
-    { row: 0, col: 2, spriteId: SPRITES.buttons.map },
+    { row: 0, col: 0, spriteId: SPRITES.actions.goal },
+    { row: 2, col: 0, spriteId: SPRITES.actions.minimap },
+    { row: 2, col: 2, spriteId: SPRITES.actions.restart },
+    { row: 0, col: 2, spriteId: SPRITES.actions.map },
   ]
 
   for (let i = 0; i < corners.length; i++) {
@@ -320,6 +373,7 @@ function buildMoveSlidePlan(s: State, anim: MoveSlideAnim, hover: Cell | null): 
     }
   }
 
+  ops.push(...cellBorderOps(s))
   return { ops }
 }
 

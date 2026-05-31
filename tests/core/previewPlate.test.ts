@@ -51,8 +51,8 @@ describe('previewPlate hooks', () => {
       const lines = lookup('camp')(state)
       expect(lines).not.toBeNull()
       expect(lines!.length).toBeGreaterThanOrEqual(2)
-      expect(lines![0]).toMatchObject({ spriteId: SPRITES.stats.food, text: `+${CAMP_FOOD_GAIN}` })
-      expect(lines![1]!.spriteId).toBe(SPRITES.stats.troop)
+      expect(lines![0]).toMatchObject({ spriteId: SPRITES.inventory.food, text: `+${CAMP_FOOD_GAIN}` })
+      expect(lines![1]!.spriteId).toBe(SPRITES.inventory.troop)
       expect(lines![1]!.text.startsWith('+')).toBe(true)
     })
 
@@ -78,9 +78,9 @@ describe('previewPlate hooks', () => {
       const lines = lookup('town')(state)
       expect(lines).not.toBeNull()
       expect(lines!.length).toBe(3)
-      expect(lines![0]).toEqual({ spriteId: SPRITES.stats.food, text: '-3' })
-      expect(lines![1]).toEqual({ spriteId: SPRITES.stats.troop, text: '-5' })
-      expect(lines![2]).toEqual({ spriteId: SPRITES.stats.scout, text: '-12' })
+      expect(lines![0]).toEqual({ spriteId: SPRITES.inventory.food, text: '-3' })
+      expect(lines![1]).toEqual({ spriteId: SPRITES.inventory.troop, text: '-5' })
+      expect(lines![2]).toEqual({ spriteId: SPRITES.inventory.scout, text: '-12' })
     })
 
     it('renders a rumors offer using the rumor sprite and price', () => {
@@ -94,7 +94,7 @@ describe('previewPlate hooks', () => {
       }
       const state = makeState(town, { kind: 'town', sourceCellId: 9, restoreMessage: '' })
       const lines = lookup('town')(state)
-      expect(lines).toEqual([{ spriteId: SPRITES.cosmetics.rumorIllustration, text: '-7' }])
+      expect(lines).toEqual([{ spriteId: SPRITES.actions.rumor, text: '-7' }])
     })
   })
 
@@ -104,8 +104,8 @@ describe('previewPlate hooks', () => {
       const state = makeState(farm, { kind: 'farm', sourceCellId: 4, restoreMessage: '' })
       const lines = lookup('farm')(state)
       expect(lines).toEqual([
-        { spriteId: SPRITES.stats.food, text: `-${FARM_BUY_FOOD_GOLD_COST}` },
-        { spriteId: SPRITES.cosmetics.beastIllustration, text: '-17' },
+        { spriteId: SPRITES.inventory.food, text: `-${FARM_BUY_FOOD_GOLD_COST}` },
+        { spriteId: SPRITES.inventory.beast, text: '-17' },
       ])
     })
   })
@@ -116,8 +116,8 @@ describe('previewPlate hooks', () => {
       const state = makeState(lock, { kind: 'locksmith', sourceCellId: 4, restoreMessage: '' })
       const lines = lookup('locksmith')(state)
       expect(lines).toEqual([
-        { spriteId: SPRITES.stats.gold, text: `-${LOCKSMITH_KEY_GOLD_COST}` },
-        { spriteId: SPRITES.stats.food, text: `-${LOCKSMITH_KEY_FOOD_COST}` },
+        { spriteId: SPRITES.inventory.gold, text: `-${LOCKSMITH_KEY_GOLD_COST}` },
+        { spriteId: SPRITES.inventory.food, text: `-${LOCKSMITH_KEY_FOOD_COST}` },
       ])
     })
   })
@@ -131,7 +131,7 @@ describe('previewPlate hooks', () => {
         restoreMessage: '',
       })
       const lines = lookup('combat')(state)
-      expect(lines).toEqual([{ spriteId: SPRITES.stats.enemy, text: '7' }])
+      expect(lines).toEqual([{ spriteId: SPRITES.enemies.enemy, text: '7' }])
     })
 
     it('returns null when no combat encounter is active', () => {
@@ -154,7 +154,7 @@ describe('previewPlate hooks', () => {
       expect(previewEncounter).toBeDefined()
       const state = makeState({ kind: 'grass' }, previewEncounter ?? null)
       const lines = lookup('combat')(state)
-      expect(lines).toEqual([{ spriteId: SPRITES.stats.enemy, text: '0' }])
+      expect(lines).toEqual([{ spriteId: SPRITES.enemies.enemy, text: '0' }])
     })
 
     it('right-grid is total on the synthesized preview encounter (sourceCellId: -1)', () => {
@@ -166,7 +166,7 @@ describe('previewPlate hooks', () => {
       // Center cell falls through `combatVariantForEncounter`; sentinel must
       // resolve to STANDARD_COMBAT_VARIANT, not crash on the missing cell.
       const center = provider(state, 1, 1)
-      expect(center.spriteId).toBe(SPRITES.stats.enemy)
+      expect(center.spriteId).toBe(SPRITES.enemies.enemy)
       expect(center.action).toBeNull()
     })
   })

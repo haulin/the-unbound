@@ -140,7 +140,7 @@ describe('v0.2 map+scout acceptance', () => {
     const onto = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     expect(onto.encounter?.kind).toBe('camp')
 
-    // North is disabled in camp.
+    // North is unused in camp.
     const north = getRightGridCellDef(onto, 0, 1)
     expect(north.action).toBe(null)
   })

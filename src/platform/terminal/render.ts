@@ -20,14 +20,14 @@ const DEFAULT_OPTIONS: RenderOptions = { blind: false }
 // the source of truth on the TIC side, and adding a label field every mechanic
 // has to fill would be a bigger churn than this 8-row table.
 const PLATE_LABEL_BY_SPRITE: Record<number, string> = {
-  [SPRITES.stats.food]: 'food',
-  [SPRITES.stats.enemy]: 'enemy',
-  [SPRITES.stats.scout]: 'scout',
-  [SPRITES.stats.troop]: 'army',
-  [SPRITES.stats.gold]: 'gold',
-  [SPRITES.cosmetics.heart]: 'hp',
-  [SPRITES.cosmetics.rumorIllustration]: 'rumor',
-  [SPRITES.cosmetics.beastIllustration]: 'beast',
+  [SPRITES.inventory.food]: 'food',
+  [SPRITES.enemies.enemy]: 'enemy',
+  [SPRITES.inventory.scout]: 'scout',
+  [SPRITES.inventory.troop]: 'army',
+  [SPRITES.inventory.gold]: 'gold',
+  [SPRITES.enemies.heart]: 'hp',
+  [SPRITES.actions.rumor]: 'rumor',
+  [SPRITES.inventory.beast]: 'beast',
 }
 
 // Numpad layout: top-row keys are 7/8/9, mid 4/5/6, bottom 1/2/3. The 3x3

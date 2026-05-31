@@ -25,16 +25,19 @@ import type { Cell, State, TownCell, TownEncounter } from '../../types'
 import {
   applyDeltas,
   buy,
+  gridButton,
   leaveEncounter,
+  makeRightGrid,
   noGoldResponse,
+  previewEncounterProvider,
   setEncounterMessage,
+  type RightGridActionCell,
 } from '../encounterHelpers'
 import { cellId, isTerrainCell, placeNamedFeature } from '../../worldgen'
 import type {
   MechanicDef,
   OnEnterTile,
   PlaceWorldProvider,
-  PreviewPlateLine,
   PreviewPlateProvider,
   ReduceEncounterAction,
   TileEnterResult,
@@ -46,17 +49,23 @@ export const ACTION_TOWN_HIRE_SCOUT = 'hireScout' as const
 export const ACTION_TOWN_BUY_RUMOR = 'buyRumors' as const
 export const ACTION_TOWN_LEAVE = 'TOWN_LEAVE' as const
 
-// `TownOfferKind` lists the four base offers (a town never sells "leave");
-// it's what `TownCell.offers` carries and what the right-grid maps to button
-// sprites. Defined here so a future "add an offer" change is local.
-export type TownOfferKind =
-  | typeof ACTION_TOWN_BUY_FOOD
-  | typeof ACTION_TOWN_BUY_TROOPS
-  | typeof ACTION_TOWN_HIRE_SCOUT
-  | typeof ACTION_TOWN_BUY_RUMOR
-export type TownAction =
-  | { type: TownOfferKind }
-  | { type: typeof ACTION_TOWN_LEAVE }
+type TownOfferSpec = {
+  spriteId: number
+  priceKey: keyof TownCell['prices']
+  reduce: (s: State, town: TownCell) => State
+}
+
+const TOWN_OFFERS = {
+  [ACTION_TOWN_BUY_FOOD]:   { spriteId: SPRITES.inventory.food,  priceKey: 'foodGold',   reduce: reduceTownBuyFood   },
+  [ACTION_TOWN_BUY_TROOPS]: { spriteId: SPRITES.inventory.troop, priceKey: 'troopsGold', reduce: reduceTownBuyTroops },
+  [ACTION_TOWN_HIRE_SCOUT]: { spriteId: SPRITES.inventory.scout, priceKey: 'scoutGold',  reduce: reduceTownHireScout },
+  [ACTION_TOWN_BUY_RUMOR]:  { spriteId: SPRITES.actions.rumor,   priceKey: 'rumorGold',  reduce: reduceTownBuyRumor  },
+} as const satisfies Record<string, TownOfferSpec>
+
+export type TownOfferKind = keyof typeof TOWN_OFFERS
+export type TownAction = { type: TownOfferKind } | { type: typeof ACTION_TOWN_LEAVE }
+
+const BASE_OFFERS = Object.keys(TOWN_OFFERS) as TownOfferKind[]
 
 function townPrefix(town: TownCell): string {
   const name = town.name || 'A Town'
@@ -102,27 +111,11 @@ const onEnterTown: OnEnterTile = ({ cell, world, pos, stepCount }) => {
 // ---- Encounter actions ----
 
 const reduceTownAction: ReduceEncounterAction = (prevState, action) => {
-  if (
-    action.type !== ACTION_TOWN_BUY_FOOD &&
-    action.type !== ACTION_TOWN_BUY_TROOPS &&
-    action.type !== ACTION_TOWN_HIRE_SCOUT &&
-    action.type !== ACTION_TOWN_BUY_RUMOR &&
-    action.type !== ACTION_TOWN_LEAVE
-  ) {
-    return null
-  }
-
-  const enc = prevState.encounter
-  if (!enc || enc.kind !== 'town') return prevState
-
+  if (action.type !== ACTION_TOWN_LEAVE && !(action.type in TOWN_OFFERS)) return null
   if (action.type === ACTION_TOWN_LEAVE) return leaveEncounter(prevState, 'town')
 
   const town = getCellAt(prevState.world, prevState.player.position) as TownCell
-
-  if (action.type === ACTION_TOWN_BUY_FOOD) return reduceTownBuyFood(prevState, town)
-  if (action.type === ACTION_TOWN_BUY_TROOPS) return reduceTownBuyTroops(prevState, town)
-  if (action.type === ACTION_TOWN_HIRE_SCOUT) return reduceTownHireScout(prevState, town)
-  return reduceTownBuyRumor(prevState, town)
+  return TOWN_OFFERS[action.type as TownOfferKind].reduce(prevState, town)
 }
 
 function reduceTownBuyFood(prevState: State, town: TownCell): State {
@@ -182,16 +175,9 @@ function reduceTownHireScout(prevState: State, town: TownCell): State {
 // ---- Worldgen placement ----
 
 // The first town never omits `hireScout` so the hero is guaranteed a place to
-// buy a scout early. Subsequent towns drop one of the four base offers at
-// random.
+// buy a scout early. Subsequent towns drop one of the base offers at random.
 const placeNamedTowns: PlaceWorldProvider = ({ cells, rngState }) => {
-  const baseOffers: TownOfferKind[] = [
-    ACTION_TOWN_BUY_FOOD,
-    ACTION_TOWN_BUY_TROOPS,
-    ACTION_TOWN_HIRE_SCOUT,
-    ACTION_TOWN_BUY_RUMOR,
-  ]
-  const omitNoScoutIndices = [0, 1, 3] as const
+  const omittableOffers = BASE_OFFERS.filter((o) => o !== ACTION_TOWN_HIRE_SCOUT)
 
   let townIndex = 0
 
@@ -201,14 +187,9 @@ const placeNamedTowns: PlaceWorldProvider = ({ cells, rngState }) => {
     fallbackName: 'A Town',
     canPlaceAt: (_x, _y, here) => isTerrainCell(here),
     buildCell: ({ x, y, name, rng }) => {
-      let omitIdx: number
-      if (townIndex === 0) {
-        const idx = rng.intExclusive(omitNoScoutIndices.length)
-        omitIdx = omitNoScoutIndices[idx]!
-      } else {
-        omitIdx = rng.intExclusive(baseOffers.length)
-      }
-      const offers = baseOffers.filter((_k, idx) => idx !== omitIdx)
+      const pool = townIndex === 0 ? omittableOffers : BASE_OFFERS
+      const omitOffer = pool[rng.intExclusive(pool.length)]!
+      const offers = BASE_OFFERS.filter((o) => o !== omitOffer)
 
       const foodGold = rng.intInRange(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX)
       const troopsGold = rng.intInRange(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX)
@@ -232,18 +213,20 @@ const placeNamedTowns: PlaceWorldProvider = ({ cells, rngState }) => {
 
 // ---- Preview plate ----
 
+function townOfferSlot(s: State, idx: number): RightGridActionCell | null {
+  const town = getCellAt(s.world, s.player.position) as TownCell
+  const o = town.offers[idx]
+  return o ? gridButton(TOWN_OFFERS, o) : null
+}
+
 const townPreviewPlate: PreviewPlateProvider = (s) => {
   const here = getCellAt(s.world, s.player.position)
   if (!here || here.kind !== 'town') return null
-  const lines: PreviewPlateLine[] = []
-  for (let i = 0; i < here.offers.length; i++) {
-    const o = here.offers[i]!
-    if (o === 'buyFood') lines.push({ spriteId: SPRITES.stats.food, text: `-${here.prices.foodGold}` })
-    else if (o === 'buyTroops') lines.push({ spriteId: SPRITES.stats.troop, text: `-${here.prices.troopsGold}` })
-    else if (o === 'hireScout') lines.push({ spriteId: SPRITES.stats.scout, text: `-${here.prices.scoutGold}` })
-    else if (o === 'buyRumors') lines.push({ spriteId: SPRITES.cosmetics.rumorIllustration, text: `-${here.prices.rumorGold}` })
-  }
-  return lines.length ? lines : null
+  if (!here.offers.length) return null
+  return here.offers.map((o) => {
+    const spec = TOWN_OFFERS[o]
+    return { spriteId: spec.spriteId, text: `-${here.prices[spec.priceKey]}` }
+  })
 }
 
 function reduceTownBuyRumor(prevState: State, town: TownCell): State {
@@ -277,33 +260,13 @@ export const townMechanic: MechanicDef = {
     kind: 'town',
     reduceAction: reduceTownAction,
     previewPlate: townPreviewPlate,
-    previewEncounter: (): TownEncounter => ({ kind: 'town', sourceCellId: -1, restoreMessage: '' }),
-    rightGrid: (s, row, col) => {
-      const town = getCellAt(s.world, s.player.position) as TownCell
-
-      function spriteIdForOffer(o: TownOfferKind | undefined): number | null {
-        if (!o) return null
-        if (o === 'buyFood') return SPRITES.buttons.food
-        if (o === 'buyTroops') return SPRITES.buttons.troop
-        if (o === 'hireScout') return SPRITES.buttons.scout
-        if (o === 'buyRumors') return SPRITES.buttons.rumorTip
-        return null
-      }
-
-      const offerAt = (idx: number) => {
-        const o = town.offers[idx]
-        if (!o) return { action: null }
-        const spriteId = spriteIdForOffer(o)
-        if (spriteId == null) return { action: null }
-        return { spriteId, action: { type: o } }
-      }
-
-      if (row === 0 && col === 1) return offerAt(0) // North
-      if (row === 1 && col === 0) return offerAt(1) // West
-      if (row === 2 && col === 1) return offerAt(2) // South
-      if (row === 1 && col === 2) return { spriteId: SPRITES.buttons.return, action: { type: ACTION_TOWN_LEAVE } }
-      if (row === 1 && col === 1) return { spriteId: SPRITES.cosmetics.marketStall, action: null }
-      return { action: null }
-    },
+    previewEncounter: previewEncounterProvider('town'),
+    rightGrid: makeRightGrid({
+      leaveAction: { type: ACTION_TOWN_LEAVE },
+      centerSpriteId: SPRITES.centers.marketStall,
+      top: (s) => townOfferSlot(s, 0),
+      left: (s) => townOfferSlot(s, 1),
+      bottom: (s) => townOfferSlot(s, 2),
+    }),
   },
 }
