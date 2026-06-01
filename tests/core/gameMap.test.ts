@@ -14,7 +14,7 @@ function makeWorld(): World {
     height: 4,
     mapGenAlgorithm: 'TEST',
     cells: [
-      [{ kind: 'farm', id: 1, name: 'F', beastGoldCost: 10 }, { kind: 'camp', id: 2, name: 'C', nextReadyStep: 0 }, { kind: 'henge', id: 3, name: 'H', nextReadyStep: 0 }, { kind: 'gate' }],
+      [{ kind: 'farm', id: 1, name: 'F', beastGoldCost: 10 }, { kind: 'camp', id: 2, name: 'C', nextReadyStep: 0 }, { kind: 'henge', id: 3, name: 'H', nextReadyStep: 0, currentGroup: null }, { kind: 'gate' }],
       [
         { kind: 'locksmith' },
         {

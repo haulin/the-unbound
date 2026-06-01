@@ -1,7 +1,7 @@
 {
   "name": "the-unbound",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "The Unbound — A minimalist retro fantasy roguelike of exploration and resource management.",
   "license": "MIT",
   "scripts": {

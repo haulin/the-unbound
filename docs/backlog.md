@@ -1,5 +1,12 @@
 # Tentative roadmap (The Unbound)
 
+## Polish backlog (boy-scout each milestone)
+
+- **Per-mechanic-file split for combat variants.** Extract `brigandCombatVariant` (+ `brigandRecruitCost`/`Eligibility`/`LootScale`/`VictoryReward`) into `src/core/mechanics/defs/mountains.ts`; extract `goblinCombatVariant` (+ `goblinVictoryReward`) into `src/core/mechanics/defs/woods.ts`. `terrainHazards.ts` becomes swamp-only (or renames to `swamp.ts`). Move the ambush spawn helper (`spawnEnemyArmy` / `rolledEnemySpawn`) to live with woods+mountains rather than in `combat.ts`. After the split, `combat.ts` is pure infrastructure: variant type, action dispatch, fight/pay/return reducers, shared plate factories. Unblocks v0.7 mountain/woods upsides, henge tiers, and the 3:1 territorial mix without fighting the current shape.
+- **Wyrm config extraction follow-up.** Wyrm pay-success outcome is currently labeled `'recruit'` in the union (`combat.ts:223`) and `onWyrmCombatClosed` absorbs it as a synonym for victory. Either widen the outcome union to `'victory' | 'flee' | 'recruit' | 'paid'`, or rename `'recruit'` to `'paid'` across the dispatch + 4 handlers. Land alongside the variant split since the wyrm variant lives in its own file already.
+- **Lore-cycling audit + per-key strategy refactor.** Per-press cycling drains failure-line pools too quickly during a single encounter. Classify pools into per-tile-stable (cell ID), per-encounter-stable (encounter open), and per-press categories; refactor `RNG.advanceCursor` keying accordingly.
+- **Registry kind-coverage validation.** A mechanic declaring `moveEventPolicyByKind: { foo: { ambushPercent: 100 } }` without a matching `combatVariantByKind[foo]` falls through to the preview placeholder silently. Add a registry-time check (`docs/backlog.md` already tracks this in the broader registry hardening task).
+
 ## Ideas
 - skip modal if nothing to do (not enough money or cooldown - camp/farm/town)
 - maybe adjust worldgen as it feels like swamps & mountains are too common
@@ -16,16 +23,6 @@
 - morale modifying battle odds, +2, +5, +10% either way (curse could lower it, praying at altar could clear a curse)
 - every 28 days a plague comes that kills half your army
 - different types of enemies (magic/strength) or different loot drops
-
-**v0.6 — Combat balance & UI intermezzo**
-
-- Fights rework — more enemies should yield bigger rewards; winning against 2× armies is sometimes impossible. Combo breaker candidate: guaranteed hit after missing 3–4× in a row.
-- The fight algo is a bit weird — long streaks of hit or miss.
-- Food carry cap: stop trimming food when army shrinks (combat losses, starvation). Rule shifts from "food ≤ cap" to "gains can't exceed cap, but existing food sticks through cap drops". Single-helper change in `src/core/foodCarry.ts` (`resourcesWithClampedFoodIfNeeded` → `applyFoodCapOnGain(prev, next)`); 5 callsites. No UI work — food is shown as a plain number, cap is invisible.
-- goblin enemies ambush in woods, replace brigands, drop food
-- Henge fights scale harder (enemy = player×2..player×3 (min 10)), reward 10..25 gold+food
-- Maybe recruit button in fights that allows to pay gold for remaining troops - 1/1, 2/4, 3/9, 4/16, etc (reuses Wyrm's Pay pattern)
-- Rich enemies drop more loot
 
 **v0.7 — Camps, Towns, Terrain & Henge Scaling**
 
@@ -106,6 +103,16 @@ See `docs/2026-05-27-slot-system-design.md` for the full design.
 # Deferred backlog
 
 This file captures ideas discussed during design, kept out of the current phase's implementation plan. Nothing here is committed to; it is a parking lot for later phases.
+
+## Combat balance — deferred
+
+Items considered during the combat-balance design and parked because each needs its own architectural migration or design week. See `docs/plans/2026-06-01-v0.6-combat-balance-design.md`.
+
+- **Henge tiers** — lesser / standard / great henges with distinct lore, sprite, and band-size envelopes. Needs a worldgen + lore split that the v0.6 single-tier henge does not justify yet.
+- **3:1 goblin/brigand territorial mix** — woods sometimes spawn brigands, mountains sometimes spawn goblins, weighted 3:1 by terrain. Requires variant-on-encounter migration (the v0.6 variant lookup is keyed on `cell.kind`, not on the encounter itself); earns its own design.
+- **Combo breaker / streak smoothing** — guaranteed hit after a run of misses. Dropped after the Monte Carlo sim (`scripts/combat-sim.mjs`) showed that re-flavoring early-game ambushes as soft-math goblins covers the early-game pain without combat memory state.
+- **Rich enemies drop more loot** — subsumed by reward scaling (rewards already scale with `initialSpawn`); revisit only if the variant menu grows a "rich" tier with its own lore.
+- **Wyrm gold loot when wounded** — cheapens the prize and conflicts with the wyrm-as-boss tone; the v0.5 design intentionally restricts wyrm loot to the blood-quench narrative.
 
 ## UI polish — deferred (post-demo)
 

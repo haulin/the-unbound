@@ -1,5 +1,4 @@
 import {
-  COMBAT_ENCOUNTER_LINES,
   FOOD_COST_MOUNTAIN,
   FOOD_COST_SWAMP,
   LOST_FLAVOR_LINES,
@@ -12,9 +11,15 @@ import {
 import { cellIdForPos } from '../../cells'
 import { RNG } from '../../rng'
 import { pickTeleportDestination } from '../../teleport'
+import type { CellKind } from '../../types'
 import type { MechanicDef, MoveEventPolicy, OnEnterTile } from '../types'
 import { rollMoveEvent } from '../moveEvents'
-import { rolledEnemySpawn, STANDARD_COMBAT_VARIANT, startCombatEncounter } from './combat'
+import {
+  brigandCombatVariant,
+  goblinCombatVariant,
+  rolledEnemySpawn,
+  startCombatEncounter,
+} from './combat'
 
 const woodsPolicy: MoveEventPolicy = {
   ambushPercent: WOODS_AMBUSH_PERCENT,
@@ -27,6 +32,11 @@ const swampPolicy: MoveEventPolicy = {
   scoutLostHalves: true,
 }
 const mountainPolicy: MoveEventPolicy = { ambushPercent: MOUNTAIN_AMBUSH_PERCENT, lostPercent: 0 }
+
+const combatVariantByKind = {
+  woods: goblinCombatVariant,
+  mountain: brigandCombatVariant,
+} as const satisfies Partial<Record<CellKind, typeof brigandCombatVariant>>
 
 // Terrain-hazards handler: ambush roll, combat spawn, and lost-teleport flow for woods/swamp/mountain.
 const onEnterTerrainHazards: OnEnterTile = ({ cell, world, pos, stepCount, resources }) => {
@@ -51,7 +61,8 @@ const onEnterTerrainHazards: OnEnterTile = ({ cell, world, pos, stepCount, resou
   }
 
   if (event.kind === 'fight') {
-    const encounterMessage = tileRand.perMoveLine(COMBAT_ENCOUNTER_LINES)
+    const variant = combatVariantByKind[kind as keyof typeof combatVariantByKind]
+    const encounterMessage = tileRand.perMoveLine(variant.encounterLines)
     return startCombatEncounter({
       world,
       pos,
@@ -90,5 +101,5 @@ export const terrainHazardsMechanic: MechanicDef = {
     mountain: mountainPolicy,
   },
   onEnterTile: onEnterTerrainHazards,
-  combatVariant: STANDARD_COMBAT_VARIANT,
+  combatVariantByKind,
 }

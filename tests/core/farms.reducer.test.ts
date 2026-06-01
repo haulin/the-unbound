@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
 import { ACTION_MOVE, INITIAL_FOOD } from '../../src/core/constants'
 import { ACTION_FARM_LEAVE } from '../../src/core/mechanics/defs/farm'
-import { foodCarryCap } from '../../src/core/foodCarry'
 import type { State, World } from '../../src/core/types'
 import { makeResources } from './_helpers/makeResources'
 
@@ -59,8 +58,10 @@ describe('farms + food reducer', () => {
     const next = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
 
     expect(next.encounter?.kind).toBe('farm')
-    const cap = foodCarryCap({ armySize: 5, party: [] })
-    expect(next.resources.food).toBe(Math.min(INITIAL_FOOD - 1, cap))
+    // Food only clamps on gain. The move shrinks food from 15 → 14; even
+    // though 14 sits above cap (=10 for armySize=5), it is not
+    // retroactively trimmed.
+    expect(next.resources.food).toBe(INITIAL_FOOD - 1)
     expect(next.world.rngState).toBe(beforeRng)
     const cell = next.world.cells[1]![1]!
     expect(cell.kind).toBe('farm')

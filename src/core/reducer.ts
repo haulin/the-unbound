@@ -36,7 +36,7 @@ import {
   type Cell,
 } from './types'
 import { enqueueAnim, enqueueDeltas, enqueueGridTransition } from './uiAnim'
-import { resourcesWithClampedFoodIfNeeded } from './foodCarry'
+import { applyFoodCapOnGain } from './foodCarry'
 import { updateRunPathMemoryAfterMove } from './gameMap'
 
 const { onEnterTileByKind } = MECHANIC_INDEX
@@ -236,7 +236,7 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
     : (onEnterTileByKind[cell.kind] ?? onEnterDefaultTerrain)(ctx)
 
   const nextWorld = outcome.world ?? world
-  const nextResources = resourcesWithClampedFoodIfNeeded(outcome.resources ?? baseResources)
+  const nextResources = applyFoodCapOnGain(baseResources, outcome.resources ?? baseResources)
   // Popup the *applied* food delta after carry-cap clamping (prevents +N popups when only +k fits).
   const appliedFoodDelta = nextResources.food - baseResources.food
   if (appliedFoodDelta) foodDeltas.push(appliedFoodDelta)

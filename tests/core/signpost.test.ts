@@ -100,7 +100,7 @@ describe('signpost', () => {
         cells: makeCells(10, 10, [
           // Both are distance 5; camp wins over henge.
           { x: 3, y: 2, cell: { kind: 'camp', id: 23, name: 'Ember Watch', nextReadyStep: 0 } },
-          { x: 2, y: 3, cell: { kind: 'henge', id: 32, name: 'Old Insistence', nextReadyStep: 0 } },
+          { x: 2, y: 3, cell: { kind: 'henge', id: 32, name: 'Old Insistence', nextReadyStep: 0, currentGroup: null } },
         ]),
       }
     )
@@ -205,7 +205,7 @@ describe('signpost', () => {
           { x: 4, y: 1, cell: { kind: 'locksmith' } },
           { x: 2, y: 3, cell: { kind: 'farm', id: 32, name: 'Greyfield', beastGoldCost: 10 } },
           { x: 1, y: 4, cell: { kind: 'camp', id: 41, name: 'Ember Watch', nextReadyStep: 0 } },
-          { x: 5, y: 0, cell: { kind: 'henge', id: 5, name: 'The Mending', nextReadyStep: 0 } },
+          { x: 5, y: 0, cell: { kind: 'henge', id: 5, name: 'The Mending', nextReadyStep: 0, currentGroup: null } },
         ]),
       }
     )

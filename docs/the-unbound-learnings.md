@@ -113,6 +113,40 @@ Animation should improve feel/legibility without infecting game logic.
 - Prefer **animation as data** advanced by a simple clock/tick, so it can be replaced or disabled without rewriting core mechanics.
 - Prefer **renderer consumes models, not mechanics**: compute deterministic models in core; platform renderers should not replicate game rules.
 
+### Docs reflect the final intent, not the history
+
+Design and plan docs are living specs of *what we intend to ship*, not changelogs of how we arrived there. When a defect or a balance retune lands, **update the design and plan in place to read as if we'd specified the new shape from the start**. Don't append "v0.6.1 retune: actually it's now 0.8". Don't strike-through old numbers. Don't add a "post-implementation refinements" section that contradicts the table above it.
+
+- Past decisions belong in *git history* (commit messages, PR descriptions) and in *ADRs* (`docs/adr/`) when a decision is consequential enough to need a long-form rationale.
+- The doc the next person opens should be coherent end-to-end and never make the reader play archaeologist.
+- This includes resolving plan-vs-design drift the moment it's found: the design is the source of truth; the plan must be edited to match it (or the design edited if the deviation was the better idea, with the design re-stated cleanly).
+
+If you catch yourself writing "originally we said X, then we changed it to Y", stop — delete X, write Y.
+
+### Comments — minimum viable
+
+Comments rot faster than code. Default is **none**; add one only when the code itself can't carry the meaning.
+
+- **Reasoning belongs in design docs**, not in code. If you're explaining *why* a number or a shape was chosen, that lives in `docs/plans/*-design.md` and the code links to it (or doesn't — `git blame` is one keystroke away).
+- **No dates, no version numbers, no "post-X-pass" annotations.** Git history already records who changed what when. Comments saying "halved post-v0.6 polish" age into noise the moment v0.7 lands.
+- **No cross-file references.** Pointers like "see `path/to/other.ts`" or "matches `SOME_CONSTANT_OVER_THERE`" age poorly across renames and moves. Either inline the relevant fact, or trust the reader to grep.
+- **No narrating the obvious.** `// increment counter`, `// import the module`, `// return the result` add nothing. If the code is unclear, rename or restructure — don't paper over with prose.
+- **What's left after these rules:** brief notes on **non-obvious intent, trade-offs the code can't show, or invariants a reader would miss** (e.g. "RNG draw order is fixed so determinism goldens stay stable"). That's the bar.
+
+When in doubt, delete the comment and see if anyone notices.
+
+### Tests — minimum viable, like comments
+
+Hobbyist TIC-80 game; regression cost is "roll back the cart". Test density should track that, not enterprise risk.
+
+- **Acceptance per shipped GWT** — one per spec, hard to lose.
+- **Determinism witnesses** — guard RNG draw order against silent drift.
+- **Unit tests only where math is non-obvious** — formula edges the type system can't prove.
+
+Push back on AI-default patterns: multi-N parameter sweeps for one invariant (one Monte Carlo with bounds is enough), one `it()` per branch (use `describe.each`), pinned witnesses for behaviors the type system enforces, edge-case tests for inputs the type system already prevents.
+
+Aim for ~15 new tests per milestone, not 60. When in doubt, delete the test and see if a real regression slips through.
+
 ## Process notes (keep brief)
 
 - **Iterate quickly** while tuning feel/UX/tables; keep diffs small.

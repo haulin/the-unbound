@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildMechanicIndex } from '../../src/core/mechanics/registry'
+import type { CombatVariantConfig } from '../../src/core/mechanics/defs/combat'
 import type {
   MechanicDef,
   OnEnterTile,
@@ -104,5 +105,20 @@ describe('mechanics registry', () => {
     ]
     const idx = buildMechanicIndex(mechanics)
     expect(idx.reduceEncounterActionByEncounterKind.camp).toBe(reducer)
+  })
+
+  it('indexes combatVariantByKind per kind (one mechanic can supply distinct variants per kind)', () => {
+    const testVariant = {} as CombatVariantConfig
+    const otherVariant = {} as CombatVariantConfig
+    const mechanics: MechanicDef[] = [
+      {
+        id: 'hazards',
+        kinds: ['mountain', 'woods'],
+        combatVariantByKind: { mountain: testVariant, woods: otherVariant },
+      },
+    ]
+    const idx = buildMechanicIndex(mechanics)
+    expect(idx.combatVariantByKind.mountain).toBe(testVariant)
+    expect(idx.combatVariantByKind.woods).toBe(otherVariant)
   })
 })

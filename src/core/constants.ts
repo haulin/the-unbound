@@ -174,14 +174,23 @@ export const SWAMP_LOST_PERCENT = 20
 export const TELEPORT_MIN_DISTANCE = 4
 // LOST_* are defined in `lore.ts`.
 
-export const COMBAT_GOLD_REWARD_MIN = 8
-export const COMBAT_GOLD_REWARD_MAX = 20
-export const COMBAT_FOOD_BONUS_MAX = 4 // 0..4
 export const GRID_TRANSITION_STEP_FRAMES = 5
 
-// Combat + henge encounter lore lines are defined in `lore.ts`.
+export const BRIGAND_RECRUIT_MAX_REMAINING = 5
+export const BRIGAND_GOLD_NOISE = 3
+export const BRIGAND_FOOD_MAX = 4
+
+export const GOBLIN_GOLD_MAX = 2
+export const GOBLIN_FOOD_FACTOR = 0.4
+export const GOBLIN_FOOD_NOISE = 1
 
 export const HENGE_COOLDOWN_MOVES = 3
+export const HENGE_BAND_MIN = 10
+export const HENGE_BAND_MAX = 40
+export const HENGE_GOLD_NOISE = 3
+export const HENGE_GOLD_BONUS = 10
+export const HENGE_FOOD_FACTOR = 0.2
+export const HENGE_FOOD_NOISE = 1
 
 // Global actions (per-mechanic actions live on the mechanic defs).
 export const ACTION_NEW_RUN = 'NEW_RUN' as const

@@ -7,7 +7,7 @@ import {
   CAMP_RECRUIT_LINES,
 } from '../../constants'
 import { cellIdForPos, getCellAt, setCellAt } from '../../cells'
-import { resourcesWithClampedFoodIfNeeded } from '../../foodCarry'
+import { applyFoodCapOnGain } from '../../foodCarry'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
 import type { CampCell, CampEncounter, Resources, State } from '../../types'
@@ -120,7 +120,7 @@ function reduceCampSearch(prevState: State): State {
   const nextCampCell: CampCell = { ...campCell, nextReadyStep: stepCount + CAMP_COOLDOWN_MOVES }
   const nextWorld = setCellAt(prevState.world, prevState.player.position, nextCampCell)
   const gained: Resources = { ...prevRes, food: prevRes.food + CAMP_FOOD_GAIN, armySize: prevRes.armySize + armyGain }
-  const nextResources = resourcesWithClampedFoodIfNeeded(gained)
+  const nextResources = applyFoodCapOnGain(prevRes, gained)
   const foodGain = nextResources.food - prevRes.food
 
   const line = rnd.perMoveLine(CAMP_RECRUIT_LINES, { cellId: campCell.id })

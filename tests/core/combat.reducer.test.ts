@@ -2,19 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
 import {
   ACTION_MOVE,
-  COMBAT_ENCOUNTER_LINES,
-  COMBAT_FOOD_BONUS_MAX,
-  COMBAT_GOLD_REWARD_MAX,
-  COMBAT_GOLD_REWARD_MIN,
   ENABLE_ANIMATIONS,
-  HENGE_ENCOUNTER_LINE,
+  GOBLIN_ENCOUNTER_LINES,
+  HENGE_BAND_MAX,
+  HENGE_BAND_MIN,
   INITIAL_FOOD,
   INITIAL_GOLD,
   WOODS_AMBUSH_PERCENT,
 } from '../../src/core/constants'
-import { ACTION_FIGHT, ACTION_RETURN, spawnEnemyArmy } from '../../src/core/mechanics/defs/combat'
+import {
+  ACTION_FIGHT,
+  ACTION_RETURN,
+  spawnEnemyArmy,
+} from '../../src/core/mechanics/defs/combat'
+import { hengeCombatVariant } from '../../src/core/mechanics/defs/henge'
 import { RNG } from '../../src/core/rng'
-import { foodCarryCap } from '../../src/core/foodCarry'
 import type { DeltaAnim, State, World } from '../../src/core/types'
 import { makeResources } from './_helpers/makeResources'
 
@@ -28,7 +30,7 @@ function makeWorld(opts: { seed: number; dstKind: 'henge' | 'woods'; rngState: n
       [{ kind: 'grass' }, { kind: 'grass' }, { kind: 'grass' }],
       [
         { kind: 'grass' },
-        opts.dstKind === 'henge' ? { kind: 'henge', id: 4, name: 'The Mending', nextReadyStep: 0 } : { kind: 'woods' },
+        opts.dstKind === 'henge' ? { kind: 'henge', id: 4, name: 'The Mending', nextReadyStep: 0, currentGroup: null } : { kind: 'woods' },
         { kind: 'grass' },
       ],
       [{ kind: 'grass' }, { kind: 'grass' }, { kind: 'grass' }],
@@ -76,21 +78,27 @@ describe('combat reducer (v0.0.7)', () => {
     const w = makeWorld({ seed: 1, dstKind: 'henge', rngState: 123 })
     const s = makeState(w)
 
-    const spawned = spawnEnemyArmy({ rngState: w.rngState, playerArmy: s.resources.armySize })
-    const expectedEnemy = spawned.enemyArmy
-    const expectedRng = spawned.rngState >>> 0
+    // Henge variant rolls U[HENGE_BAND_MIN..HENGE_BAND_MAX] from the world
+    // stream — one int draw, same shape as `spawnEnemyArmy`'s rngState
+    // advance, but the band is independent of player army.
+    const r = RNG.createStreamRandom(w.rngState)
+    const span = HENGE_BAND_MAX - HENGE_BAND_MIN + 1
+    const expectedEnemy = HENGE_BAND_MIN + r.intExclusive(span)
+    const expectedRng = r.rngState >>> 0
 
     const next = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
 
     expect(next.encounter?.kind).toBe('combat')
     expect(next.encounter && next.encounter.kind === 'combat' ? next.encounter.enemyArmySize : null).toBe(expectedEnemy)
     expect(next.world.rngState >>> 0).toBe(expectedRng)
-    expect(next.ui.message).toBe(HENGE_ENCOUNTER_LINE)
+    // Arrival message is exercised by henge unit tests; here we just
+    // witness that some message was set.
+    expect(next.ui.message).not.toBe('')
 
-    // Enter-cost still applies on the move that starts combat.
-    expect(next.resources.food).toBe(
-      Math.min((INITIAL_FOOD | 0) - 1, foodCarryCap({ armySize: s.resources.armySize, party: [] })),
-    )
+    // Enter-cost still applies on the move that starts combat. Food only
+    // clamps on gain, so the move's shrink does not retroactively trim
+    // food even when prev food sits above cap.
+    expect(next.resources.food).toBe((INITIAL_FOOD | 0) - 1)
   })
 
   it('woods move with no ambush does not consume rng and does not start combat', () => {
@@ -126,17 +134,19 @@ describe('combat reducer (v0.0.7)', () => {
     expect(next.encounter?.kind).toBe('combat')
     expect(next.encounter && next.encounter.kind === 'combat' ? next.encounter.enemyArmySize : null).toBe(expectedEnemy)
     expect(next.world.rngState >>> 0).toBe(expectedRng)
-    expect(COMBAT_ENCOUNTER_LINES.includes(next.ui.message as any)).toBe(true)
+    // Woods ambush opens the goblin variant, so the opening line comes
+    // from the goblin pool.
+    expect(GOBLIN_ENCOUNTER_LINES.includes(next.ui.message as any)).toBe(true)
   })
 
-  it('FIGHT win uses floor-halving (1->0), pays gold once at the end (5..15) plus 0..2 food, and ends combat', () => {
+  it('FIGHT win uses floor-halving (1->0), pays gold via henge variant, and ends combat', () => {
     const w = makeWorld({ seed: 1, dstKind: 'henge', rngState: 1 })
     const s = makeState(w)
     s.resources.food = 0
     s.resources.gold = 0
     s.resources.armySize = 5
-    s.encounter = { kind: 'combat', enemyArmySize: 1, sourceCellId: 4, restoreMessage: 'The Mending Henge\nThe circle remembers old debts.' }
-    s.ui.message = HENGE_ENCOUNTER_LINE
+    s.encounter = { kind: 'combat', enemyArmySize: 1, initialSpawn: 1, sourceCellId: 4, restoreMessage: 'The Mending Henge\nThe circle remembers old debts.' }
+    s.ui.message = ''
 
     const startRng = findRngStateForFightOutcome({ playerArmy: 5, enemyArmy: 1, want: 'win' })
     s.world.rngState = startRng
@@ -145,10 +155,14 @@ describe('combat reducer (v0.0.7)', () => {
     const wRoll = roundRng.intExclusive(5 + 5)
     const bRoll = roundRng.intExclusive(1 + 5)
 
-    const rewardRng = RNG.createStreamRandom(roundRng.rngState)
-    const expectedGold = COMBAT_GOLD_REWARD_MIN + rewardRng.intExclusive(COMBAT_GOLD_REWARD_MAX - COMBAT_GOLD_REWARD_MIN + 1)
-    const expectedFoodBonus = rewardRng.intExclusive(COMBAT_FOOD_BONUS_MAX + 1)
-    const expectedRng = rewardRng.rngState >>> 0
+    // Source cell is a henge → variant is `hengeCombatVariant`. Compute the
+    // expected reward by running the variant's own `victoryReward` against
+    // the same rngState the reducer uses post-round.
+    const baseAfterRound = { ...s.resources }
+    const reward = hengeCombatVariant.victoryReward(baseAfterRound, roundRng.rngState, s.encounter)
+    const expectedGold = reward.resources.gold - baseAfterRound.gold
+    const expectedFoodBonus = reward.resources.food - baseAfterRound.food
+    const expectedRng = reward.rngState >>> 0
 
     const next = processAction(s, { type: ACTION_FIGHT })!
 
@@ -156,7 +170,7 @@ describe('combat reducer (v0.0.7)', () => {
     expect(next.resources.gold).toBe(expectedGold)
     expect(next.resources.food).toBe(expectedFoodBonus)
     expect(next.world.rngState >>> 0).toBe(expectedRng)
-    expect(next.ui.message).not.toBe(HENGE_ENCOUNTER_LINE)
+    expect(next.ui.message).not.toBe('')
 
     if (ENABLE_ANIMATIONS) {
       const enemyDeltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'enemyArmy')
@@ -179,7 +193,7 @@ describe('combat reducer (v0.0.7)', () => {
     const s = makeState(w)
     s.resources.food = 10
     s.resources.armySize = 2
-    s.encounter = { kind: 'combat', enemyArmySize: 12, sourceCellId: 4, restoreMessage: 'X' }
+    s.encounter = { kind: 'combat', enemyArmySize: 12, initialSpawn: 12, sourceCellId: 4, restoreMessage: 'X' }
 
     const startRng = findRngStateForFightOutcome({ playerArmy: 2, enemyArmy: 12, want: 'loss' })
     s.world.rngState = startRng
@@ -195,7 +209,7 @@ describe('combat reducer (v0.0.7)', () => {
     const s = makeState(w)
     s.resources.food = 7
     s.resources.armySize = 4
-    s.encounter = { kind: 'combat', enemyArmySize: 30, sourceCellId: 4, restoreMessage: 'X' }
+    s.encounter = { kind: 'combat', enemyArmySize: 30, initialSpawn: 30, sourceCellId: 4, restoreMessage: 'X' }
     const beforeRng = s.world.rngState >>> 0
 
     const next = processAction(s, { type: ACTION_RETURN })!

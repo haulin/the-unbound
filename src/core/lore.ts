@@ -384,20 +384,11 @@ export const CAMP_EMPTY_LINES = [
   "The word hasn't spread far enough yet. Return later.",
 ] as const;
 
-export const HENGE_LORE_LINES = [
-  "The circle remembers old debts.",
-  "The stones do not ask why you are here.",
-  "Whatever drew you here drew them first.",
-] as const;
-
 export const HENGE_EMPTY_LINES = [
   "The spirits here are quiet. Come back later.",
   "The circle is empty for now.",
   "You do not look back. You do not need to.",
 ] as const;
-
-export const HENGE_ENCOUNTER_LINE =
-  "You walked into something that was already happening.";
 
 // ----------------------------
 // Towns
@@ -569,23 +560,152 @@ export const LOST_FLAVOR_LINES = [
   "Lost between one step and the next.",
 ] as const;
 
-export const COMBAT_ENCOUNTER_LINES = [
+// ----------------------------
+// Brigand variant (mountain ambush)
+// ----------------------------
+export const BRIGAND_ENCOUNTER_LINES = [
   "They were already here.",
   "Company. The unwanted kind.",
   "This was always going to happen.",
 ] as const;
 
-export const COMBAT_FLEE_EXIT_LINES = [
+export const BRIGAND_VICTORY_LINES = [
+  "To the victor go the spoils.",
+  "You took what you could and moved on.",
+  "They will not follow you again.",
+] as const;
+
+export const BRIGAND_FLEE_LINES = [
   "You left one of your own behind so the journey can continue.",
   "You turned away. Not everyone followed.",
   "You survived. That is not the same as winning.",
 ] as const;
 
-export const COMBAT_VICTORY_EXIT_LINES = [
-  "To the victor go the spoils.",
-  "You took what you could and moved on.",
-  "They will not follow you again.",
+export const BRIGAND_RECRUIT_SUCCESS_LINES: readonly string[] = [
+  "They lower their blades. Coins jingle in your bag.",
+  "Their captain spits, pockets the silver, falls in behind you.",
+  "A handshake, a purse. No oath beyond the pay.",
+  "The biggest of them counts the coin twice. Then nods.",
+  "They name a price. You meet it. The road has new company.",
+  "Bound coin from the fallen. The living follow you now.",
+  "They strip their dead, hand you the spoils, then bend the knee.",
+  "Coin from the slain, oaths from the breathing. A fair trade.",
+  "Their fallen pay your purse; the standing pay your wage.",
+  "Spoils of the dead, oaths of the living. The bargain is old.",
 ] as const;
+
+export const BRIGAND_RECRUIT_NO_FUNDS_LINES: readonly string[] = [
+  "Empty pockets earn empty oaths.",
+  "They weigh your purse with a look. It buys nothing.",
+  "No coin, no company. They turn back to their fire.",
+  "They have heard better offers from poorer men.",
+  "Words are cheap. They are not.",
+] as const;
+
+export const BRIGAND_RECRUIT_NOT_WOUNDED_LINES: readonly string[] = [
+  "They laugh in your face.",
+  "Too many of them still standing to listen.",
+  "They have not bled enough to need you.",
+  "Their captain waves you off. The blades stay drawn.",
+  "Come back when the road has thinned them.",
+] as const;
+
+export const BRIGAND_RECRUIT_TOO_MANY_LINES: readonly string[] = [
+  "Too proud yet. They will not bend.",
+  "Still too many to follow one man.",
+  "No banner of yours is large enough for this lot.",
+  "They count themselves and find no need of you.",
+  "A band this size answers only to itself.",
+] as const;
+
+// ----------------------------
+// Goblin variant (woods ambush)
+// ----------------------------
+// Goblins are vermin of the road, not a people. The register is feral and
+// small: yellow eyes in the brambles, scuttling, cackling, half-eaten things
+// left behind when they break. Reward lore is food-coded because goblins
+// hoard food and drop it when they run. The recruit-fail pool is the only
+// place we *teach* the rule that goblins aren't a faction you can bargain
+// with — see `docs/lore-and-tone.md` ("creatures of the road").
+
+export const GOBLIN_ENCOUNTER_LINES: readonly string[] = [
+  "Yellow eyes between the trees. Small, and many.",
+  "The brambles move wrong. Something low, something quick.",
+  "A scuttling in the undergrowth. Then teeth.",
+  "They were waiting. They are always waiting.",
+  "Low shapes break from the ferns. Knives in small hands.",
+] as const;
+
+export const GOBLIN_VICTORY_LINES: readonly string[] = [
+  "They scatter shrieking. A half-eaten haunch left in the dirt.",
+  "Their nest empties as fast as it filled. The stores they hoarded are yours.",
+  "Bones, sacks, a side of someone's salt pork. They leave more than they think.",
+  "They flee into the dark with high small sounds. You step over what they dropped.",
+  "Their cache stinks but it feeds. Enough to eat tonight.",
+] as const;
+
+export const GOBLIN_FLEE_LINES: readonly string[] = [
+  "You crash through the brambles. Their cackling follows for a while, then thins.",
+  "Branches whip your face. Behind you, small fast feet, then nothing.",
+  "You don't look back. The laughter does not need to be answered.",
+  "The trees close behind you. Whatever they were is not what they were a moment ago.",
+  "You break for the road. They don't follow far - there are easier roads.",
+] as const;
+
+export const GOBLIN_NOT_RECRUITABLE_LINES: readonly string[] = [
+  "Goblins follow no banner. They scatter when paid.",
+  "Your coin means nothing to them. They eat the man who carries it.",
+  "They are not yours to lead. Nothing is.",
+  "They take what they can and break for the trees. That is the only company they keep.",
+  "Try to pay one and you have already lost the purse.",
+] as const;
+
+// ----------------------------
+// Henge variant
+// ----------------------------
+// Henges are old places of oath and blood — banners hang from posts driven
+// into the moss, sworn brothers gather behind the standing stones. Heavier
+// register than brigand alleyway feel: they stand for something, even if
+// what they stand for is forgotten. Encounter and flee aliases reuse the
+// brigand pools (band-of-armed-men shape); arrival, victory, and recruit-
+// success pools are henge-specific.
+
+export const HENGE_ARRIVAL_LINES: readonly string[] = [
+  "Stones loom black against the sky. Banners hang in the still air.",
+  "A circle of standing stones, blood-stained at their feet. Men wait between them.",
+  "The grass at the henge has been trampled into mud. Someone is sworn here.",
+  "Painted shields lean on the stones. The men who lean with them straighten as you arrive.",
+  "Smoke from a low fire. A standard you don't recognise. They saw you long before this.",
+] as const;
+
+export const HENGE_VICTORY_LINES: readonly string[] = [
+  "The stones drink the silence. The banner falls and is not lifted again.",
+  "The oath that held them together breaks here. You take what they kept.",
+  "Their dead are heaped at the stones. You leave the circle to them.",
+  "The standard goes down between two of the stones. No one rises to right it.",
+  "A henge bought in blood. The road continues, heavier than it was.",
+] as const;
+
+export const HENGE_RECRUIT_SUCCESS_LINES: readonly string[] = [
+  "They kneel between the stones and pledge. Old oaths transfer easily enough.",
+  "The remaining few set their banner against yours. Their oath is shorter than they think.",
+  "They lay their blades on the stone. \"This circle is yours now.\" Coin changes hands.",
+  "The standard-bearer salutes you and falls in. The henge is empty behind him.",
+  // Partial-loot framing for henge: the survivors hand over the spoils
+  // gathered from their fallen sisters and brothers as part of the bargain.
+  "They gather the spoils of their fallen and pour them at your feet, then take their place at your side.",
+  "The survivors strip their dead between the stones. \"What was theirs is yours, captain.\"",
+  "Coin from the cairns, oaths from the living. The henge has done this before.",
+] as const;
+
+// Aliases — the band-of-armed-men feel maps cleanly to brigand encounter,
+// flee, and recruit-fail pools. Henge-specific authorship lives in the
+// lines above; reuse here keeps the lore surface lean.
+export const HENGE_ENCOUNTER_LINES = BRIGAND_ENCOUNTER_LINES;
+export const HENGE_FLEE_LINES = BRIGAND_FLEE_LINES;
+export const HENGE_RECRUIT_NO_FUNDS_LINES = BRIGAND_RECRUIT_NO_FUNDS_LINES;
+export const HENGE_RECRUIT_NOT_WOUNDED_LINES = BRIGAND_RECRUIT_NOT_WOUNDED_LINES;
+export const HENGE_RECRUIT_TOO_MANY_LINES = BRIGAND_RECRUIT_TOO_MANY_LINES;
 
 export const GAME_OVER_LINES = [
   "The last of them fell somewhere you won't remember. The world keeps turning.",

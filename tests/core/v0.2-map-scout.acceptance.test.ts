@@ -13,6 +13,7 @@ import {
   MAP_HINT_MESSAGE,
   SWAMP_LOST_PERCENT,
 } from '../../src/core/constants'
+import { foodCarryCap } from '../../src/core/foodCarry'
 import {
   ACTION_CAMP_LEAVE,
   ACTION_CAMP_SEARCH,
@@ -117,7 +118,18 @@ describe('v0.2 map+scout acceptance', () => {
     const armyGain = computeCampArmyGain({ seed: onto.world.seed, campId: 4, stepCount })
 
     const after = processAction(onto, { type: ACTION_CAMP_SEARCH })!
-    expect(after.resources.food).toBe(onto.resources.food + CAMP_FOOD_GAIN)
+    // A gain may be clamped to the *new* (post-army-growth) cap, but it
+    // can never drop food below `prev.food`. The fixture starts above
+    // the pre-search cap (food=14, armySize=5, cap=10), so the search's
+    // +2 food is fully absorbed only when the armyGain raises the new
+    // cap above prev.food + 2; otherwise the gain is partially or fully
+    // suppressed and food sticks at prev.food.
+    expect(after.resources.food).toBe(
+      Math.max(
+        onto.resources.food,
+        Math.min(onto.resources.food + CAMP_FOOD_GAIN, foodCarryCap(after.resources)),
+      ),
+    )
     expect(after.resources.armySize).toBe(onto.resources.armySize + armyGain)
     expect(after.ui.message).toBe(
       `Ember Watch Camp\n${RNG.createTileRandom({ world: onto.world, stepCount, pos: { x: 1, y: 1 } }).perMoveLine(CAMP_RECRUIT_LINES, { cellId: 4 })}`,

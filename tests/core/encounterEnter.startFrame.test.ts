@@ -133,7 +133,7 @@ describe('encounter-enter grid transitions fire at startFrame + MOVE_SLIDE_FRAME
   })
 
   it('henge → combat (ambushPercent: 100, always fights when ready)', () => {
-    const henge: HengeCell = { kind: 'henge', id: 4, name: 'The Mending', nextReadyStep: 0 }
+    const henge: HengeCell = { kind: 'henge', id: 4, name: 'The Mending', nextReadyStep: 0, currentGroup: null }
     const next = processAction(stateAt(blankWorldWith({ center: henge })), moveSouth)!
     const t = gridTransition(next, 'overworld', 'combat')
     expect(t).toBeDefined()

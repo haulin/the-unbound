@@ -41,6 +41,7 @@ export const SPRITES = {
   enemies: {
     heart: 134,
     enemy: 132,
+    goblin: 130,
   },
 
   // 16x16 verbs with no real-world referent.

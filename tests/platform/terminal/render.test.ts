@@ -127,7 +127,7 @@ describe('renderState — left panels', () => {
 describe('renderState — encounter plate', () => {
   it('renders the encounter kind and the preview plate stats inline', () => {
     const s = freshState()
-    s.encounter = { kind: 'combat', enemyArmySize: 8, sourceCellId: 0, restoreMessage: '' }
+    s.encounter = { kind: 'combat', enemyArmySize: 8, initialSpawn: 8, sourceCellId: 0, restoreMessage: '' }
     const out = renderState(s)
     expect(out).toContain('encounter: combat')
     // Plate provider emits enemy stat → renderer translates the sprite id into

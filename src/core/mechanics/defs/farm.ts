@@ -7,7 +7,7 @@ import {
   FARM_NAME_POOL,
 } from '../../constants'
 import { cellIdForPos, getCellAt } from '../../cells'
-import { foodCarryCap, FOOD_CARRY_FULL_MESSAGE, resourcesWithClampedFoodIfNeeded } from '../../foodCarry'
+import { applyFoodCapOnGain, foodCarryCap, FOOD_CARRY_FULL_MESSAGE } from '../../foodCarry'
 import {
   MULE_ALREADY_LINES,
   MULE_BUY_LINES,
@@ -102,7 +102,7 @@ function reduceFarmBuyFood(prevState: State, farm: FarmCell): State {
   const result = buy(prevState.resources, { gold: FARM_BUY_FOOD_GOLD_COST, gain: { food: FARM_BUY_FOOD_AMOUNT } })
   if (result.outcome === 'noFunds') return noGoldResponse(prevState, prefix, farm.id)
 
-  const clamped = resourcesWithClampedFoodIfNeeded(result.resources)
+  const clamped = applyFoodCapOnGain(prevState.resources, result.resources)
   const appliedFoodDelta = clamped.food - prevState.resources.food
   const deltas = result.deltas.map((d) => (d.target === 'food' ? { ...d, delta: appliedFoodDelta } : d))
 

@@ -40,7 +40,18 @@ export type LairCell = { kind: 'lair'; id: number; isBled: boolean }
 export type SignpostCell = { kind: 'signpost' }
 export type FarmCell = { kind: 'farm'; id: number; name: string; beastGoldCost: number }
 export type CampCell = { kind: 'camp'; id: number; name: string; nextReadyStep: number }
-export type HengeCell = { kind: 'henge'; id: number; name: string; nextReadyStep: number }
+// `currentGroup` tracks the active enemy band so flee returns to the same
+// wounded count on re-entry. `null` = no active band (fresh cell, or post-
+// defeat-cooldown). Set on fresh roll in `henge.onEnterTile`, updated to
+// the wounded count by the flee branch of `henge.onCombatClosed`, cleared
+// on victory/recruit. See design § Henge persistence.
+export type HengeCell = {
+  kind: 'henge'
+  id: number
+  name: string
+  nextReadyStep: number
+  currentGroup: number | null
+}
 export type FishingLakeCell = { kind: 'fishingLake'; id: number; nextReadyStep: number }
 export type RainbowEndCell = { kind: 'rainbowEnd'; id: number; hasPaidOut: boolean }
 
@@ -153,6 +164,12 @@ export type Resources = {
 export type CombatEncounter = {
   kind: 'combat'
   enemyArmySize: number
+  // Snapshot of `enemyArmySize` at this encounter's open. Used by recruit
+  // eligibility ("wounded" = enemyArmySize < initialSpawn) and by reward
+  // formulas that scale with the band's starting size. Wounded re-entry
+  // (henge persistence) resets this to the resumed count so recruit
+  // means "you've struck them this engagement".
+  initialSpawn: number
   sourceCellId: number
   restoreMessage: string
 }

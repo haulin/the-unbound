@@ -1,6 +1,6 @@
-// title:  The Unbound (prototype 0.5.0)
+// title:  The Unbound (prototype 0.6.0)
 // author: haulin
-// desc:   Prototype 0.5.0 toward the North Star
+// desc:   Prototype 0.6.0 toward the North Star
 // script: js
 // input:  mouse
 
@@ -258,17 +258,11 @@
     "Not yet. The road brings more, but not today.",
     "The word hasn't spread far enough yet. Return later."
   ];
-  var HENGE_LORE_LINES = [
-    "The circle remembers old debts.",
-    "The stones do not ask why you are here.",
-    "Whatever drew you here drew them first."
-  ];
   var HENGE_EMPTY_LINES = [
     "The spirits here are quiet. Come back later.",
     "The circle is empty for now.",
     "You do not look back. You do not need to."
   ];
-  var HENGE_ENCOUNTER_LINE = "You walked into something that was already happening.";
   var TOWN_ENTER_LINES = [
     "A market that learned to survive the loop.",
     "You smell bread, smoke, and old arguments.",
@@ -298,21 +292,112 @@
     "Further than expected. Not where you were.",
     "Lost between one step and the next."
   ];
-  var COMBAT_ENCOUNTER_LINES = [
+  var BRIGAND_ENCOUNTER_LINES = [
     "They were already here.",
     "Company. The unwanted kind.",
     "This was always going to happen."
   ];
-  var COMBAT_FLEE_EXIT_LINES = [
-    "You left one of your own behind so the journey can continue.",
-    "You turned away. Not everyone followed.",
-    "You survived. That is not the same as winning."
-  ];
-  var COMBAT_VICTORY_EXIT_LINES = [
+  var BRIGAND_VICTORY_LINES = [
     "To the victor go the spoils.",
     "You took what you could and moved on.",
     "They will not follow you again."
   ];
+  var BRIGAND_FLEE_LINES = [
+    "You left one of your own behind so the journey can continue.",
+    "You turned away. Not everyone followed.",
+    "You survived. That is not the same as winning."
+  ];
+  var BRIGAND_RECRUIT_SUCCESS_LINES = [
+    "They lower their blades. Coins jingle in your bag.",
+    "Their captain spits, pockets the silver, falls in behind you.",
+    "A handshake, a purse. No oath beyond the pay.",
+    "The biggest of them counts the coin twice. Then nods.",
+    "They name a price. You meet it. The road has new company.",
+    "Bound coin from the fallen. The living follow you now.",
+    "They strip their dead, hand you the spoils, then bend the knee.",
+    "Coin from the slain, oaths from the breathing. A fair trade.",
+    "Their fallen pay your purse; the standing pay your wage.",
+    "Spoils of the dead, oaths of the living. The bargain is old."
+  ];
+  var BRIGAND_RECRUIT_NO_FUNDS_LINES = [
+    "Empty pockets earn empty oaths.",
+    "They weigh your purse with a look. It buys nothing.",
+    "No coin, no company. They turn back to their fire.",
+    "They have heard better offers from poorer men.",
+    "Words are cheap. They are not."
+  ];
+  var BRIGAND_RECRUIT_NOT_WOUNDED_LINES = [
+    "They laugh in your face.",
+    "Too many of them still standing to listen.",
+    "They have not bled enough to need you.",
+    "Their captain waves you off. The blades stay drawn.",
+    "Come back when the road has thinned them."
+  ];
+  var BRIGAND_RECRUIT_TOO_MANY_LINES = [
+    "Too proud yet. They will not bend.",
+    "Still too many to follow one man.",
+    "No banner of yours is large enough for this lot.",
+    "They count themselves and find no need of you.",
+    "A band this size answers only to itself."
+  ];
+  var GOBLIN_ENCOUNTER_LINES = [
+    "Yellow eyes between the trees. Small, and many.",
+    "The brambles move wrong. Something low, something quick.",
+    "A scuttling in the undergrowth. Then teeth.",
+    "They were waiting. They are always waiting.",
+    "Low shapes break from the ferns. Knives in small hands."
+  ];
+  var GOBLIN_VICTORY_LINES = [
+    "They scatter shrieking. A half-eaten haunch left in the dirt.",
+    "Their nest empties as fast as it filled. The stores they hoarded are yours.",
+    "Bones, sacks, a side of someone's salt pork. They leave more than they think.",
+    "They flee into the dark with high small sounds. You step over what they dropped.",
+    "Their cache stinks but it feeds. Enough to eat tonight."
+  ];
+  var GOBLIN_FLEE_LINES = [
+    "You crash through the brambles. Their cackling follows for a while, then thins.",
+    "Branches whip your face. Behind you, small fast feet, then nothing.",
+    "You don't look back. The laughter does not need to be answered.",
+    "The trees close behind you. Whatever they were is not what they were a moment ago.",
+    "You break for the road. They don't follow far - there are easier roads."
+  ];
+  var GOBLIN_NOT_RECRUITABLE_LINES = [
+    "Goblins follow no banner. They scatter when paid.",
+    "Your coin means nothing to them. They eat the man who carries it.",
+    "They are not yours to lead. Nothing is.",
+    "They take what they can and break for the trees. That is the only company they keep.",
+    "Try to pay one and you have already lost the purse."
+  ];
+  var HENGE_ARRIVAL_LINES = [
+    "Stones loom black against the sky. Banners hang in the still air.",
+    "A circle of standing stones, blood-stained at their feet. Men wait between them.",
+    "The grass at the henge has been trampled into mud. Someone is sworn here.",
+    "Painted shields lean on the stones. The men who lean with them straighten as you arrive.",
+    "Smoke from a low fire. A standard you don't recognise. They saw you long before this."
+  ];
+  var HENGE_VICTORY_LINES = [
+    "The stones drink the silence. The banner falls and is not lifted again.",
+    "The oath that held them together breaks here. You take what they kept.",
+    "Their dead are heaped at the stones. You leave the circle to them.",
+    "The standard goes down between two of the stones. No one rises to right it.",
+    "A henge bought in blood. The road continues, heavier than it was."
+  ];
+  var HENGE_RECRUIT_SUCCESS_LINES = [
+    "They kneel between the stones and pledge. Old oaths transfer easily enough.",
+    "The remaining few set their banner against yours. Their oath is shorter than they think.",
+    'They lay their blades on the stone. "This circle is yours now." Coin changes hands.',
+    "The standard-bearer salutes you and falls in. The henge is empty behind him.",
+    // Partial-loot framing for henge: the survivors hand over the spoils
+    // gathered from their fallen sisters and brothers as part of the bargain.
+    "They gather the spoils of their fallen and pour them at your feet, then take their place at your side.",
+    'The survivors strip their dead between the stones. "What was theirs is yours, captain."',
+    "Coin from the cairns, oaths from the living. The henge has done this before."
+  ];
+  var HENGE_ENCOUNTER_LINES = BRIGAND_ENCOUNTER_LINES;
+  var HENGE_FLEE_LINES = BRIGAND_FLEE_LINES;
+  var HENGE_RECRUIT_NO_FUNDS_LINES = BRIGAND_RECRUIT_NO_FUNDS_LINES;
+  var HENGE_RECRUIT_NOT_WOUNDED_LINES = BRIGAND_RECRUIT_NOT_WOUNDED_LINES;
+  var HENGE_RECRUIT_TOO_MANY_LINES = BRIGAND_RECRUIT_TOO_MANY_LINES;
   var GAME_OVER_LINES = [
     "The last of them fell somewhere you won't remember. The world keeps turning.",
     "You came with an army. You leave with nothing.\nThe gate remains closed.",
@@ -356,7 +441,8 @@
     // 16x16 opponent-side stats.
     enemies: {
       heart: 134,
-      enemy: 132
+      enemy: 132,
+      goblin: 130
     },
     // 16x16 verbs with no real-world referent.
     actions: {
@@ -532,11 +618,20 @@
   var MOUNTAIN_AMBUSH_PERCENT = 25;
   var SWAMP_LOST_PERCENT = 20;
   var TELEPORT_MIN_DISTANCE = 4;
-  var COMBAT_GOLD_REWARD_MIN = 8;
-  var COMBAT_GOLD_REWARD_MAX = 20;
-  var COMBAT_FOOD_BONUS_MAX = 4;
   var GRID_TRANSITION_STEP_FRAMES = 5;
+  var BRIGAND_RECRUIT_MAX_REMAINING = 5;
+  var BRIGAND_GOLD_NOISE = 3;
+  var BRIGAND_FOOD_MAX = 4;
+  var GOBLIN_GOLD_MAX = 2;
+  var GOBLIN_FOOD_FACTOR = 0.4;
+  var GOBLIN_FOOD_NOISE = 1;
   var HENGE_COOLDOWN_MOVES = 3;
+  var HENGE_BAND_MIN = 10;
+  var HENGE_BAND_MAX = 40;
+  var HENGE_GOLD_NOISE = 3;
+  var HENGE_GOLD_BONUS = 10;
+  var HENGE_FOOD_FACTOR = 0.2;
+  var HENGE_FOOD_NOISE = 1;
   var ACTION_NEW_RUN = "NEW_RUN";
   var ACTION_RESTART = "RESTART";
   var ACTION_MOVE = "MOVE";
@@ -588,6 +683,9 @@
   }
   function cellIdForPos(world, pos) {
     return pos.y * world.width + pos.x;
+  }
+  function posForCellId(world, cellId2) {
+    return { x: cellId2 % world.width, y: Math.floor(cellId2 / world.width) };
   }
   function setCellAt(world, pos, nextCell) {
     const cells = world.cells;
@@ -782,8 +880,8 @@
     const mapLabelByKind = {};
     const enterFoodCostByKind2 = {};
     const moveEventPolicyByKind = {};
-    const combatVariantByKind = {};
-    const onCombatResolvedByKind = {};
+    const combatVariantByKind2 = {};
+    const onCombatClosedByKind = {};
     const seenEncounterKinds = /* @__PURE__ */ new Set();
     for (let i = 0; i < mechanics.length; i++) {
       const m = mechanics[i];
@@ -843,8 +941,9 @@
         if (m.onEnterTile) onEnterTileByKind2[kind] = m.onEnterTile;
         if (m.mapLabel != null) mapLabelByKind[kind] = m.mapLabel;
         if (m.poiSignpost) poiSignpostByKind[kind] = m.poiSignpost;
-        if (m.combatVariant) combatVariantByKind[kind] = m.combatVariant;
-        if (m.onCombatResolved) onCombatResolvedByKind[kind] = m.onCombatResolved;
+        const variantForKind = m.combatVariantByKind?.[kind];
+        if (variantForKind) combatVariantByKind2[kind] = variantForKind;
+        if (m.onCombatClosed) onCombatClosedByKind[kind] = m.onCombatClosed;
         const cost = costByKind?.[kind];
         if (cost != null) enterFoodCostByKind2[kind] = cost;
         const policy = policyByKind?.[kind];
@@ -863,8 +962,8 @@
       mapLabelByKind,
       enterFoodCostByKind: enterFoodCostByKind2,
       moveEventPolicyByKind,
-      combatVariantByKind,
-      onCombatResolvedByKind
+      combatVariantByKind: combatVariantByKind2,
+      onCombatClosedByKind
     };
   }
 
@@ -1298,14 +1397,12 @@ ${dir}, ${chosen.d} leagues away.`;
     const cap = 2 * Math.max(0, Math.trunc(res.armySize));
     return res.party.includes("mule") ? cap + BEAST_CARRY_CAP_BONUS : cap;
   }
-  function clampFoodToCarryCap(res) {
-    return Math.min(res.food, foodCarryCap(res));
-  }
   var FOOD_CARRY_FULL_MESSAGE = "You can't carry more food.";
-  function resourcesWithClampedFoodIfNeeded(res) {
-    const food = clampFoodToCarryCap(res);
-    if (food === res.food) return res;
-    return { ...res, food };
+  function applyFoodCapOnGain(prev, next) {
+    if (next.food <= prev.food) return next;
+    const cap = foodCarryCap(next);
+    if (next.food <= cap) return next;
+    return { ...next, food: Math.max(prev.food, cap) };
   }
 
   // src/core/mechanics/defs/farm.ts
@@ -1356,7 +1453,7 @@ ${line}`;
     }
     const result = buy(prevState.resources, { gold: FARM_BUY_FOOD_GOLD_COST, gain: { food: FARM_BUY_FOOD_AMOUNT } });
     if (result.outcome === "noFunds") return noGoldResponse(prevState, prefix, farm.id);
-    const clamped = resourcesWithClampedFoodIfNeeded(result.resources);
+    const clamped = applyFoodCapOnGain(prevState.resources, result.resources);
     const appliedFoodDelta = clamped.food - prevState.resources.food;
     const deltas = result.deltas.map((d) => d.target === "food" ? { ...d, delta: appliedFoodDelta } : d);
     const pick = RNG.createRunCopyRandom(prevState).advanceCursor("farm.buyFoodFeedback", FARM_BUY_FOOD_LINES);
@@ -1496,7 +1593,7 @@ ${rnd.perMoveLine(MULE_BUY_LINES, { cellId: farm.id })}`,
     const nextCampCell = { ...campCell, nextReadyStep: stepCount + CAMP_COOLDOWN_MOVES };
     const nextWorld = setCellAt(prevState.world, prevState.player.position, nextCampCell);
     const gained = { ...prevRes, food: prevRes.food + CAMP_FOOD_GAIN, armySize: prevRes.armySize + armyGain };
-    const nextResources = resourcesWithClampedFoodIfNeeded(gained);
+    const nextResources = applyFoodCapOnGain(prevRes, gained);
     const foodGain = nextResources.food - prevRes.food;
     const line = rnd.perMoveLine(CAMP_RECRUIT_LINES, { cellId: campCell.id });
     return applyDeltas(
@@ -1535,25 +1632,6 @@ ${line}`,
     }
   };
 
-  // src/core/mechanics/moveEvents.ts
-  function rollMoveEvent(args) {
-    const { policy, hasScout, source, rngKeys } = args;
-    const ambushPercent = policy.ambushPercent;
-    let lostPercent = policy.lostPercent;
-    if (hasScout && policy.scoutLostHalves) {
-      lostPercent = Math.floor(lostPercent / 2);
-    }
-    if (ambushPercent + lostPercent === 0) return null;
-    const percentile = RNG.keyedIntExclusive(rngKeys, 100);
-    if (percentile < ambushPercent) {
-      return { kind: "fight", source };
-    }
-    if (percentile < ambushPercent + lostPercent) {
-      return { kind: "lost", source };
-    }
-    return null;
-  }
-
   // src/core/mechanics/defs/combat.ts
   var ACTION_FIGHT = "FIGHT";
   var ACTION_COMBAT_PAY = "COMBAT_PAY";
@@ -1565,16 +1643,17 @@ ${line}`,
   };
   function spawnEnemyArmy(opts) {
     const playerArmy = Math.max(0, Math.trunc(opts.playerArmy));
+    const min = Math.max(2, playerArmy - 2);
+    const max = Math.max(min, 2 * playerArmy);
     const r = RNG.createStreamRandom(opts.rngState);
-    const delta = r.intExclusive(playerArmy + 1);
-    return { rngState: r.rngState, enemyArmy: playerArmy + delta };
+    return { rngState: r.rngState, enemyArmy: r.intInRange(min, max) };
   }
   function resolveFightRound(opts) {
     const playerArmy = Math.max(0, Math.trunc(opts.playerArmy));
     const enemyArmy = Math.max(0, Math.trunc(opts.enemyArmy));
     const r = RNG.createStreamRandom(opts.rngState);
-    const w = r.intExclusive(playerArmy + 5);
-    const b = r.intExclusive(enemyArmy + 5);
+    const w = r.intExclusive(playerArmy + opts.playerRollBonus);
+    const b = r.intExclusive(enemyArmy + opts.enemyRollBonus);
     if (w >= b) {
       const nextEnemyArmy = Math.floor(enemyArmy / 2);
       const killed = enemyArmy - nextEnemyArmy;
@@ -1582,32 +1661,28 @@ ${line}`,
     }
     return { rngState: r.rngState, outcome: "enemyHit", nextEnemyArmy: enemyArmy, enemyDelta: 0, killed: 0 };
   }
-  function isValidSourceCellId(world, sourceCellId) {
-    return sourceCellId >= 0 && sourceCellId < world.width * world.height;
+  function isPreviewSentinel(sourceCellId) {
+    return sourceCellId < 0;
   }
   function combatVariantForEncounter(state2) {
     const enc = state2.encounter;
-    if (!enc || enc.kind !== "combat") return STANDARD_COMBAT_VARIANT;
-    if (!isValidSourceCellId(state2.world, enc.sourceCellId)) return STANDARD_COMBAT_VARIANT;
-    const width = state2.world.width;
-    const pos = { x: enc.sourceCellId % width, y: Math.floor(enc.sourceCellId / width) };
-    const cell = getCellAt(state2.world, pos);
-    return MECHANIC_INDEX.combatVariantByKind[cell.kind] ?? STANDARD_COMBAT_VARIANT;
+    if (!enc || enc.kind !== "combat") return previewPlaceholderVariant;
+    if (isPreviewSentinel(enc.sourceCellId)) return previewPlaceholderVariant;
+    const cell = getCellAt(state2.world, posForCellId(state2.world, enc.sourceCellId));
+    return MECHANIC_INDEX.combatVariantByKind[cell.kind] ?? previewPlaceholderVariant;
   }
-  function applyCombatResolved(world, sourceCellId) {
-    if (!isValidSourceCellId(world, sourceCellId)) return world;
-    const width = world.width;
-    const pos = { x: sourceCellId % width, y: Math.floor(sourceCellId / width) };
-    const cell = getCellAt(world, pos);
-    const hook = MECHANIC_INDEX.onCombatResolvedByKind[cell.kind];
-    if (!hook) return world;
-    return hook(world, sourceCellId);
+  function applyCombatClosed(state2, outcome, encounter) {
+    if (isPreviewSentinel(encounter.sourceCellId)) return state2;
+    const cell = getCellAt(state2.world, posForCellId(state2.world, encounter.sourceCellId));
+    const hook = MECHANIC_INDEX.onCombatClosedByKind[cell.kind];
+    if (!hook) return state2;
+    return hook(state2, outcome, encounter);
   }
   var combatRightGrid = makeRightGrid({
     leaveAction: { type: ACTION_RETURN },
     centerSpriteId: (s) => combatVariantForEncounter(s).centerSpriteId,
     left: gridButton(COMBAT_ACTIONS, ACTION_FIGHT),
-    top: (s) => combatVariantForEncounter(s).payment ? gridButton(COMBAT_ACTIONS, ACTION_COMBAT_PAY) : null
+    top: gridButton(COMBAT_ACTIONS, ACTION_COMBAT_PAY)
   });
   var combatPreviewPlate = (s) => {
     const enc = s.encounter;
@@ -1624,50 +1699,75 @@ ${line}`,
     if (!enc || enc.kind !== "combat") return prevState;
     const variant = combatVariantForEncounter(prevState);
     const payment = variant.payment;
-    if (!payment) return prevState;
-    const cost = payment.computeCost(enc.enemyArmySize);
-    const prevRes = prevState.resources;
-    const prevUi = prevState.ui;
-    if (prevRes.gold < cost) {
-      const noFundsPick = RNG.createRunCopyRandom(prevState).advanceCursor("combat.pay.noFunds", payment.noFundsLines);
+    const eligibility = payment.isEligible(enc, prevState.resources);
+    if (eligibility !== "ok") {
+      const lines = payment.failLines[eligibility];
+      if (!lines || lines.length === 0) {
+        throw new Error(`combat.pay: variant has no failLines.${eligibility}`);
+      }
+      const pick = RNG.createRunCopyRandom(prevState).advanceCursor(`combat.pay.${eligibility}`, lines);
       return {
         world: prevState.world,
         player: prevState.player,
-        run: noFundsPick.nextState.run,
-        resources: prevRes,
+        run: pick.nextState.run,
+        resources: prevState.resources,
         encounter: enc,
-        ui: { ...prevUi, message: noFundsPick.line || prevUi.message }
+        ui: { ...prevState.ui, message: pick.line || prevState.ui.message }
       };
     }
+    const cost = payment.computeCost(enc);
+    const prevRes = prevState.resources;
+    const prevWorld = prevState.world;
+    const prevUi = prevState.ui;
     const afterDeduct = { ...prevRes, gold: prevRes.gold - cost };
-    const nextResources = payment.onSuccess(afterDeduct);
-    const successPick = RNG.createRunCopyRandom(prevState).advanceCursor("combat.pay.success", payment.successLines);
-    const nextWorld = applyCombatResolved(prevState.world, enc.sourceCellId);
-    const baseUi = { ...prevUi, message: successPick.line || prevUi.message };
-    if (!ENABLE_ANIMATIONS) {
-      return {
-        world: nextWorld,
-        player: prevState.player,
-        run: successPick.nextState.run,
-        resources: nextResources,
-        encounter: null,
-        ui: baseUi
+    const afterTroops = payment.onSuccess(afterDeduct, enc);
+    let nextResources = afterTroops;
+    let nextWorld = prevWorld;
+    let lootGoldGain = 0;
+    let lootFoodGain = 0;
+    if (variant.recruitLootScale) {
+      const scale = variant.recruitLootScale(enc);
+      const reward = variant.victoryReward(afterTroops, prevWorld.rngState, enc);
+      const fullGoldGain = reward.resources.gold - afterTroops.gold;
+      const fullFoodGain = reward.resources.food - afterTroops.food;
+      lootGoldGain = Math.floor(fullGoldGain * scale);
+      lootFoodGain = Math.floor(fullFoodGain * scale);
+      const withLoot = {
+        ...afterTroops,
+        gold: afterTroops.gold + lootGoldGain,
+        food: afterTroops.food + lootFoodGain
       };
+      nextResources = applyFoodCapOnGain(prevRes, withLoot);
+      lootFoodGain = nextResources.food - afterTroops.food;
+      nextWorld = { ...prevWorld, rngState: reward.rngState };
     }
-    let uiWith = enqueueDeltas(baseUi, { target: "gold", deltas: [-cost] });
-    uiWith = enqueueGridTransition(uiWith, { from: "combat", to: "overworld" });
-    return {
+    const successPick = RNG.createRunCopyRandom(prevState).advanceCursor("combat.pay.success", payment.successLines);
+    const baseUi = { ...prevUi, message: successPick.line || prevUi.message };
+    const intermediate = {
       world: nextWorld,
       player: prevState.player,
       run: successPick.nextState.run,
       resources: nextResources,
       encounter: null,
-      ui: uiWith
+      ui: baseUi
     };
+    const closed = applyCombatClosed(intermediate, "recruit", enc);
+    if (!ENABLE_ANIMATIONS) {
+      return closed;
+    }
+    const goldDeltas = [-cost];
+    if (lootGoldGain > 0) goldDeltas.push(lootGoldGain);
+    let uiWith = enqueueDeltas(closed.ui, { target: "gold", deltas: goldDeltas });
+    if (lootFoodGain > 0) {
+      uiWith = enqueueDeltas(uiWith, { target: "food", deltas: [lootFoodGain] });
+    }
+    uiWith = enqueueGridTransition(uiWith, { from: "combat", to: "overworld" });
+    return { ...closed, ui: uiWith };
   }
   function reduceCombatReturn(prevState) {
     if (!prevState.encounter) return prevState;
     if (prevState.encounter.kind !== "combat") return prevState;
+    const enc = prevState.encounter;
     const prevUi = prevState.ui;
     const prevRes = prevState.resources;
     const nextArmy = prevRes.armySize - 1;
@@ -1678,23 +1778,21 @@ ${line}`,
     const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : fleePick.nextState.run;
     const nextMessage = isGameOver ? gameOverMessage(prevState.world.seed, prevState.run.stepCount) : fleePick.line || prevUi.message;
     const baseUi = { ...prevUi, message: nextMessage };
-    if (!ENABLE_ANIMATIONS) {
-      return {
-        world: prevState.world,
-        player: prevState.player,
-        run: nextRun,
-        resources: nextResources,
-        encounter: null,
-        ui: baseUi
-      };
-    }
-    let uiWith = enqueueDeltas(baseUi, { target: "army", deltas: [-1] });
-    return {
+    const intermediate = {
       world: prevState.world,
       player: prevState.player,
       run: nextRun,
       resources: nextResources,
       encounter: null,
+      ui: baseUi
+    };
+    const closed = isGameOver ? intermediate : applyCombatClosed(intermediate, "flee", enc);
+    if (!ENABLE_ANIMATIONS) {
+      return closed;
+    }
+    let uiWith = enqueueDeltas(closed.ui, { target: "army", deltas: [-1] });
+    return {
+      ...closed,
       ui: isGameOver ? uiWith : enqueueGridTransition(uiWith, { from: "combat", to: "overworld" })
     };
   }
@@ -1707,10 +1805,13 @@ ${line}`,
     }
     const prevRes = prevState.resources;
     const prevUi = prevState.ui;
+    const variant = combatVariantForEncounter(prevState);
     const round = resolveFightRound({
       rngState: prevState.world.rngState,
       playerArmy: prevRes.armySize,
-      enemyArmy: prevEnemy
+      enemyArmy: prevEnemy,
+      playerRollBonus: variant.playerRollBonus,
+      enemyRollBonus: variant.enemyRollBonus
     });
     const foodDeltas = [];
     const goldDeltas = [];
@@ -1729,34 +1830,33 @@ ${line}`,
     }
     let nextWorld = { ...prevState.world, rngState: round.rngState };
     if (round.outcome === "playerHit" && nextEncounter == null) {
-      const variant = combatVariantForEncounter(prevState);
-      const reward = variant.victoryReward(nextResources, nextWorld.rngState);
+      const reward = variant.victoryReward(nextResources, nextWorld.rngState, enc);
       const goldDelta = reward.resources.gold - nextResources.gold;
       if (goldDelta) goldDeltas.push(goldDelta);
       nextResources = reward.resources;
       nextWorld = { ...nextWorld, rngState: reward.rngState };
-      nextWorld = applyCombatResolved(nextWorld, enc.sourceCellId);
     }
-    nextResources = resourcesWithClampedFoodIfNeeded(nextResources);
+    nextResources = applyFoodCapOnGain(prevRes, nextResources);
     const appliedFoodDelta = nextResources.food - prevRes.food;
     if (appliedFoodDelta) foodDeltas.push(appliedFoodDelta);
     const isGameOver = nextResources.armySize <= 0;
-    const victoryVariant = combatVariantForEncounter(prevState);
-    const victoryPick = !isGameOver && nextEncounter == null ? RNG.createRunCopyRandom(prevState).advanceCursor("combat.exit.victory", victoryVariant.victoryLines) : null;
+    const victoryPick = !isGameOver && nextEncounter == null ? RNG.createRunCopyRandom(prevState).advanceCursor("combat.exit.victory", variant.victoryLines) : null;
     const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : nextEncounter == null ? victoryPick.nextState.run : prevState.run;
     const nextMessage = isGameOver ? gameOverMessage(nextWorld.seed, prevState.run.stepCount) : nextEncounter == null ? victoryPick.line || prevUi.message : prevUi.message;
     const baseUi = { message: nextMessage, leftPanel: prevUi.leftPanel, clock: prevUi.clock, anim: prevUi.anim };
+    const intermediate = {
+      world: nextWorld,
+      player: prevState.player,
+      run: nextRun,
+      resources: nextResources,
+      encounter: isGameOver ? null : nextEncounter,
+      ui: baseUi
+    };
+    const closed = !isGameOver && nextEncounter == null ? applyCombatClosed(intermediate, "victory", enc) : intermediate;
     if (!ENABLE_ANIMATIONS) {
-      return {
-        world: nextWorld,
-        player: prevState.player,
-        run: nextRun,
-        resources: nextResources,
-        encounter: isGameOver ? null : nextEncounter,
-        ui: baseUi
-      };
+      return closed;
     }
-    let uiWith = baseUi;
+    let uiWith = closed.ui;
     uiWith = enqueueDeltas(uiWith, { target: "food", deltas: foodDeltas });
     uiWith = enqueueDeltas(uiWith, { target: "gold", deltas: goldDeltas });
     uiWith = enqueueDeltas(uiWith, { target: "army", deltas: armyDeltas });
@@ -1764,14 +1864,7 @@ ${line}`,
     if (!isGameOver && nextEncounter == null) {
       uiWith = enqueueGridTransition(uiWith, { from: "combat", to: "overworld" });
     }
-    return {
-      world: nextWorld,
-      player: prevState.player,
-      run: nextRun,
-      resources: nextResources,
-      encounter: isGameOver ? null : nextEncounter,
-      ui: uiWith
-    };
+    return { ...closed, ui: uiWith };
   }
   function rolledEnemySpawn(playerArmy) {
     return (rngState) => spawnEnemyArmy({ rngState, playerArmy });
@@ -1786,6 +1879,7 @@ ${line}`,
     const encounter = {
       kind: "combat",
       enemyArmySize: spawned.enemyArmy,
+      initialSpawn: spawned.enemyArmy,
       sourceCellId: cellIdForPos(nextWorld, args.pos),
       restoreMessage: args.restoreMessage
     };
@@ -1796,30 +1890,123 @@ ${line}`,
       enterAnims: [{ kind: "gridTransition", from: "overworld", to: "combat" }]
     };
   }
-  var STANDARD_COMBAT_VARIANT = {
-    centerSpriteId: SPRITES.enemies.enemy,
-    previewPlateLines: (s) => {
-      const enc = s.encounter;
-      if (!enc || enc.kind !== "combat") return [];
-      return [{ spriteId: SPRITES.enemies.enemy, text: `${enc.enemyArmySize}` }];
-    },
-    encounterLines: COMBAT_ENCOUNTER_LINES,
-    victoryLines: COMBAT_VICTORY_EXIT_LINES,
-    fleeLines: COMBAT_FLEE_EXIT_LINES,
-    victoryReward: (resources, rngState) => {
-      const sr = RNG.createStreamRandom(rngState);
-      const goldSpan = COMBAT_GOLD_REWARD_MAX - COMBAT_GOLD_REWARD_MIN + 1;
-      const gold = COMBAT_GOLD_REWARD_MIN + sr.intExclusive(goldSpan);
-      const foodBonus = sr.intExclusive(COMBAT_FOOD_BONUS_MAX + 1);
-      return {
-        resources: {
-          ...resources,
-          gold: resources.gold + gold,
-          food: resources.food + foodBonus
-        },
-        rngState: sr.rngState
-      };
+  function enemyCountPlateLine(state2) {
+    const enc = state2.encounter;
+    if (!enc || enc.kind !== "combat") return null;
+    const variant = combatVariantForEncounter(state2);
+    return { spriteId: variant.centerSpriteId, text: `${enc.enemyArmySize}` };
+  }
+  function enemyCountOnlyPlateLines(state2) {
+    const line = enemyCountPlateLine(state2);
+    return line ? [line] : [];
+  }
+  function recruitablePreviewPlateLines(state2) {
+    const enc = state2.encounter;
+    if (!enc || enc.kind !== "combat") return [];
+    const enemyLine = enemyCountPlateLine(state2);
+    if (!enemyLine) return [];
+    const variant = combatVariantForEncounter(state2);
+    if (variant.payment.isEligible(enc, state2.resources) === "ok") {
+      const cost = variant.payment.computeCost(enc);
+      return [
+        enemyLine,
+        { spriteId: SPRITES.inventory.gold, text: `-${cost}` }
+      ];
     }
+    return [enemyLine];
+  }
+  var previewPlaceholderVariant = {
+    centerSpriteId: SPRITES.enemies.enemy,
+    previewPlateLines: enemyCountOnlyPlateLines,
+    encounterLines: [],
+    victoryLines: [],
+    fleeLines: [],
+    playerRollBonus: 0,
+    enemyRollBonus: 0,
+    payment: {
+      computeCost: () => 0,
+      isEligible: () => "unrecruitable",
+      successLines: [],
+      failLines: { unrecruitable: [] },
+      onSuccess: (resources) => resources
+    },
+    victoryReward: (resources, rngState) => ({ resources, rngState })
+  };
+  function brigandRecruitCost(enc) {
+    return enc.enemyArmySize * enc.enemyArmySize;
+  }
+  function brigandRecruitEligibility(enc, resources) {
+    if (enc.enemyArmySize > BRIGAND_RECRUIT_MAX_REMAINING) return "tooMany";
+    if (enc.enemyArmySize >= enc.initialSpawn) return "notWounded";
+    if (resources.gold < brigandRecruitCost(enc)) return "noFunds";
+    return "ok";
+  }
+  function brigandRecruitLootScale(enc) {
+    if (enc.initialSpawn <= 0) return 0;
+    return (enc.initialSpawn - enc.enemyArmySize) / enc.initialSpawn;
+  }
+  function brigandVictoryReward(resources, rngState, enc) {
+    const r = RNG.createStreamRandom(rngState);
+    const goldNoise = r.intExclusive(2 * BRIGAND_GOLD_NOISE + 1) - BRIGAND_GOLD_NOISE;
+    const baseGold = Math.max(0, enc.initialSpawn + goldNoise);
+    const foodBonus = r.intExclusive(BRIGAND_FOOD_MAX + 1);
+    const next = {
+      ...resources,
+      gold: resources.gold + baseGold,
+      food: resources.food + foodBonus
+    };
+    return { resources: next, rngState: r.rngState };
+  }
+  var brigandCombatVariant = {
+    centerSpriteId: SPRITES.enemies.enemy,
+    previewPlateLines: recruitablePreviewPlateLines,
+    encounterLines: BRIGAND_ENCOUNTER_LINES,
+    victoryLines: BRIGAND_VICTORY_LINES,
+    fleeLines: BRIGAND_FLEE_LINES,
+    playerRollBonus: 5,
+    enemyRollBonus: 5,
+    payment: {
+      computeCost: brigandRecruitCost,
+      isEligible: brigandRecruitEligibility,
+      successLines: BRIGAND_RECRUIT_SUCCESS_LINES,
+      failLines: {
+        noFunds: BRIGAND_RECRUIT_NO_FUNDS_LINES,
+        notWounded: BRIGAND_RECRUIT_NOT_WOUNDED_LINES,
+        tooMany: BRIGAND_RECRUIT_TOO_MANY_LINES
+      },
+      onSuccess: (resources, enc) => ({ ...resources, armySize: resources.armySize + enc.enemyArmySize })
+    },
+    victoryReward: brigandVictoryReward,
+    recruitLootScale: brigandRecruitLootScale
+  };
+  function goblinVictoryReward(resources, rngState, enc) {
+    const r = RNG.createStreamRandom(rngState);
+    const gold = r.intExclusive(GOBLIN_GOLD_MAX + 1);
+    const foodNoise = r.intExclusive(2 * GOBLIN_FOOD_NOISE + 1) - GOBLIN_FOOD_NOISE;
+    const food = Math.max(0, Math.round(GOBLIN_FOOD_FACTOR * enc.initialSpawn) + foodNoise);
+    const next = {
+      ...resources,
+      gold: resources.gold + gold,
+      food: resources.food + food
+    };
+    return { resources: next, rngState: r.rngState };
+  }
+  var goblinCombatVariant = {
+    centerSpriteId: SPRITES.enemies.goblin,
+    previewPlateLines: enemyCountOnlyPlateLines,
+    encounterLines: GOBLIN_ENCOUNTER_LINES,
+    victoryLines: GOBLIN_VICTORY_LINES,
+    fleeLines: GOBLIN_FLEE_LINES,
+    playerRollBonus: 6,
+    enemyRollBonus: 3,
+    payment: {
+      computeCost: () => 0,
+      isEligible: () => "unrecruitable",
+      successLines: [],
+      failLines: { unrecruitable: GOBLIN_NOT_RECRUITABLE_LINES },
+      onSuccess: (resources) => resources
+    },
+    victoryReward: goblinVictoryReward
   };
   var combatMechanic = {
     id: "combat",
@@ -1835,6 +2022,7 @@ ${line}`,
       previewEncounter: () => ({
         kind: "combat",
         enemyArmySize: 0,
+        initialSpawn: 0,
         sourceCellId: -1,
         restoreMessage: ""
       })
@@ -1842,41 +2030,95 @@ ${line}`,
   };
 
   // src/core/mechanics/defs/henge.ts
-  var hengePolicy = { ambushPercent: 100, lostPercent: 0 };
-  var onEnterHenge = ({ cell, world, pos, stepCount, resources }) => {
+  var hengeSpawn = (rngState) => {
+    const r = RNG.createStreamRandom(rngState);
+    const span = HENGE_BAND_MAX - HENGE_BAND_MIN + 1;
+    const enemyArmy = HENGE_BAND_MIN + r.intExclusive(span);
+    return { rngState: r.rngState, enemyArmy };
+  };
+  function hengeVictoryReward(resources, rngState, enc) {
+    const r = RNG.createStreamRandom(rngState);
+    const goldNoise = r.intExclusive(2 * HENGE_GOLD_NOISE + 1) - HENGE_GOLD_NOISE;
+    const baseGold = Math.max(0, enc.initialSpawn + goldNoise) + HENGE_GOLD_BONUS;
+    const foodNoise = r.intExclusive(2 * HENGE_FOOD_NOISE + 1) - HENGE_FOOD_NOISE;
+    const food = Math.max(0, Math.round(HENGE_FOOD_FACTOR * enc.initialSpawn) + foodNoise);
+    const next = {
+      ...resources,
+      gold: resources.gold + baseGold,
+      food: resources.food + food
+    };
+    return { resources: next, rngState: r.rngState };
+  }
+  var hengeCombatVariant = {
+    centerSpriteId: SPRITES.enemies.enemy,
+    previewPlateLines: recruitablePreviewPlateLines,
+    encounterLines: HENGE_ENCOUNTER_LINES,
+    victoryLines: HENGE_VICTORY_LINES,
+    fleeLines: HENGE_FLEE_LINES,
+    playerRollBonus: 5,
+    enemyRollBonus: 5,
+    payment: {
+      computeCost: brigandRecruitCost,
+      isEligible: brigandRecruitEligibility,
+      successLines: HENGE_RECRUIT_SUCCESS_LINES,
+      failLines: {
+        noFunds: HENGE_RECRUIT_NO_FUNDS_LINES,
+        notWounded: HENGE_RECRUIT_NOT_WOUNDED_LINES,
+        tooMany: HENGE_RECRUIT_TOO_MANY_LINES
+      },
+      onSuccess: (resources, enc) => ({ ...resources, armySize: resources.armySize + enc.enemyArmySize })
+    },
+    victoryReward: hengeVictoryReward,
+    recruitLootScale: brigandRecruitLootScale
+  };
+  var onHengeCombatClosed = (state2, outcome, encounter) => {
+    const pos = posForCellId(state2.world, encounter.sourceCellId);
+    const cell = getCellAt(state2.world, pos);
+    if (cell.kind !== "henge") return state2;
+    if (outcome === "flee") {
+      const next2 = { ...cell, currentGroup: encounter.enemyArmySize };
+      return { ...state2, world: setCellAt(state2.world, pos, next2) };
+    }
+    const next = {
+      ...cell,
+      currentGroup: null,
+      nextReadyStep: state2.run.stepCount + HENGE_COOLDOWN_MOVES
+    };
+    return { ...state2, world: setCellAt(state2.world, pos, next) };
+  };
+  var onEnterHenge = ({ cell, world, pos, stepCount }) => {
     if (cell.kind !== "henge") return {};
     const hengeCell = getCellAt(world, pos);
     if (!hengeCell || hengeCell.kind !== "henge") return {};
     const r = RNG.createTileRandom({ world, stepCount, pos });
     const name = hengeCell.name || "A Henge";
     const readyAt = hengeCell.nextReadyStep ?? 0;
-    if (stepCount < readyAt) {
+    if (hengeCell.currentGroup == null && stepCount < readyAt) {
       const line = r.perMoveLine(HENGE_EMPTY_LINES, { cellId: hengeCell.id });
       return { message: `${name} Henge
 ${line}` };
     }
-    const cellId2 = cellIdForPos(world, pos);
-    const event = rollMoveEvent({
-      policy: hengePolicy,
-      hasScout: resources.party.includes("scout"),
-      source: "henge",
-      rngKeys: { seed: world.seed, stepCount, cellId: cellId2 }
-    });
-    if (event?.kind !== "fight") {
-      const line = r.perMoveLine(HENGE_LORE_LINES, { cellId: hengeCell.id });
-      return { message: `${name} Henge
-${line}` };
+    if (hengeCell.currentGroup != null) {
+      const tileMessage2 = `${name} Henge
+${r.perMoveLine(HENGE_ARRIVAL_LINES, { cellId: hengeCell.id })}`;
+      return startCombatEncounter({
+        world,
+        pos,
+        spawnEnemy: fixedEnemySpawn(hengeCell.currentGroup),
+        encounterMessage: tileMessage2,
+        restoreMessage: tileMessage2
+      });
     }
     const tileMessage = `${name} Henge
-${r.perMoveLine(HENGE_LORE_LINES, { cellId: hengeCell.id })}`;
+${r.perMoveLine(HENGE_ARRIVAL_LINES, { cellId: hengeCell.id })}`;
     const result = startCombatEncounter({
       world,
       pos,
-      spawnEnemy: rolledEnemySpawn(resources.armySize),
-      encounterMessage: HENGE_ENCOUNTER_LINE,
+      spawnEnemy: hengeSpawn,
+      encounterMessage: tileMessage,
       restoreMessage: tileMessage
     });
-    const nextHenge = { ...hengeCell, nextReadyStep: stepCount + HENGE_COOLDOWN_MOVES };
+    const nextHenge = { ...hengeCell, currentGroup: result.encounter.enemyArmySize };
     return { ...result, world: setCellAt(result.world, pos, nextHenge) };
   };
   var placeHenges = ({ cells, rngState }) => {
@@ -1885,7 +2127,7 @@ ${r.perMoveLine(HENGE_LORE_LINES, { cellId: hengeCell.id })}`;
       namePool: HENGE_NAME_POOL,
       fallbackName: "A Henge",
       canPlaceAt: (_x, _y, here) => isTerrainCell(here),
-      buildCell: ({ x, y, name }) => ({ kind: "henge", id: cellId(x, y), name, nextReadyStep: 0 })
+      buildCell: ({ x, y, name }) => ({ kind: "henge", id: cellId(x, y), name, nextReadyStep: 0, currentGroup: null })
     });
     return { rngState: next };
   };
@@ -1900,7 +2142,8 @@ ${r.perMoveLine(HENGE_LORE_LINES, { cellId: hengeCell.id })}`;
       name: (cell) => `${cell.name || "A Henge"} Henge`
     },
     placeWorld: placeHenges,
-    combatVariant: STANDARD_COMBAT_VARIANT
+    combatVariantByKind: { henge: hengeCombatVariant },
+    onCombatClosed: onHengeCombatClosed
   };
 
   // src/core/mechanics/defs/town.ts
@@ -1965,7 +2208,7 @@ ${line}`;
     }
     const result = buy(prevState.resources, { gold: town.prices.foodGold, gain: { food: town.bundles.food } });
     if (result.outcome === "noFunds") return noGoldResponse(prevState, prefix, town.id);
-    const clamped = resourcesWithClampedFoodIfNeeded(result.resources);
+    const clamped = applyFoodCapOnGain(prevState.resources, result.resources);
     const appliedFoodDelta = clamped.food - prevState.resources.food;
     const deltas = result.deltas.map((d) => d.target === "food" ? { ...d, delta: appliedFoodDelta } : d);
     const pick = RNG.createRunCopyRandom(prevState).advanceCursor("town.buyFeedback", TOWN_BUY_LINES);
@@ -2121,6 +2364,25 @@ ${pick.line}`,
     return { destination: { x: pick.x, y: pick.y }, rngState: r.rngState };
   }
 
+  // src/core/mechanics/moveEvents.ts
+  function rollMoveEvent(args) {
+    const { policy, hasScout, source, rngKeys } = args;
+    const ambushPercent = policy.ambushPercent;
+    let lostPercent = policy.lostPercent;
+    if (hasScout && policy.scoutLostHalves) {
+      lostPercent = Math.floor(lostPercent / 2);
+    }
+    if (ambushPercent + lostPercent === 0) return null;
+    const percentile = RNG.keyedIntExclusive(rngKeys, 100);
+    if (percentile < ambushPercent) {
+      return { kind: "fight", source };
+    }
+    if (percentile < ambushPercent + lostPercent) {
+      return { kind: "lost", source };
+    }
+    return null;
+  }
+
   // src/core/mechanics/defs/terrainHazards.ts
   var woodsPolicy = {
     ambushPercent: WOODS_AMBUSH_PERCENT,
@@ -2133,6 +2395,10 @@ ${pick.line}`,
     scoutLostHalves: true
   };
   var mountainPolicy = { ambushPercent: MOUNTAIN_AMBUSH_PERCENT, lostPercent: 0 };
+  var combatVariantByKind = {
+    woods: goblinCombatVariant,
+    mountain: brigandCombatVariant
+  };
   var onEnterTerrainHazards = ({ cell, world, pos, stepCount, resources }) => {
     const kind = cell.kind;
     let policy;
@@ -2152,7 +2418,8 @@ ${pick.line}`,
       return { message: tileMessage };
     }
     if (event.kind === "fight") {
-      const encounterMessage = tileRand.perMoveLine(COMBAT_ENCOUNTER_LINES);
+      const variant = combatVariantByKind[kind];
+      const encounterMessage = tileRand.perMoveLine(variant.encounterLines);
       return startCombatEncounter({
         world,
         pos,
@@ -2183,7 +2450,7 @@ ${pick.line}`,
       mountain: mountainPolicy
     },
     onEnterTile: onEnterTerrainHazards,
-    combatVariant: STANDARD_COMBAT_VARIANT
+    combatVariantByKind
   };
 
   // src/core/mechanics/defs/fishingLake.ts
@@ -2308,10 +2575,13 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     encounterLines: WYRM_ENCOUNTER_LINES,
     victoryLines: WYRM_VICTORY_LINES,
     fleeLines: WYRM_FLEE_LINES,
+    playerRollBonus: 5,
+    enemyRollBonus: 5,
     payment: {
       computeCost: () => WYRM_PAY_GOLD_COST,
+      isEligible: (_enc, resources) => resources.gold < WYRM_PAY_GOLD_COST ? "noFunds" : "ok",
       successLines: WYRM_PAYOFF_LINES,
-      noFundsLines: WYRM_NO_GOLD_LINES,
+      failLines: { noFunds: WYRM_NO_GOLD_LINES },
       onSuccess: (resources) => {
         if (resources.inventory.includes("blood")) return resources;
         return { ...resources, inventory: [...resources.inventory, "blood"] };
@@ -2325,14 +2595,14 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
       };
     }
   };
-  function onWyrmCombatResolved(world, sourceCellId) {
-    const width = world.width;
-    const pos = { x: sourceCellId % width, y: Math.floor(sourceCellId / width) };
-    const cell = getCellAt(world, pos);
-    if (cell.kind !== "lair") return world;
-    if (cell.isBled) return world;
+  function onWyrmCombatClosed(state2, outcome, encounter) {
+    if (outcome !== "victory" && outcome !== "recruit") return state2;
+    const pos = posForCellId(state2.world, encounter.sourceCellId);
+    const cell = getCellAt(state2.world, pos);
+    if (cell.kind !== "lair") return state2;
+    if (cell.isBled) return state2;
     const next = { ...cell, isBled: true };
-    return setCellAt(world, pos, next);
+    return { ...state2, world: setCellAt(state2.world, pos, next) };
   }
   var wyrmMechanic = {
     id: "wyrm",
@@ -2344,8 +2614,8 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
       name: () => LAIR_NAME
     },
     placeWorld: placeWyrm,
-    combatVariant: wyrmCombatVariant,
-    onCombatResolved: onWyrmCombatResolved
+    combatVariantByKind: { lair: wyrmCombatVariant },
+    onCombatClosed: onWyrmCombatClosed
   };
 
   // src/core/mechanics/index.ts
@@ -2708,7 +2978,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     const ctx = { cell, world, pos: nextPos, stepCount: nextStepCount, resources: baseResources };
     const outcome = wouldGameOver ? {} : (onEnterTileByKind[cell.kind] ?? onEnterDefaultTerrain)(ctx);
     const nextWorld = outcome.world ?? world;
-    const nextResources = resourcesWithClampedFoodIfNeeded(outcome.resources ?? baseResources);
+    const nextResources = applyFoodCapOnGain(baseResources, outcome.resources ?? baseResources);
     const appliedFoodDelta = nextResources.food - baseResources.food;
     if (appliedFoodDelta) foodDeltas.push(appliedFoodDelta);
     const nextHasWon = prevState.run.hasWon || !!outcome.hasWon;
@@ -3702,9 +3972,9 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
   globalThis.TIC = TIC;
 })();
 
-// title:  The Unbound (prototype 0.5.0)
+// title:  The Unbound (prototype 0.6.0)
 // author: haulin
-// desc:   Prototype 0.5.0 toward the North Star
+// desc:   Prototype 0.6.0 toward the North Star
 // script: js
 // input:  mouse
 

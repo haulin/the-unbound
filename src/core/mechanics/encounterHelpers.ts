@@ -106,7 +106,7 @@ export function applyDeltasAndClose(
 
 // What the player gains. Numeric fields add; slot tokens append (idempotent;
 // party respects `MAX_PARTY_SLOTS` via `appendPartySlot`). Food gain is NOT
-// clamped here — caller clamps via `resourcesWithClampedFoodIfNeeded`.
+// clamped here — caller clamps via `applyFoodCapOnGain(prev, next)`.
 export type BuyGain = Partial<{
   food: number
   armySize: number

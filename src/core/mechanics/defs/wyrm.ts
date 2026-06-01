@@ -1,5 +1,5 @@
 import { WYRM_INITIAL_HEALTH, WYRM_PAY_GOLD_COST } from '../../constants'
-import { getCellAt, setCellAt } from '../../cells'
+import { getCellAt, posForCellId, setCellAt } from '../../cells'
 import {
   LAIR_NAME,
   WYRM_BLED_LINES,
@@ -11,7 +11,7 @@ import {
 } from '../../lore'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
-import type { LairCell, World } from '../../types'
+import type { CombatEncounter, LairCell, State } from '../../types'
 import { cellId, placeFeature } from '../../worldgen'
 import { fixedEnemySpawn, startCombatEncounter, type CombatVariantConfig } from './combat'
 import type { MechanicDef, OnEnterTile, PlaceWorldProvider } from '../types'
@@ -60,10 +60,13 @@ const wyrmCombatVariant: CombatVariantConfig = {
   encounterLines: WYRM_ENCOUNTER_LINES,
   victoryLines: WYRM_VICTORY_LINES,
   fleeLines: WYRM_FLEE_LINES,
+  playerRollBonus: 5,
+  enemyRollBonus: 5,
   payment: {
     computeCost: () => WYRM_PAY_GOLD_COST,
+    isEligible: (_enc, resources) => (resources.gold < WYRM_PAY_GOLD_COST ? 'noFunds' : 'ok'),
     successLines: WYRM_PAYOFF_LINES,
-    noFundsLines: WYRM_NO_GOLD_LINES,
+    failLines: { noFunds: WYRM_NO_GOLD_LINES },
     onSuccess: (resources) => {
       if (resources.inventory.includes('blood')) return resources
       return { ...resources, inventory: [...resources.inventory, 'blood'] }
@@ -78,14 +81,23 @@ const wyrmCombatVariant: CombatVariantConfig = {
   },
 }
 
-function onWyrmCombatResolved(world: World, sourceCellId: number): World {
-  const width = world.width
-  const pos = { x: sourceCellId % width, y: Math.floor(sourceCellId / width) }
-  const cell = getCellAt(world, pos)
-  if (cell.kind !== 'lair') return world
-  if (cell.isBled) return world
+// Wyrm responds only to `victory` (existing behaviour: flip `isBled`).
+// `flee` and `recruit` outcomes pass through unchanged — wyrm has no recruit
+// slot at the source-cell level (paying the wyrm grants 'blood' via
+// `payment.onSuccess`, which is the same effect as victory; the post-combat
+// hook just needs to mark the lair bled when that path was reached).
+function onWyrmCombatClosed(
+  state: State,
+  outcome: 'victory' | 'flee' | 'recruit',
+  encounter: CombatEncounter,
+): State {
+  if (outcome !== 'victory' && outcome !== 'recruit') return state
+  const pos = posForCellId(state.world, encounter.sourceCellId)
+  const cell = getCellAt(state.world, pos)
+  if (cell.kind !== 'lair') return state
+  if (cell.isBled) return state
   const next: LairCell = { ...cell, isBled: true }
-  return setCellAt(world, pos, next)
+  return { ...state, world: setCellAt(state.world, pos, next) }
 }
 
 export const wyrmMechanic: MechanicDef = {
@@ -98,6 +110,6 @@ export const wyrmMechanic: MechanicDef = {
     name: () => LAIR_NAME,
   },
   placeWorld: placeWyrm,
-  combatVariant: wyrmCombatVariant,
-  onCombatResolved: onWyrmCombatResolved,
+  combatVariantByKind: { lair: wyrmCombatVariant },
+  onCombatClosed: onWyrmCombatClosed,
 }

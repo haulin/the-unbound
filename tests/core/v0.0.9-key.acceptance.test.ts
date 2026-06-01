@@ -76,8 +76,10 @@ describe('v0.0.9 key acceptance', () => {
     expect(paid.resources.inventory).toContain('bronzeKey')
     // v0.5: 'blood' is consumed as the quench when the key is forged.
     expect(paid.resources.inventory).not.toContain('blood')
-    // Move spends 1; carry cap clamps 11→10 before paying 10 for the key.
-    expect(paid.resources.food).toBe(0)
+    // Move spends 1 (12 → 11); the key forge spends 10. Pre-existing
+    // food above cap is not retroactively trimmed (food clamps on gain
+    // only), so the leftover is 12 - 1 - 10 = 1.
+    expect(paid.resources.food).toBe(1)
   })
 
   it('cannot buy key without enough food', () => {

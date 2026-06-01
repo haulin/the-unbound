@@ -3,6 +3,7 @@ import type {
   Cell,
   CellGrid,
   CellKind,
+  CombatEncounter,
   DeltaAnimTarget,
   Encounter,
   EncounterKind,
@@ -137,6 +138,13 @@ export type MechanicDef = {
   poiSignpost?: PoiSignpostContribution
   placeWorld?: PlaceWorldProvider
 
-  combatVariant?: CombatVariantConfig
-  onCombatResolved?: (world: World, sourceCellId: number) => World
+  combatVariantByKind?: Partial<Record<CellKind, CombatVariantConfig>>
+  // Post-combat hook fired by `reduceCombatVictory`, `reduceCombatReturn`
+  // (flee), and `reduceCombatPay` (recruit success). Receives the encounter
+  // snapshot captured before it's cleared, so the hook can read e.g. the
+  // wounded count or the source cell id. Wyrm uses this to flip its lair's
+  // `isBled` flag on victory; henge uses it to maintain the persistent-band
+  // state machine (flee syncs `currentGroup`, victory/recruit clears it and
+  // starts cooldown).
+  onCombatClosed?: (state: State, outcome: 'victory' | 'flee' | 'recruit', encounter: CombatEncounter) => State
 }

@@ -1,14 +1,25 @@
 import {
-  COMBAT_ENCOUNTER_LINES,
-  COMBAT_FLEE_EXIT_LINES,
-  COMBAT_FOOD_BONUS_MAX,
-  COMBAT_GOLD_REWARD_MAX,
-  COMBAT_GOLD_REWARD_MIN,
-  COMBAT_VICTORY_EXIT_LINES,
+  BRIGAND_ENCOUNTER_LINES,
+  BRIGAND_FLEE_LINES,
+  BRIGAND_FOOD_MAX,
+  BRIGAND_GOLD_NOISE,
+  BRIGAND_RECRUIT_MAX_REMAINING,
+  BRIGAND_RECRUIT_NO_FUNDS_LINES,
+  BRIGAND_RECRUIT_NOT_WOUNDED_LINES,
+  BRIGAND_RECRUIT_SUCCESS_LINES,
+  BRIGAND_RECRUIT_TOO_MANY_LINES,
+  BRIGAND_VICTORY_LINES,
   ENABLE_ANIMATIONS,
+  GOBLIN_ENCOUNTER_LINES,
+  GOBLIN_FLEE_LINES,
+  GOBLIN_FOOD_FACTOR,
+  GOBLIN_FOOD_NOISE,
+  GOBLIN_GOLD_MAX,
+  GOBLIN_NOT_RECRUITABLE_LINES,
+  GOBLIN_VICTORY_LINES,
 } from '../../constants'
-import { cellIdForPos, getCellAt } from '../../cells'
-import { resourcesWithClampedFoodIfNeeded } from '../../foodCarry'
+import { cellIdForPos, getCellAt, posForCellId } from '../../cells'
+import { applyFoodCapOnGain } from '../../foodCarry'
 import { gameOverMessage } from '../../gameOver'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
@@ -42,17 +53,18 @@ export type CombatAction = { type: keyof typeof COMBAT_ACTIONS }
 
 // ---- Pure combat math -------------------------------------------------------------
 
-// Roll the enemy army size from the world's stream RNG: U[playerArmy..playerArmy*2].
-// Exported for tests that need to predict the spawn deterministically.
+// Ambush spawn formula: U[max(2, p-2) .. 2*p]. The `max(min, …)` ceiling
+// guards `playerArmy ∈ {0, 1}` where `2 * playerArmy < min`.
 export function spawnEnemyArmy(opts: { rngState: number; playerArmy: number }): { rngState: number; enemyArmy: number } {
   const playerArmy = Math.max(0, Math.trunc(opts.playerArmy))
+  const min = Math.max(2, playerArmy - 2)
+  const max = Math.max(min, 2 * playerArmy)
   const r = RNG.createStreamRandom(opts.rngState)
-  const delta = r.intExclusive(playerArmy + 1)
-  return { rngState: r.rngState, enemyArmy: playerArmy + delta }
+  return { rngState: r.rngState, enemyArmy: r.intInRange(min, max) }
 }
 
-// One round: each side rolls U[0..size+5); ties go to the player. On player hit, enemy
-// army halves (floor); on enemy hit, player loses 1 troop (handled by the caller).
+// One round: each side rolls U[0..size+bonus); ties go to the player. On
+// player hit, enemy halves (floor); on enemy hit, caller loses 1 troop.
 type FightRound = {
   rngState: number
   outcome: 'playerHit' | 'enemyHit'
@@ -60,12 +72,18 @@ type FightRound = {
   enemyDelta: number
   killed: number
 }
-function resolveFightRound(opts: { rngState: number; playerArmy: number; enemyArmy: number }): FightRound {
+function resolveFightRound(opts: {
+  rngState: number
+  playerArmy: number
+  enemyArmy: number
+  playerRollBonus: number
+  enemyRollBonus: number
+}): FightRound {
   const playerArmy = Math.max(0, Math.trunc(opts.playerArmy))
   const enemyArmy = Math.max(0, Math.trunc(opts.enemyArmy))
   const r = RNG.createStreamRandom(opts.rngState)
-  const w = r.intExclusive(playerArmy + 5)
-  const b = r.intExclusive(enemyArmy + 5)
+  const w = r.intExclusive(playerArmy + opts.playerRollBonus)
+  const b = r.intExclusive(enemyArmy + opts.enemyRollBonus)
   if (w >= b) {
     const nextEnemyArmy = Math.floor(enemyArmy / 2)
     const killed = enemyArmy - nextEnemyArmy
@@ -76,44 +94,42 @@ function resolveFightRound(opts: { rngState: number; playerArmy: number; enemyAr
 
 // ---- Right-grid + action dispatch -------------------------------------------------
 
-// `previewEncounter()` synthesizes a placeholder with `sourceCellId: -1` so
-// the right-grid renderer can pre-paint a combat cross during grid-slide
-// transitions. Variant lookup must tolerate that sentinel.
-function isValidSourceCellId(world: World, sourceCellId: number): boolean {
-  return sourceCellId >= 0 && sourceCellId < world.width * world.height
+// `previewEncounter()` carries `sourceCellId: -1` so the right-grid can
+// pre-paint a combat cross during grid-slide transitions; the variant
+// lookup short-circuits to the placeholder for that path.
+function isPreviewSentinel(sourceCellId: number): boolean {
+  return sourceCellId < 0
 }
 
 function combatVariantForEncounter(state: State): CombatVariantConfig {
   const enc = state.encounter
-  if (!enc || enc.kind !== 'combat') return STANDARD_COMBAT_VARIANT
-  if (!isValidSourceCellId(state.world, enc.sourceCellId)) return STANDARD_COMBAT_VARIANT
-  const width = state.world.width
-  const pos = { x: enc.sourceCellId % width, y: Math.floor(enc.sourceCellId / width) }
-  const cell = getCellAt(state.world, pos)
-  return MECHANIC_INDEX.combatVariantByKind[cell.kind] ?? STANDARD_COMBAT_VARIANT
+  if (!enc || enc.kind !== 'combat') return previewPlaceholderVariant
+  if (isPreviewSentinel(enc.sourceCellId)) return previewPlaceholderVariant
+  const cell = getCellAt(state.world, posForCellId(state.world, enc.sourceCellId))
+  return MECHANIC_INDEX.combatVariantByKind[cell.kind] ?? previewPlaceholderVariant
 }
 
-function applyCombatResolved(world: World, sourceCellId: number): World {
-  if (!isValidSourceCellId(world, sourceCellId)) return world
-  const width = world.width
-  const pos = { x: sourceCellId % width, y: Math.floor(sourceCellId / width) }
-  const cell = getCellAt(world, pos)
-  const hook = MECHANIC_INDEX.onCombatResolvedByKind[cell.kind]
-  if (!hook) return world
-  return hook(world, sourceCellId)
+function applyCombatClosed(
+  state: State,
+  outcome: 'victory' | 'flee' | 'recruit',
+  encounter: CombatEncounter,
+): State {
+  if (isPreviewSentinel(encounter.sourceCellId)) return state
+  const cell = getCellAt(state.world, posForCellId(state.world, encounter.sourceCellId))
+  const hook = MECHANIC_INDEX.onCombatClosedByKind[cell.kind]
+  if (!hook) return state
+  return hook(state, outcome, encounter)
 }
 
-// Top slot (pay button) only renders when the active variant declares a
-// `payment` config (e.g. wyrm bribe); standard combat leaves it empty.
+// Top slot is the pay/recruit button — always rendered. Variants that
+// don't recruit return `unrecruitable` from `isEligible`.
 const combatRightGrid = makeRightGrid({
   leaveAction: { type: ACTION_RETURN },
   centerSpriteId: (s) => combatVariantForEncounter(s).centerSpriteId,
   left: gridButton(COMBAT_ACTIONS, ACTION_FIGHT),
-  top: (s) => (combatVariantForEncounter(s).payment ? gridButton(COMBAT_ACTIONS, ACTION_COMBAT_PAY) : null),
+  top: gridButton(COMBAT_ACTIONS, ACTION_COMBAT_PAY),
 })
 
-// Plate shows enemy-army count + any variant-specific lines (e.g. wyrm pay
-// cost). Animated +/- popups are normal `enqueueDeltas` with target 'enemyArmy'.
 const combatPreviewPlate: PreviewPlateProvider = (s) => {
   const enc = s.encounter
   if (!enc || enc.kind !== 'combat') return null
@@ -126,71 +142,90 @@ const reduceCombatAction: ReduceEncounterAction = (prevState: State, action: Act
   return COMBAT_ACTIONS[action.type as keyof typeof COMBAT_ACTIONS].reduce(prevState)
 }
 
-// Pay-button reducer (variant-driven). Standard combat has no `payment` config
-// and is short-circuited; wyrm/brigand variants supply computeCost / onSuccess
-// / successLines / noFundsLines and this reducer applies them. On success the
-// encounter closes (mirrors fight-victory close path); on insufficient funds the
-// modal stays open with a no-funds line.
 function reduceCombatPay(prevState: State): State {
   const enc = prevState.encounter
   if (!enc || enc.kind !== 'combat') return prevState
   const variant = combatVariantForEncounter(prevState)
   const payment = variant.payment
-  if (!payment) return prevState
+  const eligibility = payment.isEligible(enc, prevState.resources)
 
-  const cost = payment.computeCost(enc.enemyArmySize)
-  const prevRes = prevState.resources
-  const prevUi = prevState.ui
-
-  // Insufficient funds: keep the encounter open, just update the message line.
-  if (prevRes.gold < cost) {
-    const noFundsPick = RNG.createRunCopyRandom(prevState).advanceCursor('combat.pay.noFunds', payment.noFundsLines)
+  if (eligibility !== 'ok') {
+    const lines = payment.failLines[eligibility]
+    if (!lines || lines.length === 0) {
+      throw new Error(`combat.pay: variant has no failLines.${eligibility}`)
+    }
+    const pick = RNG.createRunCopyRandom(prevState).advanceCursor(`combat.pay.${eligibility}`, lines)
     return {
       world: prevState.world,
       player: prevState.player,
-      run: noFundsPick.nextState.run,
-      resources: prevRes,
+      run: pick.nextState.run,
+      resources: prevState.resources,
       encounter: enc,
-      ui: { ...prevUi, message: noFundsPick.line || prevUi.message },
+      ui: { ...prevState.ui, message: pick.line || prevState.ui.message },
     }
   }
 
-  // Success: deduct gold, apply onSuccess (e.g. inventory += 'blood'), close
-  // the encounter with a successLines pick, and queue the same gold-delta +
-  // grid-transition animation as fight-victory. The source mechanic's
-  // `onCombatResolved` hook (if any) runs against the source cell — wyrm uses
-  // this to flip its lair's `isBled` flag.
+  // Variants with a `recruitLootScale` draw the full `victoryReward`
+  // (advancing world rngState exactly once, same as a fight victory) and
+  // multiply gold/food gains by the returned scale.
+  const cost = payment.computeCost(enc)
+  const prevRes = prevState.resources
+  const prevWorld = prevState.world
+  const prevUi = prevState.ui
   const afterDeduct: Resources = { ...prevRes, gold: prevRes.gold - cost }
-  const nextResources = payment.onSuccess(afterDeduct)
-  const successPick = RNG.createRunCopyRandom(prevState).advanceCursor('combat.pay.success', payment.successLines)
-  const nextWorld = applyCombatResolved(prevState.world, enc.sourceCellId)
-  const baseUi: Ui = { ...prevUi, message: successPick.line || prevUi.message }
-  if (!ENABLE_ANIMATIONS) {
-    return {
-      world: nextWorld,
-      player: prevState.player,
-      run: successPick.nextState.run,
-      resources: nextResources,
-      encounter: null,
-      ui: baseUi,
+  const afterTroops = payment.onSuccess(afterDeduct, enc)
+  let nextResources: Resources = afterTroops
+  let nextWorld = prevWorld
+  let lootGoldGain = 0
+  let lootFoodGain = 0
+  if (variant.recruitLootScale) {
+    const scale = variant.recruitLootScale(enc)
+    const reward = variant.victoryReward(afterTroops, prevWorld.rngState, enc)
+    const fullGoldGain = reward.resources.gold - afterTroops.gold
+    const fullFoodGain = reward.resources.food - afterTroops.food
+    lootGoldGain = Math.floor(fullGoldGain * scale)
+    lootFoodGain = Math.floor(fullFoodGain * scale)
+    const withLoot: Resources = {
+      ...afterTroops,
+      gold: afterTroops.gold + lootGoldGain,
+      food: afterTroops.food + lootFoodGain,
     }
+    nextResources = applyFoodCapOnGain(prevRes, withLoot)
+    // Recompute applied food gain after cap-on-gain clamp.
+    lootFoodGain = nextResources.food - afterTroops.food
+    nextWorld = { ...prevWorld, rngState: reward.rngState }
   }
-
-  let uiWith = enqueueDeltas(baseUi, { target: 'gold', deltas: [-cost] })
-  uiWith = enqueueGridTransition(uiWith, { from: 'combat', to: 'overworld' })
-  return {
+  const successPick = RNG.createRunCopyRandom(prevState).advanceCursor('combat.pay.success', payment.successLines)
+  const baseUi: Ui = { ...prevUi, message: successPick.line || prevUi.message }
+  const intermediate: State = {
     world: nextWorld,
     player: prevState.player,
     run: successPick.nextState.run,
     resources: nextResources,
     encounter: null,
-    ui: uiWith,
+    ui: baseUi,
   }
+  const closed = applyCombatClosed(intermediate, 'recruit', enc)
+  if (!ENABLE_ANIMATIONS) {
+    return closed
+  }
+
+  // Cost deduction + partial-loot gains animate as separate deltas so
+  // the UI fades each independently.
+  const goldDeltas: number[] = [-cost]
+  if (lootGoldGain > 0) goldDeltas.push(lootGoldGain)
+  let uiWith = enqueueDeltas(closed.ui, { target: 'gold', deltas: goldDeltas })
+  if (lootFoodGain > 0) {
+    uiWith = enqueueDeltas(uiWith, { target: 'food', deltas: [lootFoodGain] })
+  }
+  uiWith = enqueueGridTransition(uiWith, { from: 'combat', to: 'overworld' })
+  return { ...closed, ui: uiWith }
 }
 
 function reduceCombatReturn(prevState: State): State {
   if (!prevState.encounter) return prevState
   if (prevState.encounter.kind !== 'combat') return prevState
+  const enc = prevState.encounter
   const prevUi = prevState.ui
 
   const prevRes = prevState.resources
@@ -204,24 +239,22 @@ function reduceCombatReturn(prevState: State): State {
   const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : fleePick!.nextState.run
   const nextMessage = isGameOver ? gameOverMessage(prevState.world.seed, prevState.run.stepCount) : fleePick!.line || prevUi.message
   const baseUi: Ui = { ...prevUi, message: nextMessage }
-  if (!ENABLE_ANIMATIONS) {
-    return {
-      world: prevState.world,
-      player: prevState.player,
-      run: nextRun,
-      resources: nextResources,
-      encounter: null,
-      ui: baseUi,
-    }
-  }
-
-  let uiWith = enqueueDeltas(baseUi, { target: 'army', deltas: [-1] })
-  return {
+  const intermediate: State = {
     world: prevState.world,
     player: prevState.player,
     run: nextRun,
     resources: nextResources,
     encounter: null,
+    ui: baseUi,
+  }
+  const closed = isGameOver ? intermediate : applyCombatClosed(intermediate, 'flee', enc)
+  if (!ENABLE_ANIMATIONS) {
+    return closed
+  }
+
+  let uiWith = enqueueDeltas(closed.ui, { target: 'army', deltas: [-1] })
+  return {
+    ...closed,
     ui: isGameOver ? uiWith : enqueueGridTransition(uiWith, { from: 'combat', to: 'overworld' }),
   }
 }
@@ -238,10 +271,13 @@ function reduceCombatFight(prevState: State): State {
   const prevRes = prevState.resources
   const prevUi = prevState.ui
 
+  const variant = combatVariantForEncounter(prevState)
   const round = resolveFightRound({
     rngState: prevState.world.rngState,
     playerArmy: prevRes.armySize,
     enemyArmy: prevEnemy,
+    playerRollBonus: variant.playerRollBonus,
+    enemyRollBonus: variant.enemyRollBonus,
   })
 
   const foodDeltas: number[] = []
@@ -265,29 +301,20 @@ function reduceCombatFight(prevState: State): State {
 
   let nextWorld = { ...prevState.world, rngState: round.rngState }
 
-  // Combat reward is paid once, at the end, when the enemy is eliminated.
-  // Variant-driven: STANDARD_COMBAT_VARIANT rolls gold + food bonus from the
-  // world rngState (the historical inline behavior); wyrm/brigand variants
-  // grant slot tokens (e.g. 'blood') instead.
   if (round.outcome === 'playerHit' && nextEncounter == null) {
-    const variant = combatVariantForEncounter(prevState)
-    const reward = variant.victoryReward(nextResources, nextWorld.rngState)
+    const reward = variant.victoryReward(nextResources, nextWorld.rngState, enc)
     const goldDelta = reward.resources.gold - nextResources.gold
     if (goldDelta) goldDeltas.push(goldDelta)
     nextResources = reward.resources
     nextWorld = { ...nextWorld, rngState: reward.rngState }
-    // Source-mechanic post-combat hook (e.g. wyrm flips `isBled`). Runs once,
-    // only on victory close — flee/defeat never trigger it.
-    nextWorld = applyCombatResolved(nextWorld, enc.sourceCellId)
   }
-  nextResources = resourcesWithClampedFoodIfNeeded(nextResources)
+  nextResources = applyFoodCapOnGain(prevRes, nextResources)
   const appliedFoodDelta = nextResources.food - prevRes.food
   if (appliedFoodDelta) foodDeltas.push(appliedFoodDelta)
   const isGameOver = nextResources.armySize <= 0
-  const victoryVariant = combatVariantForEncounter(prevState)
   const victoryPick =
     !isGameOver && nextEncounter == null
-      ? RNG.createRunCopyRandom(prevState).advanceCursor('combat.exit.victory', victoryVariant.victoryLines)
+      ? RNG.createRunCopyRandom(prevState).advanceCursor('combat.exit.victory', variant.victoryLines)
       : null
   const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : nextEncounter == null ? victoryPick!.nextState.run : prevState.run
   const nextMessage = isGameOver
@@ -297,18 +324,21 @@ function reduceCombatFight(prevState: State): State {
       : prevUi.message
 
   const baseUi: Ui = { message: nextMessage, leftPanel: prevUi.leftPanel, clock: prevUi.clock, anim: prevUi.anim }
+  const intermediate: State = {
+    world: nextWorld,
+    player: prevState.player,
+    run: nextRun,
+    resources: nextResources,
+    encounter: isGameOver ? null : nextEncounter,
+    ui: baseUi,
+  }
+  const closed =
+    !isGameOver && nextEncounter == null ? applyCombatClosed(intermediate, 'victory', enc) : intermediate
   if (!ENABLE_ANIMATIONS) {
-    return {
-      world: nextWorld,
-      player: prevState.player,
-      run: nextRun,
-      resources: nextResources,
-      encounter: isGameOver ? null : nextEncounter,
-      ui: baseUi,
-    }
+    return closed
   }
 
-  let uiWith = baseUi
+  let uiWith = closed.ui
   uiWith = enqueueDeltas(uiWith, { target: 'food', deltas: foodDeltas })
   uiWith = enqueueDeltas(uiWith, { target: 'gold', deltas: goldDeltas })
   uiWith = enqueueDeltas(uiWith, { target: 'army', deltas: armyDeltas })
@@ -318,29 +348,18 @@ function reduceCombatFight(prevState: State): State {
     uiWith = enqueueGridTransition(uiWith, { from: 'combat', to: 'overworld' })
   }
 
-  return {
-    world: nextWorld,
-    player: prevState.player,
-    run: nextRun,
-    resources: nextResources,
-    encounter: isGameOver ? null : nextEncounter,
-    ui: uiWith,
-  }
+  return { ...closed, ui: uiWith }
 }
 
-// Open a combat encounter from a source tile (henge, woods, swamp, mountain).
 // Source mechanics pick their `spawnEnemy` (rolled vs fixed) and own the
 // messaging — encounterMessage during combat, restoreMessage after.
 export type EnemySpawn = (rngState: number) => { rngState: number; enemyArmy: number }
 
-// Default spawn: U[playerArmy..2*playerArmy], advancing the stream RNG.
 export function rolledEnemySpawn(playerArmy: number): EnemySpawn {
   return (rngState) => spawnEnemyArmy({ rngState, playerArmy })
 }
 
-// Fixed-size spawn that leaves the stream RNG untouched. Used for deterministic
-// boss-style encounters (e.g. the wyrm's initial health) where future picks
-// must stay stable across balance tweaks.
+// Fixed spawn that leaves the stream RNG untouched.
 export function fixedEnemySpawn(enemyArmy: number): EnemySpawn {
   const clamped = Math.max(0, Math.trunc(enemyArmy))
   return (rngState) => ({ rngState, enemyArmy: clamped })
@@ -358,6 +377,7 @@ export function startCombatEncounter(args: {
   const encounter: CombatEncounter = {
     kind: 'combat',
     enemyArmySize: spawned.enemyArmy,
+    initialSpawn: spawned.enemyArmy,
     sourceCellId: cellIdForPos(nextWorld, args.pos),
     restoreMessage: args.restoreMessage,
   }
@@ -369,17 +389,44 @@ export function startCombatEncounter(args: {
   }
 }
 
-// ---- Combat variant injection -----------------------------------------------
-//
-// Combat encounters share one shape (right-grid, preview-plate, fight reducer)
-// but the per-source flavor — center sprite, line pools, optional Pay button,
-// victory loot — varies. Each combat-source mechanic exposes a CombatVariantConfig
-// via `MechanicDef.combatVariant`; combat reads the variant by walking
-// `cell.kind → mechanic → mechanic.combatVariant` from the encounter's
-// `sourceCellId`. STANDARD_COMBAT_VARIANT preserves today's behavior for henge
-// and terrainHazards; v0.5's wyrm and v0.7's brigand recruit instantiate their
-// own variants without touching the combat reducer.
+// ---- Combat variant ---------------------------------------------------------
+
 export type CombatVariantPlateLine = { spriteId: number; text: string }
+
+export type EligibilityKind = 'ok' | 'noFunds' | 'notWounded' | 'tooMany' | 'unrecruitable'
+
+// Shared enemy-count line, anchored at `lineIndex: 0` so
+// `previewPlateDeltaAnchors` can target enemy-army deltas reliably.
+export function enemyCountPlateLine(state: State): CombatVariantPlateLine | null {
+  const enc = state.encounter
+  if (!enc || enc.kind !== 'combat') return null
+  const variant = combatVariantForEncounter(state)
+  return { spriteId: variant.centerSpriteId, text: `${enc.enemyArmySize}` }
+}
+
+// Plate for variants that show only the enemy-count row (no recruit cost).
+export function enemyCountOnlyPlateLines(state: State): readonly CombatVariantPlateLine[] {
+  const line = enemyCountPlateLine(state)
+  return line ? [line] : []
+}
+
+// Plate for recruitable variants: enemy count always, plus a recruit-cost
+// row when payment is eligible.
+export function recruitablePreviewPlateLines(state: State): readonly CombatVariantPlateLine[] {
+  const enc = state.encounter
+  if (!enc || enc.kind !== 'combat') return []
+  const enemyLine = enemyCountPlateLine(state)
+  if (!enemyLine) return []
+  const variant = combatVariantForEncounter(state)
+  if (variant.payment.isEligible(enc, state.resources) === 'ok') {
+    const cost = variant.payment.computeCost(enc)
+    return [
+      enemyLine,
+      { spriteId: SPRITES.inventory.gold, text: `-${cost}` },
+    ]
+  }
+  return [enemyLine]
+}
 
 export type CombatVariantConfig = {
   centerSpriteId: number
@@ -387,39 +434,143 @@ export type CombatVariantConfig = {
   encounterLines: readonly string[]
   victoryLines: readonly string[]
   fleeLines: readonly string[]
-  payment?: {
-    computeCost: (enemyArmySize: number) => number
+  playerRollBonus: number
+  enemyRollBonus: number
+  payment: {
+    computeCost: (encounter: CombatEncounter) => number
+    isEligible: (encounter: CombatEncounter, resources: Resources) => EligibilityKind
     successLines: readonly string[]
-    noFundsLines: readonly string[]
-    onSuccess: (resources: Resources) => Resources
+    failLines: Partial<Record<Exclude<EligibilityKind, 'ok'>, readonly string[]>>
+    onSuccess: (resources: Resources, encounter: CombatEncounter) => Resources
   }
-  victoryReward: (resources: Resources, rngState: number) => { resources: Resources; rngState: number }
+  victoryReward: (
+    resources: Resources,
+    rngState: number,
+    encounter: CombatEncounter,
+  ) => { resources: Resources; rngState: number }
+  // Optional partial-loot scale (0..1) applied to gold/food gains when a
+  // recruit succeeds. Without this field, recruit grants troops only.
+  recruitLootScale?: (encounter: CombatEncounter) => number
 }
 
-export const STANDARD_COMBAT_VARIANT: CombatVariantConfig = {
+// Placeholder for the preview-sentinel and registry-hole paths. Only
+// `centerSpriteId` and `previewPlateLines` are ever read; reducer fields
+// satisfy the type but never dispatch.
+const previewPlaceholderVariant: CombatVariantConfig = {
   centerSpriteId: SPRITES.enemies.enemy,
-  previewPlateLines: (s) => {
-    const enc = s.encounter
-    if (!enc || enc.kind !== 'combat') return []
-    return [{ spriteId: SPRITES.enemies.enemy, text: `${enc.enemyArmySize}` }]
+  previewPlateLines: enemyCountOnlyPlateLines,
+  encounterLines: [],
+  victoryLines: [],
+  fleeLines: [],
+  playerRollBonus: 0,
+  enemyRollBonus: 0,
+  payment: {
+    computeCost: () => 0,
+    isEligible: () => 'unrecruitable',
+    successLines: [],
+    failLines: { unrecruitable: [] },
+    onSuccess: (resources) => resources,
   },
-  encounterLines: COMBAT_ENCOUNTER_LINES,
-  victoryLines: COMBAT_VICTORY_EXIT_LINES,
-  fleeLines: COMBAT_FLEE_EXIT_LINES,
-  victoryReward: (resources, rngState) => {
-    const sr = RNG.createStreamRandom(rngState)
-    const goldSpan = COMBAT_GOLD_REWARD_MAX - COMBAT_GOLD_REWARD_MIN + 1
-    const gold = COMBAT_GOLD_REWARD_MIN + sr.intExclusive(goldSpan)
-    const foodBonus = sr.intExclusive(COMBAT_FOOD_BONUS_MAX + 1)
-    return {
-      resources: {
-        ...resources,
-        gold: resources.gold + gold,
-        food: resources.food + foodBonus,
-      },
-      rngState: sr.rngState,
-    }
+  victoryReward: (resources, rngState) => ({ resources, rngState }),
+}
+
+// ---- Brigand variant (mountain ambush) ------------------------------------
+
+export function brigandRecruitCost(enc: CombatEncounter): number {
+  return enc.enemyArmySize * enc.enemyArmySize
+}
+
+export function brigandRecruitEligibility(enc: CombatEncounter, resources: Resources): EligibilityKind {
+  if (enc.enemyArmySize > BRIGAND_RECRUIT_MAX_REMAINING) return 'tooMany'
+  if (enc.enemyArmySize >= enc.initialSpawn) return 'notWounded'
+  if (resources.gold < brigandRecruitCost(enc)) return 'noFunds'
+  return 'ok'
+}
+
+export function brigandRecruitLootScale(enc: CombatEncounter): number {
+  if (enc.initialSpawn <= 0) return 0
+  return (enc.initialSpawn - enc.enemyArmySize) / enc.initialSpawn
+}
+
+// Returns the raw uncapped reward; the reducer owns the food-cap clamp
+// so the recruit-loot path can scale before clamping.
+export function brigandVictoryReward(
+  resources: Resources,
+  rngState: number,
+  enc: CombatEncounter,
+): { resources: Resources; rngState: number } {
+  const r = RNG.createStreamRandom(rngState)
+  const goldNoise = r.intExclusive(2 * BRIGAND_GOLD_NOISE + 1) - BRIGAND_GOLD_NOISE
+  const baseGold = Math.max(0, enc.initialSpawn + goldNoise)
+  const foodBonus = r.intExclusive(BRIGAND_FOOD_MAX + 1)
+  const next: Resources = {
+    ...resources,
+    gold: resources.gold + baseGold,
+    food: resources.food + foodBonus,
+  }
+  return { resources: next, rngState: r.rngState }
+}
+
+export const brigandCombatVariant: CombatVariantConfig = {
+  centerSpriteId: SPRITES.enemies.enemy,
+  previewPlateLines: recruitablePreviewPlateLines,
+  encounterLines: BRIGAND_ENCOUNTER_LINES,
+  victoryLines: BRIGAND_VICTORY_LINES,
+  fleeLines: BRIGAND_FLEE_LINES,
+  playerRollBonus: 5,
+  enemyRollBonus: 5,
+  payment: {
+    computeCost: brigandRecruitCost,
+    isEligible: brigandRecruitEligibility,
+    successLines: BRIGAND_RECRUIT_SUCCESS_LINES,
+    failLines: {
+      noFunds: BRIGAND_RECRUIT_NO_FUNDS_LINES,
+      notWounded: BRIGAND_RECRUIT_NOT_WOUNDED_LINES,
+      tooMany: BRIGAND_RECRUIT_TOO_MANY_LINES,
+    },
+    onSuccess: (resources, enc) => ({ ...resources, armySize: resources.armySize + enc.enemyArmySize }),
   },
+  victoryReward: brigandVictoryReward,
+  recruitLootScale: brigandRecruitLootScale,
+}
+
+// ---- Goblin variant (woods ambush) ----------------------------------------
+
+// RNG draw order: gold then food. Reordering shifts world rngState across
+// a goblin-victory transition and invalidates every fixture that pins it.
+function goblinVictoryReward(
+  resources: Resources,
+  rngState: number,
+  enc: CombatEncounter,
+): { resources: Resources; rngState: number } {
+  const r = RNG.createStreamRandom(rngState)
+  const gold = r.intExclusive(GOBLIN_GOLD_MAX + 1)
+  const foodNoise = r.intExclusive(2 * GOBLIN_FOOD_NOISE + 1) - GOBLIN_FOOD_NOISE
+  const food = Math.max(0, Math.round(GOBLIN_FOOD_FACTOR * enc.initialSpawn) + foodNoise)
+  const next: Resources = {
+    ...resources,
+    gold: resources.gold + gold,
+    food: resources.food + food,
+  }
+  return { resources: next, rngState: r.rngState }
+}
+
+export const goblinCombatVariant: CombatVariantConfig = {
+  centerSpriteId: SPRITES.enemies.goblin,
+  previewPlateLines: enemyCountOnlyPlateLines,
+  encounterLines: GOBLIN_ENCOUNTER_LINES,
+  victoryLines: GOBLIN_VICTORY_LINES,
+  fleeLines: GOBLIN_FLEE_LINES,
+  playerRollBonus: 6,
+  enemyRollBonus: 3,
+  payment: {
+    computeCost: () => 0,
+    isEligible: () => 'unrecruitable',
+    successLines: [],
+    failLines: { unrecruitable: GOBLIN_NOT_RECRUITABLE_LINES },
+    onSuccess: (resources) => resources,
+  },
+  victoryReward: goblinVictoryReward,
 }
 
 export const combatMechanic: MechanicDef = {
@@ -436,6 +587,7 @@ export const combatMechanic: MechanicDef = {
     previewEncounter: (): CombatEncounter => ({
       kind: 'combat',
       enemyArmySize: 0,
+      initialSpawn: 0,
       sourceCellId: -1,
       restoreMessage: '',
     }),

@@ -7,7 +7,7 @@ import {
 } from '../../src/core/constants'
 import { MECHANIC_INDEX } from '../../src/core/mechanics'
 import { SPRITES } from '../../src/core/spriteIds'
-import type { Cell, Encounter, EncounterKind, State, World } from '../../src/core/types'
+import type { Cell, Encounter, EncounterKind, HengeCell, State, World } from '../../src/core/types'
 import { makeResources } from './_helpers/makeResources'
 
 function makeWorld(centerCell: Cell): World {
@@ -26,12 +26,16 @@ function makeWorld(centerCell: Cell): World {
   }
 }
 
-function makeState(centerCell: Cell, encounter: Encounter | null): State {
+function makeState(
+  centerCell: Cell,
+  encounter: Encounter | null,
+  resourceOverrides: Partial<{ food: number; gold: number; armySize: number }> = {},
+): State {
   return {
     world: makeWorld(centerCell),
     player: { position: { x: 1, y: 1 } },
     run: { stepCount: 1, hasWon: false, isGameOver: false, knowsPosition: true, path: [], lostBufferStartIndex: null },
-    resources: makeResources({ food: 10, gold: 50, armySize: 5 }),
+    resources: makeResources({ food: 10, gold: 50, armySize: 5, ...resourceOverrides }),
     encounter,
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
@@ -123,15 +127,84 @@ describe('previewPlate hooks', () => {
   })
 
   describe('combat', () => {
-    it('returns the enemy count line', () => {
-      const state = makeState({ kind: 'grass' }, {
+    // Plates are minimal — enemy count + variant sprite always; a recruit
+    // cost row only when `payment.isEligible` returns 'ok'. Variant lookup
+    // keys on `cell.kind` at `encounter.sourceCellId`, so each case sets
+    // the centre cell to the corresponding kind.
+
+    it('brigand plate: enemy count only when band too large to recruit', () => {
+      const initialSpawn = 10
+      const enemyArmySize = 6 // > BRIGAND_RECRUIT_MAX_REMAINING (5) → tooMany
+      const state = makeState({ kind: 'mountain' }, {
         kind: 'combat',
-        enemyArmySize: 7,
-        sourceCellId: 0,
+        enemyArmySize,
+        initialSpawn,
+        sourceCellId: 4,
         restoreMessage: '',
       })
       const lines = lookup('combat')(state)
-      expect(lines).toEqual([{ spriteId: SPRITES.enemies.enemy, text: '7' }])
+      expect(lines).toEqual([
+        { spriteId: SPRITES.enemies.enemy, text: `${enemyArmySize}` },
+      ])
+    })
+
+    it('brigand plate: enemy count + recruit cost when wounded, small, paid', () => {
+      const initialSpawn = 12
+      const enemyArmySize = 3 // wounded + small (≤5)
+      const state = makeState(
+        { kind: 'mountain' },
+        {
+          kind: 'combat',
+          enemyArmySize,
+          initialSpawn,
+          sourceCellId: 4,
+          restoreMessage: '',
+        },
+        { gold: 100 }, // affordable: cost=9
+      )
+      const lines = lookup('combat')(state)
+      expect(lines).toEqual([
+        { spriteId: SPRITES.enemies.enemy, text: `${enemyArmySize}` },
+        { spriteId: SPRITES.inventory.gold, text: `-${enemyArmySize * enemyArmySize}` },
+      ])
+    })
+
+    it('goblin plate: enemy count only with goblin sprite (#130)', () => {
+      const initialSpawn = 10
+      const enemyArmySize = 6
+      const state = makeState({ kind: 'woods' }, {
+        kind: 'combat',
+        enemyArmySize,
+        initialSpawn,
+        sourceCellId: 4,
+        restoreMessage: '',
+      })
+      const lines = lookup('combat')(state)
+      expect(lines).toEqual([
+        { spriteId: SPRITES.enemies.goblin, text: `${enemyArmySize}` },
+      ])
+    })
+
+    it('henge plate: enemy count only when fresh band (not wounded)', () => {
+      const initialSpawn = 20
+      const henge: HengeCell = {
+        kind: 'henge',
+        id: 4,
+        name: 'The Mending',
+        nextReadyStep: 0,
+        currentGroup: initialSpawn,
+      }
+      const state = makeState(henge, {
+        kind: 'combat',
+        enemyArmySize: initialSpawn,
+        initialSpawn,
+        sourceCellId: 4,
+        restoreMessage: '',
+      })
+      const lines = lookup('combat')(state)
+      expect(lines).toEqual([
+        { spriteId: SPRITES.enemies.enemy, text: `${initialSpawn}` },
+      ])
     })
 
     it('returns null when no combat encounter is active', () => {
@@ -163,8 +236,9 @@ describe('previewPlate hooks', () => {
       const state = makeState({ kind: 'grass' }, previewEncounter ?? null)
       const provider = MECHANIC_INDEX.rightGridByEncounterKind.combat
       if (!provider) throw new Error('No combat right-grid registered')
-      // Center cell falls through `combatVariantForEncounter`; sentinel must
-      // resolve to STANDARD_COMBAT_VARIANT, not crash on the missing cell.
+      // Center cell falls through `combatVariantForEncounter`; the
+      // sentinel encounter (sourceCellId: -1) resolves to a placeholder
+      // variant that renders the generic enemy sprite without crashing.
       const center = provider(state, 1, 1)
       expect(center.spriteId).toBe(SPRITES.enemies.enemy)
       expect(center.action).toBeNull()

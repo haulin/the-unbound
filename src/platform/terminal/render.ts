@@ -22,6 +22,7 @@ const DEFAULT_OPTIONS: RenderOptions = { blind: false }
 const PLATE_LABEL_BY_SPRITE: Record<number, string> = {
   [SPRITES.inventory.food]: 'food',
   [SPRITES.enemies.enemy]: 'enemy',
+  [SPRITES.enemies.goblin]: 'goblin',
   [SPRITES.inventory.scout]: 'scout',
   [SPRITES.inventory.troop]: 'army',
   [SPRITES.inventory.gold]: 'gold',
