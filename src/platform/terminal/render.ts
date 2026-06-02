@@ -1,4 +1,5 @@
 import { ACTION_TOGGLE_MINIMAP, LOST_COORD_LABEL } from '../../core/constants'
+import { foodCarryCap } from '../../core/foodCarry'
 import { computeGameMapView } from '../../core/gameMap'
 import { torusDelta, wrapIndex } from '../../core/math'
 import { MECHANIC_INDEX } from '../../core/mechanics'
@@ -197,7 +198,11 @@ function renderResources(s: State): string {
   const r = s.resources
   const inv = r.inventory.length ? ` | inventory: ${r.inventory.join(', ')}` : ''
   const party = r.party.length ? ` | party: ${r.party.join(', ')}` : ''
-  return `army ${r.armySize} | food ${r.food} | gold ${r.gold}${inv}${party}`
+  // Food cap is invisible in the TIC build (no spare pixels). Terminal has
+  // no such constraint, so we surface it as `food N/M`. Same source of truth
+  // as the reducer (`foodCarryCap`) — picks up army growth + mule's +50 for
+  // free.
+  return `army ${r.armySize} | food ${r.food}/${foodCarryCap(r)} | gold ${r.gold}${inv}${party}`
 }
 
 function renderEncounter(s: State): string[] {

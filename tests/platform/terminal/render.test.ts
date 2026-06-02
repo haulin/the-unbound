@@ -34,9 +34,23 @@ describe('renderState — header and resources', () => {
     expect(renderState(s)).toMatch(/pos [A-Z]\d+/)
   })
 
-  it('renders a resources line with army / food / gold', () => {
+  it('renders a resources line with army / food (current/cap) / gold', () => {
+    // Terminal-only affordance: surface the food carry cap that the TIC build
+    // hides for pixel reasons. Default cap is army×2 (no mule), so a fresh
+    // run with army 10 reads `food 15/20`.
     const out = renderState(freshState())
-    expect(out).toMatch(/army \d+ \| food \d+ \| gold \d+/)
+    expect(out).toMatch(/army \d+ \| food \d+\/\d+ \| gold \d+/)
+  })
+
+  it('renders the food cap as army×2 by default and bumps it when mule is in the party', () => {
+    const noMule = freshState()
+    noMule.resources = { ...noMule.resources, armySize: 10, food: 5, party: [] }
+    expect(renderState(noMule)).toMatch(/food 5\/20 /)
+
+    const withMule = freshState()
+    withMule.resources = { ...withMule.resources, armySize: 10, food: 5, party: ['mule'] }
+    // BEAST_CARRY_CAP_BONUS = 50 → cap becomes 70 with army 10 + mule.
+    expect(renderState(withMule)).toMatch(/food 5\/70 /)
   })
 
   it('appends [GAME OVER] to the header when the run is over', () => {

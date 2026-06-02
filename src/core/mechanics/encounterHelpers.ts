@@ -2,8 +2,17 @@
 // Must NOT import MECHANIC_INDEX or any def-level module (cycle: the index is
 // built from defs that import this file).
 
-import { ENABLE_ANIMATIONS, MAX_PARTY_SLOTS, TOWN_NO_GOLD_LINES } from '../constants'
+import {
+  ENABLE_ANIMATIONS,
+  LOST_FLAVOR_LINES,
+  MAX_PARTY_SLOTS,
+  TOWN_NO_GOLD_LINES,
+} from '../constants'
+import { cellIdForPos } from '../cells'
 import { RNG } from '../rng'
+import { pickTeleportDestination } from '../teleport'
+import { rollMoveEvent } from './moveEvents'
+import type { MoveEventPolicy, MoveEventSource, TileEnterResult } from './types'
 import { SPRITES } from '../spriteIds'
 import type {
   Action,
@@ -15,6 +24,8 @@ import type {
   Run,
   State,
   Ui,
+  Vec2,
+  World,
 } from '../types'
 import { enqueueDeltas, enqueueGridTransition } from '../uiAnim'
 import type { AnimSpec, RightGridProvider } from './types'
@@ -245,4 +256,129 @@ export function applyEnterAnims(ui: Ui, anims: readonly AnimSpec[], startFrame: 
     next = enqueueGridTransition(next, { from: a.from, to: a.to, startFrame: startFrame + offset })
   }
   return next
+}
+
+// ---- Terrain move events -------------------------------------------------------
+
+export type TerrainQuietCtx = {
+  tileMessage: string
+  rngKeys: { seed: number; stepCount: number; cellId: number }
+  tileRand: ReturnType<typeof RNG.createTileRandom>
+  resources: Resources
+}
+
+export type TerrainQuietResult = { message: string; resources?: Resources }
+
+export type QuietFindSpec = {
+  findPercent: number
+  lines: readonly string[]
+  foodBase: number
+  goldBase: number
+  amountNoise: number
+  rollSalt: string
+  foodSalt: string
+  goldSalt: string
+}
+
+export function tryQuietFind(
+  spec: QuietFindSpec,
+  ctx: TerrainQuietCtx,
+): TerrainQuietResult | undefined {
+  const { rngKeys, tileRand, resources } = ctx
+  const findRoll = RNG.keyedIntExclusive({ ...rngKeys, salt: RNG.domainSalt(spec.rollSalt) }, 100)
+  if (findRoll >= spec.findPercent) return undefined
+
+  const foodGain = RNG.keyedBoundedBase(rngKeys, spec.foodSalt, spec.foodBase, spec.amountNoise)
+  const goldGain = RNG.keyedBoundedBase(rngKeys, spec.goldSalt, spec.goldBase, spec.amountNoise)
+  return {
+    message: tileRand.perMoveLine(spec.lines),
+    resources: {
+      ...resources,
+      food: resources.food + foodGain,
+      gold: resources.gold + goldGain,
+    },
+  }
+}
+
+export type ResolvedTerrainMove =
+  | { outcome: 'quiet'; message: string; resources?: Resources }
+  | { outcome: 'fight' }
+  | { outcome: 'lost'; world: World; teleportTo: Vec2; message: string }
+
+export function resolveTerrainMove(args: {
+  moveEventSource: MoveEventSource
+  policy: MoveEventPolicy
+  world: World
+  pos: Vec2
+  stepCount: number
+  resources: Resources
+  hasScout: boolean
+  tileMessage: string
+  onQuiet?: (ctx: TerrainQuietCtx) => TerrainQuietResult | undefined
+}): { tileMessage: string; resolved: ResolvedTerrainMove } {
+  const { moveEventSource, policy, world, pos, stepCount, resources, hasScout, tileMessage, onQuiet } =
+    args
+  const rngKeys = { seed: world.seed, stepCount, cellId: cellIdForPos(world, pos) }
+  const tileRand = RNG.createTileRandom({ world, stepCount, pos })
+
+  const event = rollMoveEvent({
+    policy,
+    hasScout,
+    source: moveEventSource,
+    rngKeys,
+  })
+
+  if (!event) {
+    const quietCtx: TerrainQuietCtx = { tileMessage, rngKeys, tileRand, resources }
+    const custom = onQuiet?.(quietCtx)
+    if (custom) {
+      const resolved: ResolvedTerrainMove = {
+        outcome: 'quiet',
+        message: custom.message,
+        ...(custom.resources !== undefined ? { resources: custom.resources } : {}),
+      }
+      return { tileMessage, resolved }
+    }
+    return { tileMessage, resolved: { outcome: 'quiet', message: tileMessage } }
+  }
+
+  if (event.kind === 'fight') {
+    return { tileMessage, resolved: { outcome: 'fight' } }
+  }
+
+  const td = pickTeleportDestination({ world, origin: pos, rngState: world.rngState })
+  const nextWorld = { ...world, rngState: td.rngState }
+  const lostMessage = RNG.createTileRandom({ world: nextWorld, stepCount, pos }).perMoveLine(
+    LOST_FLAVOR_LINES,
+  )
+  return {
+    tileMessage,
+    resolved: {
+      outcome: 'lost',
+      world: nextWorld,
+      teleportTo: td.destination,
+      message: lostMessage,
+    },
+  }
+}
+
+export function tileEnterFromTerrainMove(
+  resolved: ResolvedTerrainMove,
+  onFight: () => TileEnterResult,
+): TileEnterResult {
+  switch (resolved.outcome) {
+    case 'quiet':
+      return {
+        message: resolved.message,
+        ...(resolved.resources ? { resources: resolved.resources } : {}),
+      }
+    case 'fight':
+      return onFight()
+    case 'lost':
+      return {
+        world: resolved.world,
+        teleportTo: resolved.teleportTo,
+        message: resolved.message,
+      }
+  }
 }

@@ -10,7 +10,7 @@ import { hengeCombatVariant } from '../../src/core/mechanics/defs/henge'
 import type { CombatEncounter, Resources } from '../../src/core/types'
 import { makeResources } from './_helpers/makeResources'
 
-// Henge shares `brigandRecruitEligibility` (see `defs/henge.ts`); the predicate
+// Henge shares `brigandRecruitEligibility` (see `mountain.ts`); the predicate
 // is exercised by combat.brigand.unit.test.ts. This file pins henge-specific
 // distribution + the killed-ratio loot scale.
 

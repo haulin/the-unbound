@@ -18,7 +18,7 @@ import { makeResources } from './makeResources'
 // opens combat. Convention follows `tests/core/_helpers/makeResources.ts`.
 
 // Find a seed that triggers the ambush roll for the destination cell on its
-// first step. The `rollMoveEvent` flow in `terrainHazardsMechanic` keys the
+// first step. The `rollMoveEvent` flow in woods/mountain mechanics keys the
 // roll on `(seed, stepCount, cellId)`.
 export function findAmbushSeed(opts: {
   cellId: number

@@ -16,38 +16,7 @@ import { cellId, placeFeature } from '../../worldgen'
 import { fixedEnemySpawn, startCombatEncounter, type CombatVariantConfig } from './combat'
 import type { MechanicDef, OnEnterTile, PlaceWorldProvider } from '../types'
 
-const onEnterWyrm: OnEnterTile = ({ cell, world, pos, stepCount }) => {
-  if (cell.kind !== 'lair') return {}
-  const lair = getCellAt(world, pos)
-  if (lair.kind !== 'lair') return {}
-
-  const r = RNG.createTileRandom({ world, stepCount, pos })
-
-  if (lair.isBled) {
-    const line = r.perMoveLine(WYRM_BLED_LINES, { cellId: lair.id })
-    return { message: `${LAIR_NAME}\n${line}` }
-  }
-
-  const tileMessage = `${LAIR_NAME}\n${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`
-  return startCombatEncounter({
-    world,
-    pos,
-    spawnEnemy: fixedEnemySpawn(WYRM_INITIAL_HEALTH),
-    encounterMessage: tileMessage,
-    restoreMessage: tileMessage,
-  })
-}
-
-const placeWyrm: PlaceWorldProvider = ({ cells, rngState }) => {
-  const res = placeFeature(cells, rngState, {
-    count: 1,
-    canPlaceAt: (_x, _y, here) => here.kind === 'mountain',
-    buildCell: ({ x, y }) => ({ kind: 'lair', id: cellId(x, y), isBled: false }),
-  })
-  return { rngState: res.rngState }
-}
-
-const wyrmCombatVariant: CombatVariantConfig = {
+export const wyrmCombatVariant: CombatVariantConfig = {
   centerSpriteId: SPRITES.centers.wyrm,
   previewPlateLines: (s) => {
     const enc = s.encounter
@@ -81,11 +50,37 @@ const wyrmCombatVariant: CombatVariantConfig = {
   },
 }
 
-// Wyrm responds only to `victory` (existing behaviour: flip `isBled`).
-// `flee` and `recruit` outcomes pass through unchanged — wyrm has no recruit
-// slot at the source-cell level (paying the wyrm grants 'blood' via
-// `payment.onSuccess`, which is the same effect as victory; the post-combat
-// hook just needs to mark the lair bled when that path was reached).
+const onEnterWyrm: OnEnterTile = ({ cell, world, pos, stepCount }) => {
+  if (cell.kind !== 'lair') return {}
+  const lair = getCellAt(world, pos)
+  if (lair.kind !== 'lair') return {}
+
+  const r = RNG.createTileRandom({ world, stepCount, pos })
+
+  if (lair.isBled) {
+    const line = r.perMoveLine(WYRM_BLED_LINES, { cellId: lair.id })
+    return { message: `${LAIR_NAME}\n${line}` }
+  }
+
+  const tileMessage = `${LAIR_NAME}\n${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`
+  return startCombatEncounter({
+    world,
+    pos,
+    spawnEnemy: fixedEnemySpawn(WYRM_INITIAL_HEALTH),
+    encounterMessage: tileMessage,
+    restoreMessage: tileMessage,
+  })
+}
+
+const placeWyrm: PlaceWorldProvider = ({ cells, rngState }) => {
+  const res = placeFeature(cells, rngState, {
+    count: 1,
+    canPlaceAt: (_x, _y, here) => here.kind === 'mountain',
+    buildCell: ({ x, y }) => ({ kind: 'lair', id: cellId(x, y), isBled: false }),
+  })
+  return { rngState: res.rngState }
+}
+
 function onWyrmCombatClosed(
   state: State,
   outcome: 'victory' | 'flee' | 'recruit',

@@ -18,11 +18,9 @@ import {
   HENGE_RECRUIT_SUCCESS_LINES,
 } from '../../src/core/constants'
 import { RNG } from '../../src/core/rng'
-import {
-  brigandCombatVariant,
-  goblinCombatVariant,
-  spawnEnemyArmy,
-} from '../../src/core/mechanics/defs/combat'
+import { spawnEnemyArmy } from '../../src/core/mechanics/defs/combat'
+import { brigandCombatVariant } from '../../src/core/mechanics/defs/mountain'
+import { goblinCombatVariant } from '../../src/core/mechanics/defs/woods'
 import { hengeCombatVariant } from '../../src/core/mechanics/defs/henge'
 import { MECHANIC_INDEX } from '../../src/core/mechanics'
 import { processAction } from '../../src/core/processAction'

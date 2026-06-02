@@ -1,6 +1,6 @@
-// title:  The Unbound (prototype 0.6.0)
+// title:  The Unbound (prototype 0.7.0)
 // author: haulin
-// desc:   Prototype 0.6.0 toward the North Star
+// desc:   Prototype 0.7.0 toward the North Star
 // script: js
 // input:  mouse
 
@@ -29,6 +29,9 @@
       "Woods and swamps can pull you off course.",
       "When lost, find a signpost, farm, or town to get your bearings again.",
       "What's nice about the Unbound is that everything is at most 10 leagues away."
+    ],
+    terrain: [
+      "Swamps and mountains cost double rations. Quiet steps through them sometimes turn up a mixed haul."
     ],
     map: [
       "The map shows landmarks, not terrain.",
@@ -66,6 +69,10 @@
     captain: [
       "A banner makes the men fight straighter. It also makes them seen. Mind your woods and mountains.",
       "If you carry the colours, expect company on bad roads."
+    ],
+    combat: [
+      "You can meet goblins in the woods and brigands in the mountains.",
+      "Only a small wounded band will march for coin \u2014 never a full war party."
     ],
     fisherman: [
       "A fisherman doubles what a lake gives you. He's heavy gear though. You'll feel it if you run."
@@ -171,6 +178,18 @@
       "The trees rearrange themselves while you blink. You hope it is the wind."
     ]
   };
+  var SWAMP_FIND_LINES = [
+    "A corpse in the reeds. Tangled roots hide a rotted sack \u2014 mushrooms and tarnished coin.",
+    "A sunken pack, half swallowed. Edible reeds and a bent penny.",
+    "A journeyman's bones in the mud. Roots, berries, a few dull coins left behind.",
+    "The mud coughs up a meal and pocket change. You do not ask who lost it."
+  ];
+  var MOUNTAIN_FIND_LINES = [
+    "A frozen climber in a crevice. Coin in the belt pouch and a hard strip of jerky.",
+    "Cold stone holds an old stash. Gold first; wax paper of rations beside it.",
+    "Someone cached this against winter. Coin, then crumbs. Take both.",
+    "The cave yields what climbers left. Dull gold and the last of their bread."
+  ];
   var FARM_NAME_POOL = [
     "The Oast",
     "Burnt Acre",
@@ -516,8 +535,8 @@
   var INITIAL_FOOD = 15;
   var INITIAL_GOLD = 15;
   var FOOD_COST_DEFAULT = 1;
-  var FOOD_COST_MOUNTAIN = 2;
   var FOOD_COST_SWAMP = 2;
+  var FOOD_COST_MOUNTAIN = 2;
   var FOOD_WARNING_THRESHOLD = 5;
   var FARM_COUNT = 3;
   var FISHING_LAKE_COUNT = 6;
@@ -613,11 +632,18 @@
     }
   }
   var FOOD_DELTA_FRAMES = 24;
-  var WOODS_AMBUSH_PERCENT = 15;
+  var WOODS_AMBUSH_PERCENT = 25;
   var WOODS_LOST_PERCENT = 10;
-  var MOUNTAIN_AMBUSH_PERCENT = 25;
   var SWAMP_LOST_PERCENT = 20;
+  var MOUNTAIN_AMBUSH_PERCENT = 25;
   var TELEPORT_MIN_DISTANCE = 4;
+  var SWAMP_FIND_PERCENT = 15;
+  var SWAMP_FIND_FOOD_BASE = 8;
+  var SWAMP_FIND_GOLD_BASE = 2;
+  var MOUNTAIN_FIND_PERCENT = 15;
+  var MOUNTAIN_FIND_GOLD_BASE = 8;
+  var MOUNTAIN_FIND_FOOD_BASE = 2;
+  var TERRAIN_FIND_AMOUNT_NOISE = 2;
   var GRID_TRANSITION_STEP_FRAMES = 5;
   var BRIGAND_RECRUIT_MAX_REMAINING = 5;
   var BRIGAND_GOLD_NOISE = 3;
@@ -848,7 +874,25 @@
   function createStreamRandomFromSeed(seed) {
     return createStreamRandom(seedToRngState(seed));
   }
+  function domainSalt(label) {
+    let h = 0;
+    for (let i = 0; i < label.length; i++) {
+      h = Math.imul(31, h) + label.charCodeAt(i) | 0;
+    }
+    return h >>> 0;
+  }
+  function keyedBoundedBase(keys, saltLabel, base, noiseSpan) {
+    const noise = pickIntInRange({ ...keys, salt: domainSalt(saltLabel) }, -noiseSpan, noiseSpan);
+    return Math.max(0, base + noise);
+  }
+  function streamSignedNoise(r, noiseSpan) {
+    return r.intExclusive(2 * noiseSpan + 1) - noiseSpan;
+  }
+  function streamBoundedBase(r, base, noiseSpan) {
+    return Math.max(0, base + streamSignedNoise(r, noiseSpan));
+  }
   var RNG = {
+    domainSalt,
     // Facades (preferred)
     createTileRandom,
     createRunCopyRandom,
@@ -856,7 +900,10 @@
     createStreamRandomFromSeed,
     // Keyed deterministic helpers (stable, no global rngState consumption).
     keyedIntExclusive: pickIntExclusive,
-    keyedIntInRange: pickIntInRange
+    keyedIntInRange: pickIntInRange,
+    keyedBoundedBase,
+    streamSignedNoise,
+    streamBoundedBase
   };
 
   // src/core/gameOver.ts
@@ -880,7 +927,7 @@
     const mapLabelByKind = {};
     const enterFoodCostByKind2 = {};
     const moveEventPolicyByKind = {};
-    const combatVariantByKind2 = {};
+    const combatVariantByKind = {};
     const onCombatClosedByKind = {};
     const seenEncounterKinds = /* @__PURE__ */ new Set();
     for (let i = 0; i < mechanics.length; i++) {
@@ -942,7 +989,7 @@
         if (m.mapLabel != null) mapLabelByKind[kind] = m.mapLabel;
         if (m.poiSignpost) poiSignpostByKind[kind] = m.poiSignpost;
         const variantForKind = m.combatVariantByKind?.[kind];
-        if (variantForKind) combatVariantByKind2[kind] = variantForKind;
+        if (variantForKind) combatVariantByKind[kind] = variantForKind;
         if (m.onCombatClosed) onCombatClosedByKind[kind] = m.onCombatClosed;
         const cost = costByKind?.[kind];
         if (cost != null) enterFoodCostByKind2[kind] = cost;
@@ -962,7 +1009,7 @@
       mapLabelByKind,
       enterFoodCostByKind: enterFoodCostByKind2,
       moveEventPolicyByKind,
-      combatVariantByKind: combatVariantByKind2,
+      combatVariantByKind,
       onCombatClosedByKind
     };
   }
@@ -1061,6 +1108,58 @@ ${line}` };
     },
     placeWorld: placeGate
   };
+
+  // src/core/teleport.ts
+  var FEATURE_KIND_SET = new Set(FEATURE_KINDS);
+  function isTerrain(kind) {
+    return !FEATURE_KIND_SET.has(kind);
+  }
+  function pickTeleportDestination(args) {
+    const { world, origin } = args;
+    const r = RNG.createStreamRandom(args.rngState);
+    const candidates = [];
+    let maxD = 0;
+    for (let y = 0; y < world.height; y++) {
+      const row = world.cells[y];
+      for (let x = 0; x < world.width; x++) {
+        const cell = row[x];
+        if (!isTerrain(cell.kind)) continue;
+        if (x === origin.x && y === origin.y) continue;
+        const dx = torusDelta(origin.x, x, world.width);
+        const dy = torusDelta(origin.y, y, world.height);
+        const d = manhattan(dx, dy);
+        candidates.push({ x, y, d });
+        if (d > maxD) maxD = d;
+      }
+    }
+    const target = Math.min(TELEPORT_MIN_DISTANCE, maxD);
+    const eligible = candidates.filter((c) => c.d >= target);
+    const pool = eligible.length > 0 ? eligible : candidates;
+    if (pool.length === 0) {
+      return { destination: origin, rngState: r.rngState };
+    }
+    const pick = pool[r.intExclusive(pool.length)];
+    return { destination: { x: pick.x, y: pick.y }, rngState: r.rngState };
+  }
+
+  // src/core/mechanics/moveEvents.ts
+  function rollMoveEvent(args) {
+    const { policy, hasScout, source, rngKeys } = args;
+    const ambushPercent = policy.ambushPercent;
+    let lostPercent = policy.lostPercent;
+    if (hasScout && policy.scoutLostHalves) {
+      lostPercent = Math.floor(lostPercent / 2);
+    }
+    if (ambushPercent + lostPercent === 0) return null;
+    const percentile = RNG.keyedIntExclusive(rngKeys, 100);
+    if (percentile < ambushPercent) {
+      return { kind: "fight", source };
+    }
+    if (percentile < ambushPercent + lostPercent) {
+      return { kind: "lost", source };
+    }
+    return null;
+  }
 
   // src/core/uiAnim.ts
   function enqueueAnim(ui, anim) {
@@ -1214,6 +1313,79 @@ ${line}` } };
       next = enqueueGridTransition(next, { from: a.from, to: a.to, startFrame: startFrame + offset });
     }
     return next;
+  }
+  function tryQuietFind(spec, ctx) {
+    const { rngKeys, tileRand, resources } = ctx;
+    const findRoll = RNG.keyedIntExclusive({ ...rngKeys, salt: RNG.domainSalt(spec.rollSalt) }, 100);
+    if (findRoll >= spec.findPercent) return void 0;
+    const foodGain = RNG.keyedBoundedBase(rngKeys, spec.foodSalt, spec.foodBase, spec.amountNoise);
+    const goldGain = RNG.keyedBoundedBase(rngKeys, spec.goldSalt, spec.goldBase, spec.amountNoise);
+    return {
+      message: tileRand.perMoveLine(spec.lines),
+      resources: {
+        ...resources,
+        food: resources.food + foodGain,
+        gold: resources.gold + goldGain
+      }
+    };
+  }
+  function resolveTerrainMove(args) {
+    const { moveEventSource, policy, world, pos, stepCount, resources, hasScout, tileMessage, onQuiet } = args;
+    const rngKeys = { seed: world.seed, stepCount, cellId: cellIdForPos(world, pos) };
+    const tileRand = RNG.createTileRandom({ world, stepCount, pos });
+    const event = rollMoveEvent({
+      policy,
+      hasScout,
+      source: moveEventSource,
+      rngKeys
+    });
+    if (!event) {
+      const quietCtx = { tileMessage, rngKeys, tileRand, resources };
+      const custom = onQuiet?.(quietCtx);
+      if (custom) {
+        const resolved = {
+          outcome: "quiet",
+          message: custom.message,
+          ...custom.resources !== void 0 ? { resources: custom.resources } : {}
+        };
+        return { tileMessage, resolved };
+      }
+      return { tileMessage, resolved: { outcome: "quiet", message: tileMessage } };
+    }
+    if (event.kind === "fight") {
+      return { tileMessage, resolved: { outcome: "fight" } };
+    }
+    const td = pickTeleportDestination({ world, origin: pos, rngState: world.rngState });
+    const nextWorld = { ...world, rngState: td.rngState };
+    const lostMessage = RNG.createTileRandom({ world: nextWorld, stepCount, pos }).perMoveLine(
+      LOST_FLAVOR_LINES
+    );
+    return {
+      tileMessage,
+      resolved: {
+        outcome: "lost",
+        world: nextWorld,
+        teleportTo: td.destination,
+        message: lostMessage
+      }
+    };
+  }
+  function tileEnterFromTerrainMove(resolved, onFight) {
+    switch (resolved.outcome) {
+      case "quiet":
+        return {
+          message: resolved.message,
+          ...resolved.resources ? { resources: resolved.resources } : {}
+        };
+      case "fight":
+        return onFight();
+      case "lost":
+        return {
+          world: resolved.world,
+          teleportTo: resolved.teleportTo,
+          message: resolved.message
+        };
+    }
   }
 
   // src/core/mechanics/defs/locksmith.ts
@@ -1932,6 +2104,39 @@ ${line}`,
     },
     victoryReward: (resources, rngState) => ({ resources, rngState })
   };
+  var combatMechanic = {
+    id: "combat",
+    kinds: [],
+    encounter: {
+      kind: "combat",
+      rightGrid: combatRightGrid,
+      reduceAction: reduceCombatAction,
+      previewPlate: combatPreviewPlate,
+      // Enemy-army delta popups land on the plate's enemy line. Negative deltas
+      // (enemy losing troops) are "good" for the player → green.
+      previewPlateDeltaAnchors: [{ target: "enemyArmy", lineIndex: 0, goodSign: -1 }],
+      previewEncounter: () => ({
+        kind: "combat",
+        enemyArmySize: 0,
+        initialSpawn: 0,
+        sourceCellId: -1,
+        restoreMessage: ""
+      })
+    }
+  };
+
+  // src/core/mechanics/defs/mountain.ts
+  var mountainPolicy = { ambushPercent: MOUNTAIN_AMBUSH_PERCENT, lostPercent: 0 };
+  var MOUNTAIN_QUIET_FIND = {
+    findPercent: MOUNTAIN_FIND_PERCENT,
+    lines: MOUNTAIN_FIND_LINES,
+    foodBase: MOUNTAIN_FIND_FOOD_BASE,
+    goldBase: MOUNTAIN_FIND_GOLD_BASE,
+    amountNoise: TERRAIN_FIND_AMOUNT_NOISE,
+    rollSalt: "mountain.find.roll",
+    foodSalt: "mountain.find.food",
+    goldSalt: "mountain.find.gold"
+  };
   function brigandRecruitCost(enc) {
     return enc.enemyArmySize * enc.enemyArmySize;
   }
@@ -1947,8 +2152,7 @@ ${line}`,
   }
   function brigandVictoryReward(resources, rngState, enc) {
     const r = RNG.createStreamRandom(rngState);
-    const goldNoise = r.intExclusive(2 * BRIGAND_GOLD_NOISE + 1) - BRIGAND_GOLD_NOISE;
-    const baseGold = Math.max(0, enc.initialSpawn + goldNoise);
+    const baseGold = Math.max(0, enc.initialSpawn + RNG.streamSignedNoise(r, BRIGAND_GOLD_NOISE));
     const foodBonus = r.intExclusive(BRIGAND_FOOD_MAX + 1);
     const next = {
       ...resources,
@@ -1979,69 +2183,46 @@ ${line}`,
     victoryReward: brigandVictoryReward,
     recruitLootScale: brigandRecruitLootScale
   };
-  function goblinVictoryReward(resources, rngState, enc) {
-    const r = RNG.createStreamRandom(rngState);
-    const gold = r.intExclusive(GOBLIN_GOLD_MAX + 1);
-    const foodNoise = r.intExclusive(2 * GOBLIN_FOOD_NOISE + 1) - GOBLIN_FOOD_NOISE;
-    const food = Math.max(0, Math.round(GOBLIN_FOOD_FACTOR * enc.initialSpawn) + foodNoise);
-    const next = {
-      ...resources,
-      gold: resources.gold + gold,
-      food: resources.food + food
-    };
-    return { resources: next, rngState: r.rngState };
-  }
-  var goblinCombatVariant = {
-    centerSpriteId: SPRITES.enemies.goblin,
-    previewPlateLines: enemyCountOnlyPlateLines,
-    encounterLines: GOBLIN_ENCOUNTER_LINES,
-    victoryLines: GOBLIN_VICTORY_LINES,
-    fleeLines: GOBLIN_FLEE_LINES,
-    playerRollBonus: 6,
-    enemyRollBonus: 3,
-    payment: {
-      computeCost: () => 0,
-      isEligible: () => "unrecruitable",
-      successLines: [],
-      failLines: { unrecruitable: GOBLIN_NOT_RECRUITABLE_LINES },
-      onSuccess: (resources) => resources
-    },
-    victoryReward: goblinVictoryReward
-  };
-  var combatMechanic = {
-    id: "combat",
-    kinds: [],
-    encounter: {
-      kind: "combat",
-      rightGrid: combatRightGrid,
-      reduceAction: reduceCombatAction,
-      previewPlate: combatPreviewPlate,
-      // Enemy-army delta popups land on the plate's enemy line. Negative deltas
-      // (enemy losing troops) are "good" for the player → green.
-      previewPlateDeltaAnchors: [{ target: "enemyArmy", lineIndex: 0, goodSign: -1 }],
-      previewEncounter: () => ({
-        kind: "combat",
-        enemyArmySize: 0,
-        initialSpawn: 0,
-        sourceCellId: -1,
-        restoreMessage: ""
+  var onEnterMountain = ({ cell, world, pos, stepCount, resources }) => {
+    if (cell.kind !== "mountain") return {};
+    const tileRand = RNG.createTileRandom({ world, stepCount, pos });
+    const tileMessage = tileRand.perMoveLine(terrainLoreLinesForKind("mountain"));
+    const { tileMessage: restoreMessage, resolved } = resolveTerrainMove({
+      moveEventSource: "mountain",
+      policy: mountainPolicy,
+      world,
+      pos,
+      stepCount,
+      resources,
+      hasScout: resources.party.includes("scout"),
+      tileMessage,
+      onQuiet: (ctx) => tryQuietFind(MOUNTAIN_QUIET_FIND, ctx)
+    });
+    return tileEnterFromTerrainMove(
+      resolved,
+      () => startCombatEncounter({
+        world,
+        pos,
+        spawnEnemy: rolledEnemySpawn(resources.armySize),
+        encounterMessage: tileRand.perMoveLine(brigandCombatVariant.encounterLines),
+        restoreMessage
       })
-    }
+    );
+  };
+  var mountainMechanic = {
+    id: "mountain",
+    kinds: ["mountain"],
+    enterFoodCostByKind: { mountain: FOOD_COST_MOUNTAIN },
+    moveEventPolicyByKind: { mountain: mountainPolicy },
+    onEnterTile: onEnterMountain,
+    combatVariantByKind: { mountain: brigandCombatVariant }
   };
 
   // src/core/mechanics/defs/henge.ts
-  var hengeSpawn = (rngState) => {
-    const r = RNG.createStreamRandom(rngState);
-    const span = HENGE_BAND_MAX - HENGE_BAND_MIN + 1;
-    const enemyArmy = HENGE_BAND_MIN + r.intExclusive(span);
-    return { rngState: r.rngState, enemyArmy };
-  };
   function hengeVictoryReward(resources, rngState, enc) {
     const r = RNG.createStreamRandom(rngState);
-    const goldNoise = r.intExclusive(2 * HENGE_GOLD_NOISE + 1) - HENGE_GOLD_NOISE;
-    const baseGold = Math.max(0, enc.initialSpawn + goldNoise) + HENGE_GOLD_BONUS;
-    const foodNoise = r.intExclusive(2 * HENGE_FOOD_NOISE + 1) - HENGE_FOOD_NOISE;
-    const food = Math.max(0, Math.round(HENGE_FOOD_FACTOR * enc.initialSpawn) + foodNoise);
+    const baseGold = Math.max(0, enc.initialSpawn + RNG.streamSignedNoise(r, HENGE_GOLD_NOISE)) + HENGE_GOLD_BONUS;
+    const food = RNG.streamBoundedBase(r, Math.round(HENGE_FOOD_FACTOR * enc.initialSpawn), HENGE_FOOD_NOISE);
     const next = {
       ...resources,
       gold: resources.gold + baseGold,
@@ -2070,6 +2251,12 @@ ${line}`,
     },
     victoryReward: hengeVictoryReward,
     recruitLootScale: brigandRecruitLootScale
+  };
+  var hengeSpawn = (rngState) => {
+    const r = RNG.createStreamRandom(rngState);
+    const span = HENGE_BAND_MAX - HENGE_BAND_MIN + 1;
+    const enemyArmy = HENGE_BAND_MIN + r.intExclusive(span);
+    return { rngState: r.rngState, enemyArmy };
   };
   var onHengeCombatClosed = (state2, outcome, encounter) => {
     const pos = posForCellId(state2.world, encounter.sourceCellId);
@@ -2159,6 +2346,48 @@ ${r.perMoveLine(HENGE_ARRIVAL_LINES, { cellId: hengeCell.id })}`;
     [ACTION_TOWN_BUY_RUMOR]: { spriteId: SPRITES.actions.rumor, priceKey: "rumorGold", reduce: reduceTownBuyRumor }
   };
   var BASE_OFFERS = Object.keys(TOWN_OFFERS);
+  var OFFERS_PER_TOWN = 3;
+  function buildTownOfferSets(rng) {
+    if (BASE_OFFERS.length > TOWN_COUNT * OFFERS_PER_TOWN) {
+      throw new Error("TOWN_COUNT is too low for BASE_OFFERS \u2014 bump TOWN_COUNT in constants.ts");
+    }
+    const townCount = TOWN_COUNT;
+    const towns = Array.from({ length: townCount }, () => []);
+    towns[0].push(ACTION_TOWN_HIRE_SCOUT);
+    const mustPlace = BASE_OFFERS.filter((o) => o !== ACTION_TOWN_HIRE_SCOUT);
+    for (let i = 0; i < mustPlace.length; i++) {
+      const offer = mustPlace[i];
+      let placed = false;
+      for (let t = 0; t < townCount; t++) {
+        const slot = towns[t];
+        if (slot.length < OFFERS_PER_TOWN && !slot.includes(offer)) {
+          slot.push(offer);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        for (let t = 0; t < townCount; t++) {
+          const slot = towns[t];
+          if (slot.length < OFFERS_PER_TOWN) {
+            slot.push(offer);
+            break;
+          }
+        }
+      }
+    }
+    for (let t = 0; t < townCount; t++) {
+      const slot = towns[t];
+      const available = BASE_OFFERS.filter((o) => !slot.includes(o));
+      while (slot.length < OFFERS_PER_TOWN && available.length > 0) {
+        const pick = available[rng.intExclusive(available.length)];
+        slot.push(pick);
+        const idx = available.indexOf(pick);
+        if (idx >= 0) available.splice(idx, 1);
+      }
+    }
+    return towns;
+  }
   function townPrefix(town) {
     const name = town.name || "A Town";
     return `${name} Town`;
@@ -2249,17 +2478,16 @@ ${rnd.perMoveLine(TOWN_SCOUT_HIRE_LINES, { cellId: town.id })}`,
     });
   }
   var placeNamedTowns = ({ cells, rngState }) => {
-    const omittableOffers = BASE_OFFERS.filter((o) => o !== ACTION_TOWN_HIRE_SCOUT);
+    const stream = RNG.createStreamRandom(rngState);
+    const offerSets = buildTownOfferSets(stream);
     let townIndex = 0;
-    const next = placeNamedFeature(cells, rngState, {
+    const next = placeNamedFeature(cells, stream.rngState, {
       count: TOWN_COUNT,
       namePool: TOWN_NAME_POOL,
       fallbackName: "A Town",
       canPlaceAt: (_x, _y, here) => isTerrainCell(here),
       buildCell: ({ x, y, name, rng }) => {
-        const pool = townIndex === 0 ? omittableOffers : BASE_OFFERS;
-        const omitOffer = pool[rng.intExclusive(pool.length)];
-        const offers = BASE_OFFERS.filter((o) => o !== omitOffer);
+        const offers = [...offerSets[townIndex]];
         const foodGold = rng.intInRange(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX);
         const troopsGold = rng.intInRange(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX);
         const scoutGold = rng.intInRange(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX);
@@ -2331,126 +2559,116 @@ ${pick.line}`,
     }
   };
 
-  // src/core/teleport.ts
-  var FEATURE_KIND_SET = new Set(FEATURE_KINDS);
-  function isTerrain(kind) {
-    return !FEATURE_KIND_SET.has(kind);
-  }
-  function pickTeleportDestination(args) {
-    const { world, origin } = args;
-    const r = RNG.createStreamRandom(args.rngState);
-    const candidates = [];
-    let maxD = 0;
-    for (let y = 0; y < world.height; y++) {
-      const row = world.cells[y];
-      for (let x = 0; x < world.width; x++) {
-        const cell = row[x];
-        if (!isTerrain(cell.kind)) continue;
-        if (x === origin.x && y === origin.y) continue;
-        const dx = torusDelta(origin.x, x, world.width);
-        const dy = torusDelta(origin.y, y, world.height);
-        const d = manhattan(dx, dy);
-        candidates.push({ x, y, d });
-        if (d > maxD) maxD = d;
-      }
-    }
-    const target = Math.min(TELEPORT_MIN_DISTANCE, maxD);
-    const eligible = candidates.filter((c) => c.d >= target);
-    const pool = eligible.length > 0 ? eligible : candidates;
-    if (pool.length === 0) {
-      return { destination: origin, rngState: r.rngState };
-    }
-    const pick = pool[r.intExclusive(pool.length)];
-    return { destination: { x: pick.x, y: pick.y }, rngState: r.rngState };
-  }
-
-  // src/core/mechanics/moveEvents.ts
-  function rollMoveEvent(args) {
-    const { policy, hasScout, source, rngKeys } = args;
-    const ambushPercent = policy.ambushPercent;
-    let lostPercent = policy.lostPercent;
-    if (hasScout && policy.scoutLostHalves) {
-      lostPercent = Math.floor(lostPercent / 2);
-    }
-    if (ambushPercent + lostPercent === 0) return null;
-    const percentile = RNG.keyedIntExclusive(rngKeys, 100);
-    if (percentile < ambushPercent) {
-      return { kind: "fight", source };
-    }
-    if (percentile < ambushPercent + lostPercent) {
-      return { kind: "lost", source };
-    }
-    return null;
-  }
-
-  // src/core/mechanics/defs/terrainHazards.ts
+  // src/core/mechanics/defs/woods.ts
   var woodsPolicy = {
     ambushPercent: WOODS_AMBUSH_PERCENT,
     lostPercent: WOODS_LOST_PERCENT,
     scoutLostHalves: true
   };
+  function goblinVictoryReward(resources, rngState, enc) {
+    const r = RNG.createStreamRandom(rngState);
+    const gold = r.intExclusive(GOBLIN_GOLD_MAX + 1);
+    const food = RNG.streamBoundedBase(
+      r,
+      Math.round(GOBLIN_FOOD_FACTOR * enc.initialSpawn),
+      GOBLIN_FOOD_NOISE
+    );
+    const next = {
+      ...resources,
+      gold: resources.gold + gold,
+      food: resources.food + food
+    };
+    return { resources: next, rngState: r.rngState };
+  }
+  var goblinCombatVariant = {
+    centerSpriteId: SPRITES.enemies.goblin,
+    previewPlateLines: enemyCountOnlyPlateLines,
+    encounterLines: GOBLIN_ENCOUNTER_LINES,
+    victoryLines: GOBLIN_VICTORY_LINES,
+    fleeLines: GOBLIN_FLEE_LINES,
+    playerRollBonus: 6,
+    enemyRollBonus: 3,
+    payment: {
+      computeCost: () => 0,
+      isEligible: () => "unrecruitable",
+      successLines: [],
+      failLines: { unrecruitable: GOBLIN_NOT_RECRUITABLE_LINES },
+      onSuccess: (resources) => resources
+    },
+    victoryReward: goblinVictoryReward
+  };
+  var onEnterWoods = ({ cell, world, pos, stepCount, resources }) => {
+    if (cell.kind !== "woods") return {};
+    const tileRand = RNG.createTileRandom({ world, stepCount, pos });
+    const tileMessage = tileRand.perMoveLine(terrainLoreLinesForKind("woods"));
+    const { tileMessage: restoreMessage, resolved } = resolveTerrainMove({
+      moveEventSource: "woods",
+      policy: woodsPolicy,
+      world,
+      pos,
+      stepCount,
+      resources,
+      hasScout: resources.party.includes("scout"),
+      tileMessage
+    });
+    return tileEnterFromTerrainMove(
+      resolved,
+      () => startCombatEncounter({
+        world,
+        pos,
+        spawnEnemy: rolledEnemySpawn(resources.armySize),
+        encounterMessage: tileRand.perMoveLine(goblinCombatVariant.encounterLines),
+        restoreMessage
+      })
+    );
+  };
+  var woodsMechanic = {
+    id: "woods",
+    kinds: ["woods"],
+    moveEventPolicyByKind: { woods: woodsPolicy },
+    onEnterTile: onEnterWoods,
+    combatVariantByKind: { woods: goblinCombatVariant }
+  };
+
+  // src/core/mechanics/defs/swamp.ts
   var swampPolicy = {
     ambushPercent: 0,
     lostPercent: SWAMP_LOST_PERCENT,
     scoutLostHalves: true
   };
-  var mountainPolicy = { ambushPercent: MOUNTAIN_AMBUSH_PERCENT, lostPercent: 0 };
-  var combatVariantByKind = {
-    woods: goblinCombatVariant,
-    mountain: brigandCombatVariant
+  var SWAMP_QUIET_FIND = {
+    findPercent: SWAMP_FIND_PERCENT,
+    lines: SWAMP_FIND_LINES,
+    foodBase: SWAMP_FIND_FOOD_BASE,
+    goldBase: SWAMP_FIND_GOLD_BASE,
+    amountNoise: TERRAIN_FIND_AMOUNT_NOISE,
+    rollSalt: "swamp.find.roll",
+    foodSalt: "swamp.find.food",
+    goldSalt: "swamp.find.gold"
   };
-  var onEnterTerrainHazards = ({ cell, world, pos, stepCount, resources }) => {
-    const kind = cell.kind;
-    let policy;
-    if (kind === "woods") policy = woodsPolicy;
-    else if (kind === "swamp") policy = swampPolicy;
-    else if (kind === "mountain") policy = mountainPolicy;
-    else return {};
+  var onEnterSwamp = ({ cell, world, pos, stepCount, resources }) => {
+    if (cell.kind !== "swamp") return {};
     const tileRand = RNG.createTileRandom({ world, stepCount, pos });
-    const tileMessage = tileRand.perMoveLine(terrainLoreLinesForKind(kind));
-    const event = rollMoveEvent({
-      policy,
+    const tileMessage = tileRand.perMoveLine(terrainLoreLinesForKind("swamp"));
+    const { resolved } = resolveTerrainMove({
+      moveEventSource: "swamp",
+      policy: swampPolicy,
+      world,
+      pos,
+      stepCount,
+      resources,
       hasScout: resources.party.includes("scout"),
-      source: kind,
-      rngKeys: { seed: world.seed, stepCount, cellId: cellIdForPos(world, pos) }
+      tileMessage,
+      onQuiet: (ctx) => tryQuietFind(SWAMP_QUIET_FIND, ctx)
     });
-    if (!event) {
-      return { message: tileMessage };
-    }
-    if (event.kind === "fight") {
-      const variant = combatVariantByKind[kind];
-      const encounterMessage = tileRand.perMoveLine(variant.encounterLines);
-      return startCombatEncounter({
-        world,
-        pos,
-        spawnEnemy: rolledEnemySpawn(resources.armySize),
-        encounterMessage,
-        restoreMessage: tileMessage
-      });
-    }
-    const td = pickTeleportDestination({ world, origin: pos, rngState: world.rngState });
-    const nextWorld = { ...world, rngState: td.rngState };
-    const lostMessage = RNG.createTileRandom({ world: nextWorld, stepCount, pos }).perMoveLine(LOST_FLAVOR_LINES);
-    return {
-      world: nextWorld,
-      teleportTo: td.destination,
-      message: lostMessage
-    };
+    return tileEnterFromTerrainMove(resolved, () => ({}));
   };
-  var terrainHazardsMechanic = {
-    id: "terrainHazards",
-    kinds: ["woods", "swamp", "mountain"],
-    enterFoodCostByKind: {
-      swamp: FOOD_COST_SWAMP,
-      mountain: FOOD_COST_MOUNTAIN
-    },
-    moveEventPolicyByKind: {
-      woods: woodsPolicy,
-      swamp: swampPolicy,
-      mountain: mountainPolicy
-    },
-    onEnterTile: onEnterTerrainHazards,
-    combatVariantByKind
+  var swampMechanic = {
+    id: "swamp",
+    kinds: ["swamp"],
+    enterFoodCostByKind: { swamp: FOOD_COST_SWAMP },
+    moveEventPolicyByKind: { swamp: swampPolicy },
+    onEnterTile: onEnterSwamp
   };
 
   // src/core/mechanics/defs/fishingLake.ts
@@ -2534,34 +2752,6 @@ ${pick.line}`,
   };
 
   // src/core/mechanics/defs/wyrm.ts
-  var onEnterWyrm = ({ cell, world, pos, stepCount }) => {
-    if (cell.kind !== "lair") return {};
-    const lair = getCellAt(world, pos);
-    if (lair.kind !== "lair") return {};
-    const r = RNG.createTileRandom({ world, stepCount, pos });
-    if (lair.isBled) {
-      const line = r.perMoveLine(WYRM_BLED_LINES, { cellId: lair.id });
-      return { message: `${LAIR_NAME}
-${line}` };
-    }
-    const tileMessage = `${LAIR_NAME}
-${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
-    return startCombatEncounter({
-      world,
-      pos,
-      spawnEnemy: fixedEnemySpawn(WYRM_INITIAL_HEALTH),
-      encounterMessage: tileMessage,
-      restoreMessage: tileMessage
-    });
-  };
-  var placeWyrm = ({ cells, rngState }) => {
-    const res = placeFeature(cells, rngState, {
-      count: 1,
-      canPlaceAt: (_x, _y, here) => here.kind === "mountain",
-      buildCell: ({ x, y }) => ({ kind: "lair", id: cellId(x, y), isBled: false })
-    });
-    return { rngState: res.rngState };
-  };
   var wyrmCombatVariant = {
     centerSpriteId: SPRITES.centers.wyrm,
     previewPlateLines: (s) => {
@@ -2594,6 +2784,34 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
         rngState
       };
     }
+  };
+  var onEnterWyrm = ({ cell, world, pos, stepCount }) => {
+    if (cell.kind !== "lair") return {};
+    const lair = getCellAt(world, pos);
+    if (lair.kind !== "lair") return {};
+    const r = RNG.createTileRandom({ world, stepCount, pos });
+    if (lair.isBled) {
+      const line = r.perMoveLine(WYRM_BLED_LINES, { cellId: lair.id });
+      return { message: `${LAIR_NAME}
+${line}` };
+    }
+    const tileMessage = `${LAIR_NAME}
+${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
+    return startCombatEncounter({
+      world,
+      pos,
+      spawnEnemy: fixedEnemySpawn(WYRM_INITIAL_HEALTH),
+      encounterMessage: tileMessage,
+      restoreMessage: tileMessage
+    });
+  };
+  var placeWyrm = ({ cells, rngState }) => {
+    const res = placeFeature(cells, rngState, {
+      count: 1,
+      canPlaceAt: (_x, _y, here) => here.kind === "mountain",
+      buildCell: ({ x, y }) => ({ kind: "lair", id: cellId(x, y), isBled: false })
+    });
+    return { rngState: res.rngState };
   };
   function onWyrmCombatClosed(state2, outcome, encounter) {
     if (outcome !== "victory" && outcome !== "recruit") return state2;
@@ -2630,7 +2848,9 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     signpostMechanic,
     fishingLakeMechanic,
     rainbowEndMechanic,
-    terrainHazardsMechanic,
+    woodsMechanic,
+    swampMechanic,
+    mountainMechanic,
     combatMechanic
   ];
   var MECHANIC_INDEX = buildMechanicIndex(MECHANICS);
@@ -2960,6 +3180,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     const prevFood = prevRes.food;
     const cost = enterFoodCostByKind[cell.kind] ?? FOOD_COST_DEFAULT;
     const foodDeltas = [];
+    const goldDeltas = [];
     const armyDeltas = [];
     let food;
     let armySize;
@@ -2981,6 +3202,8 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     const nextResources = applyFoodCapOnGain(baseResources, outcome.resources ?? baseResources);
     const appliedFoodDelta = nextResources.food - baseResources.food;
     if (appliedFoodDelta) foodDeltas.push(appliedFoodDelta);
+    const appliedGoldDelta = nextResources.gold - baseResources.gold;
+    if (appliedGoldDelta > 0) goldDeltas.push(appliedGoldDelta);
     const nextHasWon = prevState.run.hasWon || !!outcome.hasWon;
     const isGameOver = nextResources.armySize <= 0;
     const nextEncounter = outcome.encounter ?? null;
@@ -3022,6 +3245,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     const startFrame = baseUi.clock.frame;
     let uiWith = baseState.ui;
     uiWith = enqueueDeltas(uiWith, { target: "food", deltas: foodDeltas, startFrame });
+    uiWith = enqueueDeltas(uiWith, { target: "gold", deltas: goldDeltas, startFrame });
     uiWith = enqueueDeltas(uiWith, { target: "army", deltas: armyDeltas, startFrame });
     if (outcome.enterAnims && outcome.enterAnims.length) {
       uiWith = applyEnterAnims(uiWith, outcome.enterAnims, startFrame + MOVE_SLIDE_FRAMES);
@@ -3972,9 +4196,9 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
   globalThis.TIC = TIC;
 })();
 
-// title:  The Unbound (prototype 0.6.0)
+// title:  The Unbound (prototype 0.7.0)
 // author: haulin
-// desc:   Prototype 0.6.0 toward the North Star
+// desc:   Prototype 0.7.0 toward the North Star
 // script: js
 // input:  mouse
 

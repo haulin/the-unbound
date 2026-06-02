@@ -209,6 +209,7 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
   const cost = enterFoodCostByKind[cell.kind] ?? FOOD_COST_DEFAULT
 
   const foodDeltas: number[] = []
+  const goldDeltas: number[] = []
   const armyDeltas: number[] = []
   let food: number
   let armySize: number
@@ -240,6 +241,8 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
   // Popup the *applied* food delta after carry-cap clamping (prevents +N popups when only +k fits).
   const appliedFoodDelta = nextResources.food - baseResources.food
   if (appliedFoodDelta) foodDeltas.push(appliedFoodDelta)
+  const appliedGoldDelta = nextResources.gold - baseResources.gold
+  if (appliedGoldDelta > 0) goldDeltas.push(appliedGoldDelta)
   const nextHasWon = prevState.run.hasWon || !!outcome.hasWon
 
   // wouldGameOver implies isGameOver (handler skipped, so resources unchanged from baseResources).
@@ -293,6 +296,7 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
   const startFrame = baseUi.clock.frame
   let uiWith = baseState.ui
   uiWith = enqueueDeltas(uiWith, { target: 'food', deltas: foodDeltas, startFrame })
+  uiWith = enqueueDeltas(uiWith, { target: 'gold', deltas: goldDeltas, startFrame })
   uiWith = enqueueDeltas(uiWith, { target: 'army', deltas: armyDeltas, startFrame })
 
   // Mechanic-supplied enter-anims (e.g. grid transitions into an encounter) play AFTER the

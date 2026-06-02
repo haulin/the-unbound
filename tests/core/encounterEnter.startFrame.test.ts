@@ -140,7 +140,7 @@ describe('encounter-enter grid transitions fire at startFrame + MOVE_SLIDE_FRAME
     expect(t!.startFrame).toBe(MOVE_SLIDE_FRAMES)
   })
 
-  it('terrainHazards (woods → combat) on an ambush-rolling seed', () => {
+  it('woods (ambush → combat) on an ambush-rolling seed', () => {
     const seed = findAmbushSeed(WOODS_AMBUSH_PERCENT)
     const world = { ...blankWorldWith({ center: { kind: 'woods' } }), seed }
     const next = processAction(stateAt(world), moveSouth)!
@@ -149,7 +149,7 @@ describe('encounter-enter grid transitions fire at startFrame + MOVE_SLIDE_FRAME
     expect(t!.startFrame).toBe(MOVE_SLIDE_FRAMES)
   })
 
-  it('terrainHazards (mountain → combat) on an ambush-rolling seed', () => {
+  it('mountain (ambush → combat) on an ambush-rolling seed', () => {
     const seed = findAmbushSeed(MOUNTAIN_AMBUSH_PERCENT)
     const world = { ...blankWorldWith({ center: { kind: 'mountain' } }), seed }
     const next = processAction(stateAt(world), moveSouth)!

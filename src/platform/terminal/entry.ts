@@ -1,8 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { ACTION_NEW_RUN, ACTION_TICK } from '../../core/constants'
 import { processAction } from '../../core/processAction'
 import { hasBlockingAnim } from '../../core/reducer'
 import type { State } from '../../core/types'
-import { parseBlind, parseMoves, parseSeed } from './args'
+import { parseBlind, parseMoves, parseMovesFile, parseSeed } from './args'
 import { actionForKey } from './input'
 import { renderState } from './render'
 
@@ -36,7 +37,13 @@ function paintAndPrompt(): void {
   process.stdout.write('> ')
 }
 
-const replayMoves = parseMoves(args)
+// `--moves-file` wins over `--moves` when both are supplied — having two
+// move sources at once is always a mistake, so we collapse to the file.
+// Non-existent or unreadable files crash loudly: silently falling back to
+// interactive mode would mask the agent's actual intent.
+const movesFilePath = parseMovesFile(args)
+const replayMoves: string | null =
+  movesFilePath !== null ? readFileSync(movesFilePath, 'utf8') : parseMoves(args)
 if (replayMoves !== null) {
   for (const ch of replayMoves) {
     if (ch === '\n' || ch === '\r' || ch === ' ' || ch === ',') continue

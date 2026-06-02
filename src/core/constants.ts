@@ -24,7 +24,7 @@ export const CAMP_COUNT = 3
 export const CAMP_COOLDOWN_MOVES = 3
 export const CAMP_FOOD_GAIN = 2
 
-// v0.3 - Towns
+// 3 offers per town. Bump when `TOWN_OFFERS` in town.ts has more than TOWN_COUNT * 3 entries.
 export const TOWN_COUNT = 2
 export const TOWN_FOOD_BUNDLE = 3
 export const TOWN_TROOPS_BUNDLE = 2
@@ -51,8 +51,8 @@ export const NOISE_VALUE_MAX = 10000
 export const INITIAL_FOOD = 15
 export const INITIAL_GOLD = 15
 export const FOOD_COST_DEFAULT = 1
-export const FOOD_COST_MOUNTAIN = 2
 export const FOOD_COST_SWAMP = 2
+export const FOOD_COST_MOUNTAIN = 2
 export const FOOD_WARNING_THRESHOLD = 5
 
 export const FARM_COUNT = 3
@@ -166,12 +166,24 @@ export const FOOD_DELTA_FRAMES = 24
 
 // Lore strings + name pools are defined in `lore.ts`.
 
-// v0.1 - Lost (per-tile event roll + teleport)
-export const WOODS_AMBUSH_PERCENT = 15
+// Terrain move events (lost / ambush / quiet)
+export const WOODS_AMBUSH_PERCENT = 25
 export const WOODS_LOST_PERCENT = 10
-export const MOUNTAIN_AMBUSH_PERCENT = 25
 export const SWAMP_LOST_PERCENT = 20
+export const MOUNTAIN_AMBUSH_PERCENT = 25
 export const TELEPORT_MIN_DISTANCE = 4
+
+// Swamp quiet-enter find
+export const SWAMP_FIND_PERCENT = 15
+export const SWAMP_FIND_FOOD_BASE = 8
+export const SWAMP_FIND_GOLD_BASE = 2
+
+// Mountain quiet-enter find
+export const MOUNTAIN_FIND_PERCENT = 15
+export const MOUNTAIN_FIND_GOLD_BASE = 8
+export const MOUNTAIN_FIND_FOOD_BASE = 2
+
+export const TERRAIN_FIND_AMOUNT_NOISE = 2
 // LOST_* are defined in `lore.ts`.
 
 export const GRID_TRANSITION_STEP_FRAMES = 5

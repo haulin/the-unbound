@@ -31,11 +31,13 @@ Mechanics index (keep this list current):
   - run.path records steps; while lost we buffer mapping; on re-orient we backfill mappedness from lostBufferStartIndex.
 
 - Encounters / POIs
-  - Combat: fight/flee; deterministic encounter flavor + exit lines.
+  - Combat: fight/flee; Pay when the variant allows it.
+  - Woods ambush: goblins, food-skewed loot, not recruitable.
+  - Mountain ambush: brigands, gold-skewed loot; recruit small wounded bands for N² gold.
   - Farms: modal encounter; buy food, hire one slot (varies by farm — Mule, Boar, or Magpie), leave.
   - Camps: modal encounter; Search (deterministic reinforcements when ready); hire one slot (varies by camp — Scout or Captain); leave.
   - Towns: modal encounter; buy food, hire one slot (varies by town — Scout, Healer, or Fisherman), leave. Tavern rumors land later (see backlog).
-  - Henges: combat encounter when ready; cooldown; henge-specific encounter line.
+  - Henges: combat when a band is present; flee leaves wounded count on the henge; victory or recruit empties it and starts cooldown; quiet visit while cooling down.
   - Gate / Locksmith
     - Locksmith modal: requires the Blood + pay-gold-or-food; skipped if you have the key.
     - Without the Blood: no modal opens; tile shows inline flavor only.
@@ -44,7 +46,9 @@ Mechanics index (keep this list current):
   - The Crossing: sell-only PoI. Buttons show each held slot; tapping sells that slot for half its purchase price. 1–2 per map.
   - Fishing lakes: placed PoIs; grant 1-3 food when ready; cooldown 3; do not appear on the map.
   - Rainbow's End: placed PoIs; grant +30 gold once per end (then spent).
-  - Woods / Mountains: ambush chance
+  - Woods / Swamp / Mountain: move-event roll (lost / ambush / quiet).
+  - Woods and mountains can ambush; swamps can lost (scout halves lost in woods and swamp).
+  - Swamp or mountain quiet enter: rare inline find (mixed loot), replaces terrain line, food/gold deltas — no modal.
 
 Note: Not every mechanic must be taught by ambient lore. Short teaching lines can also live in Town rumors (`BARKEEP_TIPS`).
 */
@@ -79,6 +83,9 @@ export const BARKEEP_TIPS = {
     "Woods and swamps can pull you off course.",
     "When lost, find a signpost, farm, or town to get your bearings again.",
     "What's nice about the Unbound is that everything is at most 10 leagues away.",
+  ],
+  terrain: [
+    "Swamps and mountains cost double rations. Quiet steps through them sometimes turn up a mixed haul.",
   ],
   map: [
     "The map shows landmarks, not terrain.",
@@ -116,6 +123,10 @@ export const BARKEEP_TIPS = {
   captain: [
     "A banner makes the men fight straighter. It also makes them seen. Mind your woods and mountains.",
     "If you carry the colours, expect company on bad roads.",
+  ],
+  combat: [
+    "You can meet goblins in the woods and brigands in the mountains.",
+    "Only a small wounded band will march for coin — never a full war party.",
   ],
   fisherman: [
     "A fisherman doubles what a lake gives you. He's heavy gear though. You'll feel it if you run.",
@@ -252,6 +263,20 @@ export const TERRAIN_LORE_BY_KIND: Record<TerrainKind, readonly string[]> = {
     "The trees rearrange themselves while you blink. You hope it is the wind.",
   ],
 };
+
+export const SWAMP_FIND_LINES = [
+  "A corpse in the reeds. Tangled roots hide a rotted sack — mushrooms and tarnished coin.",
+  "A sunken pack, half swallowed. Edible reeds and a bent penny.",
+  "A journeyman's bones in the mud. Roots, berries, a few dull coins left behind.",
+  "The mud coughs up a meal and pocket change. You do not ask who lost it.",
+] as const;
+
+export const MOUNTAIN_FIND_LINES = [
+  "A frozen climber in a crevice. Coin in the belt pouch and a hard strip of jerky.",
+  "Cold stone holds an old stash. Gold first; wax paper of rations beside it.",
+  "Someone cached this against winter. Coin, then crumbs. Take both.",
+  "The cave yields what climbers left. Dull gold and the last of their bread.",
+] as const;
 
 // ----------------------------
 // Name pools

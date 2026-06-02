@@ -92,6 +92,11 @@ This means action constants, action union types, encounter shapes, signpost rank
 Be explicit about which kind of “randomness” you need.
 
 - **Flavor / copy**: use deterministic keyed picks that do **not** consume `world.rngState`.
+  - **Line from a pool**: `RNG.createTileRandom(…).perMoveLine(pool)` or `createRunCopyRandom(…).stableLine` / `advanceCursor` — keyed by `(seed, stepCount, cellId)` or place id; no extra salt needed when the pool identity differs.
+  - **Numeric roll on a tile step** (odds, amounts): `RNG.keyedIntExclusive` / `keyedIntInRange` with `{ seed, stepCount, cellId }`.
+  - **Second draw on the same step** (e.g. move-event percentile already used, then quiet-find %): the first draw consumes that key; add `salt: RNG.domainSalt('feature.draw')` with a stable string label. **Do not** add new exported salt constants — `domainSalt` lives only in `rng.ts`.
+  - **Base + bounded noise** (find amounts, goblin food, brigand gold jitter): `RNG.keyedBoundedBase(keys, label, base, noiseSpan)` or `RNG.streamBoundedBase(stream, base, noiseSpan)` — not ad-hoc `intExclusive(2*n+1)-n` at call sites.
+  - **Quiet-find payout** lives on the biome def (`SWAMP_QUIET_FIND`, …); `encounterHelpers.tryQuietFind` is generic; `resolveTerrainMove` takes `onQuiet`, not a kind registry.
 - **Simulation**: consume stream RNG and thread the returned `rngState` forward.
 - **No-repeat feedback**: store cursors in run state (data-only) and advance them explicitly.
 - **More**: `src/core/rng.ts` and `docs/plans/2026-05-02-rng-copy-policy-plan.md`
@@ -163,14 +168,22 @@ The terminal platform (`npm run play`) is, among other things, an agent-driveabl
 
 **The minimal recipe**:
 
-1. Pick a seed (`--seed=N`). Same seed = same world, useful for A/B comparing render changes against each other.
+1. Pick a seed (`--seed=N`). Same seed = same world for the *first* attempt; on `3` (restart), the run seed advances internally so subsequent attempts get fresh worlds even though the CLI seed stays fixed.
 2. Use `--blind` to suppress dev-only affordances (currently the minimap toggle).
-3. Launch a subagent with these absolute rules in its prompt:
-   - Only tool: Shell, only command: `npm run play -- --seed=N --blind --moves=<KEYS>`.
+3. Use `--moves-file=<path>` (recommended over inline `--moves=`). The agent's loop becomes a single command run twice the same way, with a one-digit append in between:
+   ```bash
+   : > /tmp/agent-run.txt                                        # fresh start
+   echo -n "8" >> /tmp/agent-run.txt
+   npm run play -- --seed=N --blind --moves-file=/tmp/agent-run.txt
+   ```
+   This avoids dragging the entire move string through tokens every turn, makes rewinding require a deliberate truncate (no free retries), and sidesteps shell-quoting bugs.
+4. Launch a subagent with these absolute rules in its prompt:
+   - Only tool: Shell, only command shape: `echo -n <digit> >> <path>` followed by `npm run play -- --seed=N --blind --moves-file=<path>`. No piping/grepping the output (it filters out the action labels the agent needs).
    - No file reads, no web, no other shell commands, no `cat`/`ls`/`pwd`.
-   - Never press `3` (restart) while alive — it advances the seed and discards map memory.
-4. Each turn: agent narrates observation + hypothesis + intended next move + appends one key to the accumulating `<KEYS>` string.
-5. Stop on `[GAME OVER]`, `[YOU WIN]`, move budget, or strategic stop.
+   - One key per turn — no batching multiple digits in a single append (kills observation discipline).
+   - Restart only after `[GAME OVER]` — appending `3` while alive throws away map memory and progress.
+5. Each turn: agent narrates observation + hypothesis + intended next move, then appends one digit and re-runs.
+6. Stop on `[GAME OVER]`, `[YOU WIN]`, move budget, or strategic stop.
 
 **Reading the report**: take action sequences as ground truth. Prose narration is a mix of observation and confabulation — agents will describe map markers as "cottages and gardens" when the output is single-letter glyphs. Confidence outpaces sample size: a few lucky combat rolls can become a confidently-stated wrong "rule". The final action can also contradict the chain-of-thought directly above it — log what was *done*, not what was *thought*.
 
@@ -184,8 +197,9 @@ The terminal platform (`npm run play`) is, among other things, an agent-driveabl
 **Limits**:
 
 - Prompt-trust isolation only — within Cursor, a subagent technically *can* read source. Honest agents flag their own slips at the end of the run.
-- ~30–60 s per LLM turn. An 80-move blind run is ~60–90 minutes of wall time.
+- Wall time depends heavily on model. Slow careful models (Opus-tier) run ~30–60 s per turn → 60–90 min for an 80-move run, but produce richer observation. Fast models (Composer-tier) run a 200-move arc in single-digit minutes, but tend to batch commands and skim — useful as a "skim test" canary, weaker as a careful explorer.
 - The open-files panel in Cursor is visible to the subagent. For stricter isolation, run from a window with no relevant files open, or move the runner to the Cursor SDK with allow-listed tools.
+- `--moves-file` rewinding is honor-based today — an agent could truncate the file to retry from a prior turn. Append-only enforcement is a future change vector (see the design doc).
 
 **More**: full architectural details and decision rationale are in [`docs/plans/2026-05-30-terminal-platform-design.md`](./plans/2026-05-30-terminal-platform-design.md).
 

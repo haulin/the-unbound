@@ -27,6 +27,8 @@ import {
   brigandRecruitCost,
   brigandRecruitEligibility,
   brigandRecruitLootScale,
+} from './mountain'
+import {
   fixedEnemySpawn,
   recruitablePreviewPlateLines,
   startCombatEncounter,
@@ -35,34 +37,15 @@ import {
 } from './combat'
 import { cellId, isTerrainCell, placeNamedFeature } from '../../worldgen'
 
-// Henge spawn: U[HENGE_BAND_MIN..HENGE_BAND_MAX], independent of player army.
-// Henges hold sworn bands at fixed strength — the road's danger doesn't scale
-// with your purse. RNG draws exactly one int from the world stream, matching
-// the existing single-draw shape of `rolledEnemySpawn` so determinism goldens
-// stay stable.
-const hengeSpawn: EnemySpawn = (rngState) => {
-  const r = RNG.createStreamRandom(rngState)
-  const span = HENGE_BAND_MAX - HENGE_BAND_MIN + 1
-  // intExclusive advances `r.rngState` as a side effect; compute the enemy
-  // count first, then read the advanced state. Reversing the order returns
-  // the unadvanced `rngState` and breaks determinism downstream.
-  const enemyArmy = HENGE_BAND_MIN + r.intExclusive(span)
-  return { rngState: r.rngState, enemyArmy }
-}
-
-// Returns the raw uncapped reward — the food cap is owned by the reducer.
-// RNG draw order: gold noise, then food noise. Reordering invalidates
-// determinism fixtures that pin world.rngState across a victory.
 function hengeVictoryReward(
   resources: Resources,
   rngState: number,
   enc: CombatEncounter,
 ): { resources: Resources; rngState: number } {
   const r = RNG.createStreamRandom(rngState)
-  const goldNoise = r.intExclusive(2 * HENGE_GOLD_NOISE + 1) - HENGE_GOLD_NOISE
-  const baseGold = Math.max(0, enc.initialSpawn + goldNoise) + HENGE_GOLD_BONUS
-  const foodNoise = r.intExclusive(2 * HENGE_FOOD_NOISE + 1) - HENGE_FOOD_NOISE
-  const food = Math.max(0, Math.round(HENGE_FOOD_FACTOR * enc.initialSpawn) + foodNoise)
+  const baseGold =
+    Math.max(0, enc.initialSpawn + RNG.streamSignedNoise(r, HENGE_GOLD_NOISE)) + HENGE_GOLD_BONUS
+  const food = RNG.streamBoundedBase(r, Math.round(HENGE_FOOD_FACTOR * enc.initialSpawn), HENGE_FOOD_NOISE)
   const next: Resources = {
     ...resources,
     gold: resources.gold + baseGold,
@@ -94,14 +77,14 @@ export const hengeCombatVariant: CombatVariantConfig = {
   recruitLootScale: brigandRecruitLootScale,
 }
 
+// Henge spawn: U[HENGE_BAND_MIN..HENGE_BAND_MAX], independent of player army.
+const hengeSpawn: EnemySpawn = (rngState) => {
+  const r = RNG.createStreamRandom(rngState)
+  const span = HENGE_BAND_MAX - HENGE_BAND_MIN + 1
+  const enemyArmy = HENGE_BAND_MIN + r.intExclusive(span)
+  return { rngState: r.rngState, enemyArmy }
+}
 
-// Henge state-machine on combat close. Three branches:
-//   - flee:    wounded count persists (`currentGroup = enc.enemyArmySize`),
-//              no cooldown — the natural cost of re-entry is friction enough.
-//   - victory: empty (`currentGroup = null`) + start cooldown.
-//   - recruit: same as victory — band absorbed, henge empty.
-// Cooldown timing: `nextReadyStep = state.run.stepCount + HENGE_COOLDOWN_MOVES`
-// — same formula the previous on-entry path used.
 const onHengeCombatClosed = (
   state: State,
   outcome: 'victory' | 'flee' | 'recruit',
@@ -115,7 +98,6 @@ const onHengeCombatClosed = (
     const next: HengeCell = { ...cell, currentGroup: encounter.enemyArmySize }
     return { ...state, world: setCellAt(state.world, pos, next) }
   }
-  // victory or recruit: empty + cooldown.
   const next: HengeCell = {
     ...cell,
     currentGroup: null,
@@ -124,8 +106,6 @@ const onHengeCombatClosed = (
   return { ...state, world: setCellAt(state.world, pos, next) }
 }
 
-// Henge handler: cooldown check, fresh roll vs wounded re-entry, combat-encounter
-// open. State transitions per design § Henge persistence.
 const onEnterHenge: OnEnterTile = ({ cell, world, pos, stepCount }) => {
   if (cell.kind !== 'henge') return {}
 
@@ -136,15 +116,11 @@ const onEnterHenge: OnEnterTile = ({ cell, world, pos, stepCount }) => {
   const name = hengeCell.name || 'A Henge'
   const readyAt = hengeCell.nextReadyStep ?? 0
 
-  // Empty + cooldown: the fight is over for now. Walk through, get a quiet line.
   if (hengeCell.currentGroup == null && stepCount < readyAt) {
     const line = r.perMoveLine(HENGE_EMPTY_LINES, { cellId: hengeCell.id })
     return { message: `${name} Henge\n${line}` }
   }
 
-  // Wounded re-entry: resume at the recorded count. `initialSpawn` matches
-  // `enemyArmySize` so recruit eligibility ("wounded" = enemy < initialSpawn)
-  // is comparable to the resumed band, never the original full count.
   if (hengeCell.currentGroup != null) {
     const tileMessage = `${name} Henge\n${r.perMoveLine(HENGE_ARRIVAL_LINES, { cellId: hengeCell.id })}`
     return startCombatEncounter({
@@ -156,8 +132,6 @@ const onEnterHenge: OnEnterTile = ({ cell, world, pos, stepCount }) => {
     })
   }
 
-  // Fresh arrival: persist the rolled band into `currentGroup` immediately
-  // so the flee hook has a "home" to update on encounter close.
   const tileMessage = `${name} Henge\n${r.perMoveLine(HENGE_ARRIVAL_LINES, { cellId: hengeCell.id })}`
   const result = startCombatEncounter({
     world,

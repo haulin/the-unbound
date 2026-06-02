@@ -18,3 +18,7 @@ declare const console: {
   log: (...args: unknown[]) => void
   error: (...args: unknown[]) => void
 }
+
+declare module 'node:fs' {
+  export function readFileSync(path: string, encoding: 'utf8'): string
+}

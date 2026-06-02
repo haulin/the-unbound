@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/core/mechanics'
-import { brigandCombatVariant } from '../../src/core/mechanics/defs/combat'
+import { brigandCombatVariant } from '../../src/core/mechanics/defs/mountain'
 import {
   BRIGAND_FOOD_MAX,
   BRIGAND_GOLD_NOISE,

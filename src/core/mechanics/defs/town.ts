@@ -67,6 +67,57 @@ export type TownAction = { type: TownOfferKind } | { type: typeof ACTION_TOWN_LE
 
 const BASE_OFFERS = Object.keys(TOWN_OFFERS) as TownOfferKind[]
 
+const OFFERS_PER_TOWN = 3
+
+type TownRng = ReturnType<typeof RNG.createStreamRandom>
+
+function buildTownOfferSets(rng: TownRng): TownOfferKind[][] {
+  if (BASE_OFFERS.length > TOWN_COUNT * OFFERS_PER_TOWN) {
+    throw new Error('TOWN_COUNT is too low for BASE_OFFERS — bump TOWN_COUNT in constants.ts')
+  }
+
+  const townCount = TOWN_COUNT
+  const towns: TownOfferKind[][] = Array.from({ length: townCount }, () => [])
+
+  towns[0]!.push(ACTION_TOWN_HIRE_SCOUT)
+
+  const mustPlace = BASE_OFFERS.filter((o) => o !== ACTION_TOWN_HIRE_SCOUT)
+  for (let i = 0; i < mustPlace.length; i++) {
+    const offer = mustPlace[i]!
+    let placed = false
+    for (let t = 0; t < townCount; t++) {
+      const slot = towns[t]!
+      if (slot.length < OFFERS_PER_TOWN && !slot.includes(offer)) {
+        slot.push(offer)
+        placed = true
+        break
+      }
+    }
+    if (!placed) {
+      for (let t = 0; t < townCount; t++) {
+        const slot = towns[t]!
+        if (slot.length < OFFERS_PER_TOWN) {
+          slot.push(offer)
+          break
+        }
+      }
+    }
+  }
+
+  for (let t = 0; t < townCount; t++) {
+    const slot = towns[t]!
+    const available = BASE_OFFERS.filter((o) => !slot.includes(o))
+    while (slot.length < OFFERS_PER_TOWN && available.length > 0) {
+      const pick = available[rng.intExclusive(available.length)]!
+      slot.push(pick)
+      const idx = available.indexOf(pick)
+      if (idx >= 0) available.splice(idx, 1)
+    }
+  }
+
+  return towns
+}
+
 function townPrefix(town: TownCell): string {
   const name = town.name || 'A Town'
   return `${name} Town`
@@ -174,22 +225,19 @@ function reduceTownHireScout(prevState: State, town: TownCell): State {
 
 // ---- Worldgen placement ----
 
-// The first town never omits `hireScout` so the hero is guaranteed a place to
-// buy a scout early. Subsequent towns drop one of the base offers at random.
+// Every base offer appears at least once across all towns (3 offers per town).
 const placeNamedTowns: PlaceWorldProvider = ({ cells, rngState }) => {
-  const omittableOffers = BASE_OFFERS.filter((o) => o !== ACTION_TOWN_HIRE_SCOUT)
-
+  const stream = RNG.createStreamRandom(rngState)
+  const offerSets = buildTownOfferSets(stream)
   let townIndex = 0
 
-  const next = placeNamedFeature(cells, rngState, {
+  const next = placeNamedFeature(cells, stream.rngState, {
     count: TOWN_COUNT,
     namePool: TOWN_NAME_POOL,
     fallbackName: 'A Town',
     canPlaceAt: (_x, _y, here) => isTerrainCell(here),
     buildCell: ({ x, y, name, rng }) => {
-      const pool = townIndex === 0 ? omittableOffers : BASE_OFFERS
-      const omitOffer = pool[rng.intExclusive(pool.length)]!
-      const offers = BASE_OFFERS.filter((o) => o !== omitOffer)
+      const offers = [...offerSets[townIndex]!]
 
       const foodGold = rng.intInRange(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX)
       const troopsGold = rng.intInRange(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX)

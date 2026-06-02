@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/core/mechanics'
-import { goblinCombatVariant } from '../../src/core/mechanics/defs/combat'
+import { goblinCombatVariant } from '../../src/core/mechanics/defs/woods'
 import {
   GOBLIN_FOOD_FACTOR,
   GOBLIN_FOOD_NOISE,

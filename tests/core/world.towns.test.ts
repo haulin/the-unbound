@@ -16,7 +16,7 @@ function isTown(c: Cell): c is TownCell {
 }
 
 describe('world towns', () => {
-  it('places towns deterministically and guarantees hireScout exists', () => {
+  it('places towns deterministically with full offer coverage', () => {
     const w1 = generateWorld(123).world
     const w2 = generateWorld(123).world
 
@@ -31,6 +31,16 @@ describe('world towns', () => {
     )
 
     expect(towns1.some((t) => t.offers.includes('hireScout'))).toBe(true)
+
+    const union = new Set<TownCell['offers'][number]>()
+    for (let i = 0; i < towns1.length; i++) {
+      for (let j = 0; j < towns1[i]!.offers.length; j++) {
+        union.add(towns1[i]!.offers[j]!)
+      }
+    }
+    expect(union.has('buyFood')).toBe(true)
+    expect(union.has('buyTroops')).toBe(true)
+    expect(union.has('hireScout')).toBe(true)
+    expect(union.has('buyRumors')).toBe(true)
   })
 })
-

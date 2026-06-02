@@ -10,7 +10,7 @@ import type { MoveEventPolicy, MoveEventSource } from '../../src/core/mechanics/
 import { RNG } from '../../src/core/rng'
 
 // Slice 3 / T4: rollMoveEvent is now a pure helper. Tests construct policies inline
-// matching the live policies set on terrainHazardsMechanic / hengeMechanic. Henge-cooldown
+// matching the live policies on woods / swamp / mountain / henge mechanics. Henge-cooldown
 // tests have moved up to the caller (reducer's transitional guard until T13b lands).
 
 const woodsPolicy: MoveEventPolicy = {

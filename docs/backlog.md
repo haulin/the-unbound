@@ -1,14 +1,17 @@
 # Tentative roadmap (The Unbound)
 
+Tentative milestones plus ideas in other sections below. Each milestone should close with a **lore pass**: update the mechanics index and line pools in `lore.ts` so they match what shipped (combat copy, new verbs, teaching lines). Catch up previous milestones when a pass was skipped.
+
 ## Polish backlog (boy-scout each milestone)
 
-- **Per-mechanic-file split for combat variants.** Extract `brigandCombatVariant` (+ `brigandRecruitCost`/`Eligibility`/`LootScale`/`VictoryReward`) into `src/core/mechanics/defs/mountains.ts`; extract `goblinCombatVariant` (+ `goblinVictoryReward`) into `src/core/mechanics/defs/woods.ts`. `terrainHazards.ts` becomes swamp-only (or renames to `swamp.ts`). Move the ambush spawn helper (`spawnEnemyArmy` / `rolledEnemySpawn`) to live with woods+mountains rather than in `combat.ts`. After the split, `combat.ts` is pure infrastructure: variant type, action dispatch, fight/pay/return reducers, shared plate factories. Unblocks v0.7 mountain/woods upsides, henge tiers, and the 3:1 territorial mix without fighting the current shape.
 - **Wyrm config extraction follow-up.** Wyrm pay-success outcome is currently labeled `'recruit'` in the union (`combat.ts:223`) and `onWyrmCombatClosed` absorbs it as a synonym for victory. Either widen the outcome union to `'victory' | 'flee' | 'recruit' | 'paid'`, or rename `'recruit'` to `'paid'` across the dispatch + 4 handlers. Land alongside the variant split since the wyrm variant lives in its own file already.
-- **Lore-cycling audit + per-key strategy refactor.** Per-press cycling drains failure-line pools too quickly during a single encounter. Classify pools into per-tile-stable (cell ID), per-encounter-stable (encounter open), and per-press categories; refactor `RNG.advanceCursor` keying accordingly.
+- **Lore-cycling audit + per-key strategy refactor.** Per-press cycling drains failure-line pools too quickly during a single encounter. Classify pools into per-tile-stable (cell ID), per-encounter-stable (encounter open), and per-press categories; refactor `RNG.advanceCursor` keying accordingly. Locksmith lines vary per step.
 - **Registry kind-coverage validation.** A mechanic declaring `moveEventPolicyByKind: { foo: { ambushPercent: 100 } }` without a matching `combatVariantByKind[foo]` falls through to the preview placeholder silently. Add a registry-time check (`docs/backlog.md` already tracks this in the broader registry hardening task).
+- **Recruit helper coupling (henge → mountain).** `henge.ts` imports `brigandRecruitCost` / `brigandRecruitEligibility` / `brigandRecruitLootScale` from `mountain.ts` because both use the same recruitable-bandit math. That ties a PoI encounter to a terrain file and makes brigand tuning silently affect henge. Extract neutral shared helpers (e.g. `recruitableBandit.ts` or combat-layer recruit utilities) when a third recruitable source appears—or sooner if recruit rules diverge per variant.
 
 ## Ideas
 - skip modal if nothing to do (not enough money or cooldown - camp/farm/town)
+- cap rumors to 3 per visit/town
 - maybe adjust worldgen as it feels like swamps & mountains are too common
 - make rainbows modals - if player chooses to not take gold, next visit it increases
 - Consider making roads cost food only ~50% of the time (mechanics/balance change; would require tests + tuning).
@@ -17,6 +20,7 @@
 - active item that allows you to auto-win a fight or land a hit at least
 - passive item no food consumed for 10 steps
 - bank gives interest on deposits
+- battle log - every fight attempt marks ✓/✗ in the lore lines
 - an item that gives more gold from fights / selling
 - orchard get 5 free food
 - plant a tree to pick 5 free food every cooldown
@@ -24,22 +28,20 @@
 - every 28 days a plague comes that kills half your army
 - different types of enemies (magic/strength) or different loot drops
 
-**v0.7 — Camps, Towns, Terrain & Henge Scaling**
+**v0.8 — Camps, Towns & slot groundwork**
 
-- Camps reworked: Search (food + troops, cooldown) / Local Map (fixed price, fixed radius, buyer beware) / Leave
-- Buy map features - add Cs, Fs, Ts, Rs, L/G for gold.
-- Swamp upside: small chance of rare herb (food bonus or combat buff) or gold from a corpse
-- Mountains upside: small chance of cave loot (gold or food cache)
-- Slot system infrastructure (groundwork for later slot work): generalize the existing single-hire pattern at Camps/Towns into a per-PoI specialty (one of a small pool, fixed at worldgen by seed). Farms get the same pattern. Modal stays 3 buttons + Leave. See `docs/2026-05-27-slot-system-design.md`.
-- Scout becomes a Camp specialty (in addition to Towns) via the new pool pattern. Scout already exists; this just adds the Camp variant of the hire flow. Lore lines for `CAMP_SCOUT_HIRE_LINES` / `CAMP_SCOUT_ALREADY_LINES` already in `lore.ts`.
+- Slot system infrastructure: generalize the existing single-hire pattern at Camps/Towns into a per-PoI specialty (one of a small pool, fixed at worldgen by seed). Farms get the same pattern. Modal stays 3 buttons + Leave. See `docs/2026-05-27-slot-system-design.md`.
+- Scout becomes a Camp specialty (in addition to Towns) via the pool pattern. `CAMP_SCOUT_*` lines already in `lore.ts`.
+- Camp local map (Search / paid local reveal / Leave) — see *Camp local map* in Deferred backlog.
+- Lore pass.
 
-- for everything we should audit lore.ts and make sure to update lines to reflect new mechanics.
+**v0.9 — Random Encounters & World Texture**
 
-**v0.8 — Random Encounters & World Texture**
 - Random encounter pool on any tile (5-6 types): loot find / lone soldier joins / cursed tile / traps / abandoned supplies / fellow traveller with rumor / something negative TBD
-- Healer specialty hire added to Town pool (replaces the original swamp-healer concept). P5 revive 1 wounded per combat + N9 -1 gold per Town visit (maintenance). Existing sprite. New lore pool `HEALER_*`. See `docs/2026-05-27-slot-system-design.md`.
+- Healer specialty hire added to Town pool. Revive 1 soldier per combat (define against current loss model) + upkeep gold on town visit. `HEALER_*` lines in `lore.ts`. See `docs/2026-05-27-slot-system-design.md`.
 - Multiple flavor text variations per tile type (deterministic rotation by seed+step)
 - Contextual first-visit lore for every mechanic introduced so far
+- Lore pass.
 
 Polish for demo:
 - Balance pass: town prices, scout cost, combat gold drops...
@@ -49,7 +51,7 @@ Polish for demo:
 - animations for left panel
 - more exciting win / lose
 
-**v0.9 — Slot System: Trading & Farm Animals**
+**v0.10 — Slot System: Trading & Farm Animals**
 
 See `docs/2026-05-27-slot-system-design.md` for the full design.
 
@@ -58,33 +60,33 @@ See `docs/2026-05-27-slot-system-design.md` for the full design.
 - Boar specialty added to Farm pool. P3' opening volley (~25% of enemy army at combat start) + N15 bidirectional Mule exclusion. New 16×16 sprite (low body, bristled back, tusks). Lore lines for `BOAR_*` and `*_REFUSED_LINES` already in `lore.ts`.
 - Mule update (paired with Boar): wire Mule end of the bidirectional exclusion. Mule N1 (-1 food per Camp Search) gets the sprite-flash treatment in passing. Also implement mule negative. Mule upside is not communicated well enough. Only one lore line spells it out.
 
-**v0.10 — Slot System: People & Economy**
+**v0.11 — Slot System: People & Economy**
 
 - Captain specialty added to Camp pool. P4 +10% combat odds + N7 +ambush% in woods/mountains. New 16×16 sprite (head + shoulders + flag-on-pole). New lore pool `CAPTAIN_*`.
 - Fisherman specialty added to Town pool. P8 double lake yields + N8 +1 troop loss per flee. New 16×16 sprite (rod-on-shoulder). New lore pool `FISHERMAN_*`.
 - Magpie specialty added to Farm pool. P probabilistic 30% refund on folk payments (Town food, Camp/Town hires, Locksmith fee); shows original price, gold check against original, refund visible. No demo negative; balanced by probability + higher purchase price. New 16×16 bird sprite. New lore pool `MAGPIE_*`.
 - Final slot-system audit against pairing rules in `the-unbound-learnings.md` (P+P slot exemptions, ledger consistency).
 
-**v0.11 — Taverns** (demo release milestone)
+**v0.12 — Taverns** (demo release milestone)
 - Tavern PoI (named, standalone, one or two per map)
 - Buy rumors: reveals one named PoI location for gold (locksmith, gate, lair, random landmark)
 - Gambling mini-game (bet gold, contextual buttons, slight house edge)
 - Tavern flavor text pool (warmer, unreliable narrator register)
 - Tavern rumors may reveal which Town carries which specialty hire (Scout / Healer / Fisherman).
 
-**v0.12 — Second Gate (Silver)**
+**v0.13 — Second Gate (Silver)**
 - Silver keyholder, silver gate, silver border
 - Map size increases (10×10)
 - Slot system carries over between gates (all seven slots persist).
 - Balance pass across full run arc: food, gold, army, run length
 
-**v0.13 — Polish & Teaching**
+**v0.14 — Polish & Teaching**
 - Game over messages per cause (starvation, combat, fleeing with 1 troop)
 - Win messages per gate tier
 - Full flavor text audit — tone consistency, missing tile types, first-visit teaching lines
 - Sprite audit and bank reshuffle if needed
 
-**v0.14 — Third Gate & Release Candidate**
+**v0.15 — Third Gate & Release Candidate**
 - Gold gate, gold border
 - Epic map size (15×15)
 - Full balance pass
@@ -103,6 +105,23 @@ See `docs/2026-05-27-slot-system-design.md` for the full design.
 # Deferred backlog
 
 This file captures ideas discussed during design, kept out of the current phase's implementation plan. Nothing here is committed to; it is a parking lot for later phases.
+
+## Camp local map
+
+Separate from Scout map reveal and from free exploration. Needs its own design pass before implementation.
+
+**Core idea:** At a camp, pay gold for *local* intelligence (~3 leagues radius). Buyer beware: the roll might reveal nothing new (you already mapped it), or high-value targets (rainbow `R`, wyrm/locksmith/gate `W`/`L`/`G`), or mid-tier PoIs (`T`/`C`/`F`) if you lack a Scout.
+
+**Letter economy (draft tensions to resolve):**
+
+- Exploration still reveals everything eventually (~50-step “optimal” pattern); paid intel is a shortcut, not a replacement for the loop.
+- Scout already reveals farms/camps/henges when oriented; paid letters are for players *without* Scout or who want to skip food spend on wandering.
+- `R` = pay gold to learn where more gold might be — feels odd; price tiering may need `R` cheap or excluded from camp rolls.
+- `W`/`L`/`G` are what players most want; should a camp sell *one* gate-chain hint per visit vs several? Multiple buys per camp vs rumor-style cap?
+- Revealing all three of `W`/`L`/`G` from one camp may bypass the intended exploration arc — likely cap to one “tier-1” reveal per purchase or per camp cooldown.
+- Alphabet buy menu is *only* meaningful in this feature; do not ship letter SKUs without Local Map.
+
+**Modal vs traversal:** Likely a camp modal action (like Search), not a terrain modal.
 
 ## Combat balance — deferred
 
@@ -224,14 +243,6 @@ Effects available to current or future slots. Includes both already-wired-to-dem
 ## shop clarity (deferred)
 
 - Town offer UI: decide whether to show quantity, price, or both (e.g. `3/5`), and whether bundle sizes should vary per offer/town.
-
-## Swamp opportunity
-
-Swamps are pure-risk (lost only). If playtest shows swamps are universally avoided:
-
-- Strange-fish food find (1–3 food, RNG-amount, mutually exclusive with the lost roll). Same shape as combat reward; "probabilistic flavor" pattern is already established (deterministic flavor picker + RNG amount).
-- Or: under future Scout (deferred companions), swamps cost less food when Scout slot is filled (Cartographer-style effect).
-
 
 ## Prototype follow-ups
 

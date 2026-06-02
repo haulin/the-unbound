@@ -25,7 +25,8 @@ The prerequisite was already paid by the existing core/platform split: `processA
 
 ```
 src/platform/terminal/
-  entry.ts        # main loop + arg parsing (--seed, --blind, --moves)
+  entry.ts        # main loop + arg parsing (--seed, --blind, --moves, --moves-file)
+  args.ts         # pure argv parsers, isolated for unit tests
   render.ts       # State -> string
   input.ts        # key -> grid cell -> Action via getRightGridCellDef
   labels.ts       # Action.type -> snake_case display label
@@ -45,11 +46,14 @@ The platform reads three core seams:
 
 ## Key decisions
 
-### 1. Single-shot replay (`--moves=<keys>`) is the agent ergonomic, not raw-mode REPL
+### 1. Single-shot replay is the agent ergonomic, not raw-mode REPL
 
-Interactive raw-mode keypress works well for humans (`npm run play`), but is awkward for agents that drive via tool calls. `--moves=ABCD` replays the full key sequence from the seed in one shot and prints the resulting state. The agent's loop becomes: read state → pick key → append to moves → run again. Stateless, deterministic, accumulating.
+Interactive raw-mode keypress works well for humans (`npm run play`), but is awkward for agents that drive via tool calls. Two replay modes exist:
 
-`--moves=` also tolerates whitespace and commas inside the value, *and* word-splits across argv (we collect any non-flag positionals after `--moves=` and concatenate). This last bit is a real correctness fix — without it, an unquoted `--moves=8826 7777` silently drops the second batch and the agent's mental moves-string desyncs from reality.
+- `--moves=<keys>` — inline argv, convenient for short replays and ad-hoc experiments. Tolerates whitespace and commas inside the value, *and* word-splits across argv (we collect any non-flag positionals after `--moves=` and concatenate). The argv-concatenation is a real correctness fix — without it, an unquoted `--moves=8826 7777` silently drops the second batch and the agent's mental moves-string desyncs from reality.
+- `--moves-file=<path>` — reads the moves string from a file. **The recommended agent loop.** Each turn the agent appends one digit (`echo -n N >> /tmp/run.txt`) and re-runs the same command. Three things this fixes vs. inline `--moves=`: no long string round-tripping through tokens every turn; rewinding requires a deliberate truncation of the file (no free retries from an arbitrary turn N); quoting bugs and bash word-splits go away because the file is the source. `--moves-file` wins over `--moves` when both are supplied. Errors loud if the file is missing — silent fallback to interactive mode would mask the agent's intent.
+
+Both flows are stateless, deterministic, accumulating: each invocation rebuilds the entire run from the seed.
 
 ### 2. `--blind` hides developer-only affordances
 
@@ -101,7 +105,8 @@ Three Node touchpoints (`process`, `console`, `Buffer-ish chunk`). [`node.d.ts`]
 
 ## Future change vectors
 
-- **Multi-seed batch playtester.** Wrap `npm run play -- --moves=` in a script that runs N seeds with a fixed key strategy (or an LLM-driven strategy) and tabulates outcomes. Useful for tuning combat / food / camp parameters once balance becomes the focus.
+- **Append-only enforcement on `--moves-file`.** Today the agent could still cheat by truncating the file mid-run; a small flag (`--strict-append`) plus a sidecar last-known length would error if the file shrank between invocations. Closes the rewind loophole entirely without changing the happy-path ergonomic.
+- **Multi-seed batch playtester.** Wrap `npm run play -- --moves=` (or `--moves-file=`) in a script that runs N seeds with a fixed key strategy (or an LLM-driven strategy) and tabulates outcomes. Useful for tuning combat / food / camp parameters once balance becomes the focus.
 - **Absolute-coord map labels.** Currently the rolling map shows landmarks at viewport-relative positions; agents have to mentally convert to absolute coordinates and sometimes get it wrong (one run hypothesised "two gates" when it was one gate seen at two relative positions). A header line (`map: viewport B2..J10 around F6`) would close that gap. Small render change.
 - **State JSON dump.** Add `--dump=json` printing the full `State` as JSON. Useful for offline analysis, reproducible bug reports, training data.
 - **Tighter agent isolation.** Move the runner to the Cursor SDK with explicit tool restrictions (Shell-only, command-allowlisted) for adversarial-style playtests where prompt-trust is too weak.

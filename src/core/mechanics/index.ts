@@ -7,7 +7,9 @@ import { farmMechanic } from './defs/farm'
 import { campMechanic } from './defs/camp'
 import { hengeMechanic } from './defs/henge'
 import { townMechanic } from './defs/town'
-import { terrainHazardsMechanic } from './defs/terrainHazards'
+import { woodsMechanic } from './defs/woods'
+import { swampMechanic } from './defs/swamp'
+import { mountainMechanic } from './defs/mountain'
 import { combatMechanic } from './defs/combat'
 import { fishingLakeMechanic } from './defs/fishingLake'
 import { rainbowEndMechanic } from './defs/rainbowEnd'
@@ -27,7 +29,9 @@ export const MECHANICS: readonly MechanicDef[] = [
   signpostMechanic,
   fishingLakeMechanic,
   rainbowEndMechanic,
-  terrainHazardsMechanic,
+  woodsMechanic,
+  swampMechanic,
+  mountainMechanic,
   combatMechanic,
 ] as const
 

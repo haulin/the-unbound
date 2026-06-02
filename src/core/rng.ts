@@ -207,7 +207,33 @@ function createStreamRandomFromSeed(seed: number) {
   return createStreamRandom(seedToRngState(seed))
 }
 
+// Stable salt for a second (or third) keyed draw at the same seed/step/cellId.
+// Prefer `perMoveLine` / `stableLine` when picking copy; use `domainSalt` only for numeric rolls.
+function domainSalt(label: string): number {
+  let h = 0
+  for (let i = 0; i < label.length; i++) {
+    h = (Math.imul(31, h) + label.charCodeAt(i)) | 0
+  }
+  return h >>> 0
+}
+
+type KeyedRng = { seed: number; stepCount: number; cellId: number }
+
+function keyedBoundedBase(keys: KeyedRng, saltLabel: string, base: number, noiseSpan: number): number {
+  const noise = pickIntInRange({ ...keys, salt: domainSalt(saltLabel) }, -noiseSpan, noiseSpan)
+  return Math.max(0, base + noise)
+}
+
+function streamSignedNoise(r: ReturnType<typeof createStreamRandom>, noiseSpan: number): number {
+  return r.intExclusive(2 * noiseSpan + 1) - noiseSpan
+}
+
+function streamBoundedBase(r: ReturnType<typeof createStreamRandom>, base: number, noiseSpan: number): number {
+  return Math.max(0, base + streamSignedNoise(r, noiseSpan))
+}
+
 export const RNG = {
+  domainSalt,
   // Facades (preferred)
   createTileRandom,
   createRunCopyRandom,
@@ -217,5 +243,8 @@ export const RNG = {
   // Keyed deterministic helpers (stable, no global rngState consumption).
   keyedIntExclusive: pickIntExclusive,
   keyedIntInRange: pickIntInRange,
+  keyedBoundedBase,
+  streamSignedNoise,
+  streamBoundedBase,
 } as const
 
