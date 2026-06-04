@@ -6,7 +6,7 @@ import {
   FISHING_LAKE_READY_LINES,
 } from '../../constants'
 import { getCellAt, setCellAt } from '../../cells'
-import { cellId, isTerrainCell, placeFeature } from '../../worldgen'
+import { cellId, isTerrainCell, placeFeatureFromSeed } from '../../worldgen'
 import type { FishingLakeCell } from '../../types'
 import type { MechanicDef, OnEnterTile, PlaceWorldProvider } from '../types'
 
@@ -42,13 +42,13 @@ const onEnterFishingLake: OnEnterTile = ({ cell, world, pos, stepCount, resource
   }
 }
 
-const placeFishingLakes: PlaceWorldProvider = ({ cells, rngState }) => {
-  const res = placeFeature(cells, rngState, {
+const placeFishingLakes: PlaceWorldProvider = ({ cells, rngState, seed }) => {
+  placeFeatureFromSeed(cells, seed, 'place.fishingLake', {
     count: FISHING_LAKE_COUNT,
     canPlaceAt: (_x, _y, here) => isTerrainCell(here),
     buildCell: ({ x, y }) => ({ kind: 'fishingLake', id: cellId(x, y), nextReadyStep: 0 }),
   })
-  return { rngState: res.rngState }
+  return { rngState }
 }
 
 export const fishingLakeMechanic: MechanicDef = {

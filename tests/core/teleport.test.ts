@@ -15,7 +15,13 @@ function makeWorld(rngState = 1): World {
   // Sprinkle some non-terrain features that must be avoided.
   cells[0]![0] = { kind: 'gate' }
   cells[5]![5] = { kind: 'locksmith' }
-  cells[2]![3] = { kind: 'farm', id: 23, name: 'A Farm', beastGoldCost: 10 }
+  cells[2]![3] = {
+    kind: 'farm',
+    id: 23,
+    name: 'A Farm',
+    offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'],
+    companionHireGold: 10,
+  }
   cells[7]![1] = { kind: 'signpost' }
   return { seed: 1, width: 10, height: 10, mapGenAlgorithm: 'TEST', cells, rngState }
 }

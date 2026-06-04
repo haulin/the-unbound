@@ -101,7 +101,7 @@ function findQuietFindSeed(kind: 'swamp' | 'mountain'): number {
         seed,
         stepCount: QUIET_STEP,
         cellId: QUIET_CELL_ID,
-        salt: RNG.domainSalt(rollSalt),
+        salt: rollSalt,
       },
       100,
     )

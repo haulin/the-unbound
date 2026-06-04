@@ -92,7 +92,14 @@ describe('encounter-enter grid transitions fire at startFrame + MOVE_SLIDE_FRAME
   }
 
   it('camp', () => {
-    const camp: CampCell = { kind: 'camp', id: 1, name: 'Ember', nextReadyStep: 0 }
+    const camp: CampCell = {
+      kind: 'camp',
+      id: 1,
+      name: 'Ember',
+      nextReadyStep: 0,
+      offers: ['CAMP_SEARCH'],
+      companionHireGold: 15,
+    }
     const next = processAction(stateAt(blankWorldWith({ center: camp })), moveSouth)!
     const t = gridTransition(next, 'overworld', 'camp')
     expect(t).toBeDefined()
@@ -106,7 +113,7 @@ describe('encounter-enter grid transitions fire at startFrame + MOVE_SLIDE_FRAME
       name: 'Harbor',
       offers: ['buyFood', 'buyTroops', 'hireScout'] as TownOfferKind[],
       bundles: { food: 5, troops: 2 },
-      prices: { foodGold: 5, troopsGold: 10, scoutGold: 20, rumorGold: 3 },
+      prices: { foodGold: 5, troopsGold: 10, companionHireGold: 20, rumorGold: 3 },
     }
     const next = processAction(stateAt(blankWorldWith({ center: town })), moveSouth)!
     const t = gridTransition(next, 'overworld', 'town')
@@ -115,7 +122,13 @@ describe('encounter-enter grid transitions fire at startFrame + MOVE_SLIDE_FRAME
   })
 
   it('farm', () => {
-    const farm: FarmCell = { kind: 'farm', id: 3, name: 'Heron', beastGoldCost: 10 }
+    const farm: FarmCell = {
+      kind: 'farm',
+      id: 3,
+      name: 'Heron',
+      offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'],
+      companionHireGold: 10,
+    }
     const next = processAction(stateAt(blankWorldWith({ center: farm })), moveSouth)!
     const t = gridTransition(next, 'overworld', 'farm')
     expect(t).toBeDefined()
@@ -125,7 +138,7 @@ describe('encounter-enter grid transitions fire at startFrame + MOVE_SLIDE_FRAME
   it('locksmith', () => {
     // v0.5: locksmith requires Blood as a precondition for the modal to open.
     const s0 = stateAt(blankWorldWith({ center: { kind: 'locksmith' } }))
-    s0.resources.inventory.push('blood')
+    s0.resources.inventory.push('bloodVial')
     const next = processAction(s0, moveSouth)!
     const t = gridTransition(next, 'overworld', 'locksmith')
     expect(t).toBeDefined()

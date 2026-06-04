@@ -61,14 +61,14 @@ describe('buy()', () => {
   })
 
   it('does not overwrite unrelated party slots', () => {
-    const r = buy(makeResources({ food: 10, gold: 10, armySize: 5, party: ['scout', 'mule'] }), {
+    const r = buy(makeResources({ food: 10, gold: 10, armySize: 5, party: ['scout', 'beast'] }), {
       gold: 3,
       gain: { inventory: ['bronzeKey'] },
     })
     expect(r.outcome).toBe('ok')
     if (r.outcome !== 'ok') return
     expect(r.resources.party).toContain('scout')
-    expect(r.resources.party).toContain('mule')
+    expect(r.resources.party).toContain('beast')
     expect(r.resources.inventory).toContain('bronzeKey')
   })
 })

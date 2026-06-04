@@ -24,7 +24,7 @@ function makeWorld(seed: number): World {
           id: 4,
           name: 'Stonebridge',
           offers: ['buyFood', 'buyTroops', 'hireScout'],
-          prices: { foodGold: 3, troopsGold: 5, scoutGold: 12, rumorGold: 3 },
+          prices: { foodGold: 3, troopsGold: 5, companionHireGold: 12, rumorGold: 3 },
           bundles: { food: 3, troops: 2 },
         },
         grass(),

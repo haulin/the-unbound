@@ -70,12 +70,12 @@ describe('v0.0.9 key acceptance', () => {
     s.resources.food = 12
     // v0.5: locksmith requires Blood as a precondition; seeded directly to keep
     // this test focused on the original food→key forge behavior.
-    s.resources.inventory.push('blood')
+    s.resources.inventory.push('bloodVial')
     const ontoLocksmith = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     const paid = processAction(ontoLocksmith, { type: ACTION_LOCKSMITH_PAY_FOOD })!
     expect(paid.resources.inventory).toContain('bronzeKey')
     // v0.5: 'blood' is consumed as the quench when the key is forged.
-    expect(paid.resources.inventory).not.toContain('blood')
+    expect(paid.resources.inventory).not.toContain('bloodVial')
     // Move spends 1 (12 → 11); the key forge spends 10. Pre-existing
     // food above cap is not retroactively trimmed (food clamps on gain
     // only), so the leftover is 12 - 1 - 10 = 1.
@@ -85,7 +85,7 @@ describe('v0.0.9 key acceptance', () => {
   it('cannot buy key without enough food', () => {
     const s = makeState()
     s.resources.food = 5
-    s.resources.inventory.push('blood')
+    s.resources.inventory.push('bloodVial')
     const ontoLocksmith = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     const tryBuy = processAction(ontoLocksmith, { type: ACTION_LOCKSMITH_PAY_FOOD })!
     expect(tryBuy.resources.inventory).not.toContain('bronzeKey')
@@ -94,7 +94,7 @@ describe('v0.0.9 key acceptance', () => {
   it('gate opens with key (win, and gate cell becomes gateOpen)', () => {
     let s = makeState()
     s.resources.food = 12
-    s.resources.inventory.push('blood')
+    s.resources.inventory.push('bloodVial')
     s = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     s = processAction(s, { type: ACTION_LOCKSMITH_PAY_FOOD })!
     s = processAction(s, { type: ACTION_LOCKSMITH_LEAVE })!

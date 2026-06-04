@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { TOWN_COUNT } from '../../src/core/constants'
+import { CAMP_COUNT, FARM_COUNT, TOWN_COUNT } from '../../src/core/constants'
 import { generateWorld } from '../../src/core/world'
-import type { Cell, TownCell, World } from '../../src/core/types'
+import type { CampCell, Cell, FarmCell, TownCell, World } from '../../src/core/types'
 
 function flatten(world: World): Cell[] {
   const out: Cell[] = []
@@ -41,6 +41,55 @@ describe('world towns', () => {
     expect(union.has('buyFood')).toBe(true)
     expect(union.has('buyTroops')).toBe(true)
     expect(union.has('hireScout')).toBe(true)
+    expect(union.has('hireHealer')).toBe(true)
     expect(union.has('buyRumors')).toBe(true)
+  })
+})
+
+function isCamp(c: Cell): c is CampCell {
+  return c.kind === 'camp'
+}
+
+function isFarm(c: Cell): c is FarmCell {
+  return c.kind === 'farm'
+}
+
+const townEconomy = new Set<string>(['buyFood', 'buyTroops', 'buyRumors'])
+const campEconomy = new Set<string>(['CAMP_SEARCH'])
+const farmEconomy = new Set<string>(['FARM_BUY_FOOD'])
+
+function poiHasEconomyOffer(offers: readonly string[], economyIds: Set<string>): boolean {
+  return offers.some((o) => economyIds.has(o))
+}
+
+describe('world PoI offer invariants', () => {
+  it('every town, camp, and farm has at least one non-hire offer', () => {
+    const world = generateWorld(4242).world
+    const cells = flatten(world)
+
+    const towns = cells.filter(isTown)
+    const camps = cells.filter(isCamp)
+    const farms = cells.filter(isFarm)
+
+    expect(towns.length).toBe(TOWN_COUNT)
+    expect(camps.length).toBe(CAMP_COUNT)
+    expect(farms.length).toBe(FARM_COUNT)
+
+    for (const t of towns) {
+      expect(t.offers.length).toBeGreaterThanOrEqual(1)
+      expect(t.offers.length).toBeLessThanOrEqual(3)
+      expect(poiHasEconomyOffer(t.offers, townEconomy)).toBe(true)
+    }
+    for (const c of camps) {
+      expect(c.offers.length).toBeGreaterThanOrEqual(1)
+      expect(c.offers.length).toBeLessThanOrEqual(3)
+      expect(poiHasEconomyOffer(c.offers, campEconomy)).toBe(true)
+    }
+    for (const f of farms) {
+      expect(f.offers.length).toBeGreaterThanOrEqual(1)
+      expect(f.offers.length).toBeLessThanOrEqual(3)
+      expect(poiHasEconomyOffer(f.offers, farmEconomy)).toBe(true)
+      expect(f.offers).toContain('FARM_BUY_FOOD')
+    }
   })
 })

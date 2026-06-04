@@ -145,7 +145,14 @@ describe('combat reducer (v0.0.7)', () => {
     s.resources.food = 0
     s.resources.gold = 0
     s.resources.armySize = 5
-    s.encounter = { kind: 'combat', enemyArmySize: 1, initialSpawn: 1, sourceCellId: 4, restoreMessage: 'The Mending Henge\nThe circle remembers old debts.' }
+    s.encounter = {
+      kind: 'combat',
+      enemyArmySize: 1,
+      initialSpawn: 1,
+      armyAtCombatStart: 10,
+      sourceCellId: 4,
+      restoreMessage: 'The Mending Henge\nThe circle remembers old debts.',
+    }
     s.ui.message = ''
 
     const startRng = findRngStateForFightOutcome({ playerArmy: 5, enemyArmy: 1, want: 'win' })
@@ -193,7 +200,14 @@ describe('combat reducer (v0.0.7)', () => {
     const s = makeState(w)
     s.resources.food = 10
     s.resources.armySize = 2
-    s.encounter = { kind: 'combat', enemyArmySize: 12, initialSpawn: 12, sourceCellId: 4, restoreMessage: 'X' }
+    s.encounter = {
+      kind: 'combat',
+      enemyArmySize: 12,
+      initialSpawn: 12,
+      armyAtCombatStart: 10,
+      sourceCellId: 4,
+      restoreMessage: 'X',
+    }
 
     const startRng = findRngStateForFightOutcome({ playerArmy: 2, enemyArmy: 12, want: 'loss' })
     s.world.rngState = startRng
@@ -209,7 +223,14 @@ describe('combat reducer (v0.0.7)', () => {
     const s = makeState(w)
     s.resources.food = 7
     s.resources.armySize = 4
-    s.encounter = { kind: 'combat', enemyArmySize: 30, initialSpawn: 30, sourceCellId: 4, restoreMessage: 'X' }
+    s.encounter = {
+      kind: 'combat',
+      enemyArmySize: 30,
+      initialSpawn: 30,
+      armyAtCombatStart: 10,
+      sourceCellId: 4,
+      restoreMessage: 'X',
+    }
     const beforeRng = s.world.rngState >>> 0
 
     const next = processAction(s, { type: ACTION_RETURN })!

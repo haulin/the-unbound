@@ -24,8 +24,8 @@ export const CAMP_COUNT = 3
 export const CAMP_COOLDOWN_MOVES = 3
 export const CAMP_FOOD_GAIN = 2
 
-// 3 offers per town. Bump when `TOWN_OFFERS` in town.ts has more than TOWN_COUNT * 3 entries.
-export const TOWN_COUNT = 2
+// Max offers per town is 3. Bump TOWN_COUNT when must-cover pool outgrows coverage.
+export const TOWN_COUNT = 3
 export const TOWN_FOOD_BUNDLE = 3
 export const TOWN_TROOPS_BUNDLE = 2
 
@@ -33,11 +33,17 @@ export const TOWN_PRICE_FOOD_MIN = 5
 export const TOWN_PRICE_FOOD_MAX = 8
 export const TOWN_PRICE_TROOPS_MIN = 5
 export const TOWN_PRICE_TROOPS_MAX = 10
-export const TOWN_PRICE_SCOUT_MIN = 10
-export const TOWN_PRICE_SCOUT_MAX = 15
 export const TOWN_PRICE_RUMOR_MIN = 2
 export const TOWN_PRICE_RUMOR_MAX = 4
 
+export const COMPANION_HIRE_GOLD_MIN = 15
+export const COMPANION_HIRE_GOLD_MAX = 20
+export const HEALER_UPKEEP_GOLD = 1
+export const TOWN_RUMORS_PER_VISIT_MAX = 3
+
+// PoI modal buttons (town / camp / farm): 1–3 distinct offers per site.
+export const POI_MIN_OFFERS = 1
+export const POI_MAX_OFFERS = 3
 
 export const HENGE_COUNT = 3
 
@@ -58,7 +64,6 @@ export const FOOD_WARNING_THRESHOLD = 5
 export const FARM_COUNT = 3
 export const FARM_COOLDOWN_MOVES = 3
 
-// v0.4 - Placed lakes / rainbow ends + farm/locksmith tuning
 export const FISHING_LAKE_COUNT = 6
 export const FISHING_LAKE_COOLDOWN_MOVES = 3
 export const RAINBOW_END_COUNT = 2
@@ -67,18 +72,16 @@ export const RAINBOW_END_GOLD_PAYOUT = 30
 
 export const FARM_BUY_FOOD_GOLD_COST = 3
 export const FARM_BUY_FOOD_AMOUNT = 3
-export const FARM_BEAST_GOLD_MIN = 10
-export const FARM_BEAST_GOLD_MAX = 15
 export const BEAST_CARRY_CAP_BONUS = 50
 
 export const LOCKSMITH_KEY_FOOD_COST = 10
 export const LOCKSMITH_KEY_GOLD_COST = 20
 
-// v0.5 - Wyrm / Lair
 export const WYRM_PAY_GOLD_COST = 30
-export const WYRM_INITIAL_HEALTH = 30
+export const WYRM_INITIAL_HEALTH = 40
 export const MAX_PARTY_SLOTS = 3
 
+// Noise buckets for worldgen: equal slices, duplicates = more of that kind (~2/7 grass/road).
 export const TERRAIN_KINDS = ['grass', 'road', 'mountain', 'grass', 'swamp', 'woods', 'road'] as const satisfies readonly TerrainKind[]
 export const FEATURE_KINDS = [
   'gate',
@@ -162,7 +165,7 @@ export function terrainLoreLinesForKind(kind: CellKind): readonly string[] {
   }
 }
 
-export const FOOD_DELTA_FRAMES = 24
+export const FOOD_DELTA_FRAMES = 36
 
 // Lore strings + name pools are defined in `lore.ts`.
 

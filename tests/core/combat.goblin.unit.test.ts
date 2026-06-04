@@ -11,7 +11,14 @@ import type { CombatEncounter, Resources } from '../../src/core/types'
 import { makeResources } from './_helpers/makeResources'
 
 function makeEncounter(initialSpawn: number, enemyArmySize = initialSpawn): CombatEncounter {
-  return { kind: 'combat', enemyArmySize, initialSpawn, sourceCellId: 0, restoreMessage: '' }
+  return {
+    kind: 'combat',
+    enemyArmySize,
+    initialSpawn,
+    armyAtCombatStart: 10,
+    sourceCellId: 0,
+    restoreMessage: '',
+  }
 }
 
 function bigArmyResources(overrides: Partial<Resources> = {}): Resources {

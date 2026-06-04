@@ -1,7 +1,7 @@
 import { GATE_LOCKED_LINES, GATE_LOCKSMITH_MIN_DISTANCE, GATE_NAME, GATE_OPEN_LINES } from '../../constants'
 import { findCellByKind, setCellAt } from '../../cells'
 import { RNG } from '../../rng'
-import { isTerrainCell, placeFeature } from '../../worldgen'
+import { isTerrainCell, placeFeatureFromSeed } from '../../worldgen'
 import type { MechanicDef, OnEnterTile, PlaceWorldProvider } from '../types'
 
 const onEnterGate: OnEnterTile = ({ cell, world, pos, stepCount, resources }) => {
@@ -19,16 +19,16 @@ const onEnterGate: OnEnterTile = ({ cell, world, pos, stepCount, resources }) =>
   return { world: nextWorld, hasWon: true, message: `${GATE_NAME}\n${line}` }
 }
 
-const placeGate: PlaceWorldProvider = ({ cells, rngState }) => {
+const placeGate: PlaceWorldProvider = ({ cells, rngState, seed }) => {
   const locksmithPos = findCellByKind(cells, 'locksmith')
   if (!locksmithPos) throw new Error('placeGate: locksmith must be placed before gate')
-  const res = placeFeature(cells, rngState, {
+  placeFeatureFromSeed(cells, seed, 'place.gate', {
     count: 1,
     canPlaceAt: (_x, _y, here) => isTerrainCell(here),
     awayFrom: { pos: locksmithPos, minDistance: GATE_LOCKSMITH_MIN_DISTANCE },
     buildCell: () => ({ kind: 'gate' }),
   })
-  return { rngState: res.rngState }
+  return { rngState }
 }
 
 export const gateMechanic: MechanicDef = {

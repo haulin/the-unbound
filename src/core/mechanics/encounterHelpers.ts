@@ -3,16 +3,18 @@
 // built from defs that import this file).
 
 import {
+  COMPANION_ALREADY_LINES,
   ENABLE_ANIMATIONS,
   LOST_FLAVOR_LINES,
   MAX_PARTY_SLOTS,
+  PARTY_FULL_LINES,
   TOWN_NO_GOLD_LINES,
+  terrainLoreLinesForKind,
 } from '../constants'
 import { cellIdForPos } from '../cells'
 import { RNG } from '../rng'
 import { pickTeleportDestination } from '../teleport'
-import { rollMoveEvent } from './moveEvents'
-import type { MoveEventPolicy, MoveEventSource, TileEnterResult } from './types'
+import type { MoveEvent, MoveEventPolicy, MoveEventSource, TileEnterCtx, TileEnterResult } from './types'
 import { SPRITES } from '../spriteIds'
 import type {
   Action,
@@ -28,7 +30,56 @@ import type {
   World,
 } from '../types'
 import { enqueueDeltas, enqueueGridTransition } from '../uiAnim'
-import type { AnimSpec, RightGridProvider } from './types'
+import type { AnimSpec, PreviewPlateLine, RightGridProvider } from './types'
+
+// ---- Preview plate from offer specs --------------------------------------------
+
+export type GridSlot = 'top' | 'left' | 'bottom'
+
+const GRID_SLOT_FILL_ORDER: readonly GridSlot[] = ['left', 'top', 'bottom']
+
+// Assign offers to modal buttons in fill order (left, then top, then bottom).
+export function offersToGridLayout<T extends string>(offers: readonly T[]): Record<GridSlot, T | null> {
+  const layout: Record<GridSlot, T | null> = { left: null, top: null, bottom: null }
+  for (let i = 0; i < GRID_SLOT_FILL_ORDER.length && i < offers.length; i++) {
+    layout[GRID_SLOT_FILL_ORDER[i]!] = offers[i]!
+  }
+  return layout
+}
+
+// Plate line order follows button layout, then any offers not placed on the grid.
+export function offersInGridOrder<T extends string>(
+  offers: readonly T[],
+  layout: Partial<Record<GridSlot, T | null>>,
+  slots: readonly GridSlot[] = GRID_SLOT_FILL_ORDER,
+): readonly T[] {
+  const ordered: T[] = []
+  const seen = new Set<T>()
+  for (const slot of slots) {
+    const o = layout[slot]
+    if (o != null && offers.includes(o) && !seen.has(o)) {
+      ordered.push(o)
+      seen.add(o)
+    }
+  }
+  for (const o of offers) {
+    if (!seen.has(o)) ordered.push(o)
+  }
+  return ordered
+}
+
+export function previewPlateForOffers(
+  state: State,
+  offers: readonly string[],
+  table: Record<string, { previewPlate?: (state: State) => readonly PreviewPlateLine[] | null }>,
+): readonly PreviewPlateLine[] | null {
+  const lines: PreviewPlateLine[] = []
+  for (const offer of offers) {
+    const part = table[offer]?.previewPlate?.(state)
+    if (part) lines.push(...part)
+  }
+  return lines.length > 0 ? lines : null
+}
 
 // ---- Message + encounter scaffolding ------------------------------------------
 
@@ -41,10 +92,28 @@ export function setEncounterMessage(state: State, prefix: string, line: string):
 // TOWN_NO_GOLD_LINES pool (used today by town/farm/locksmith — the same lore is reused
 // across all three since the player-facing concept is the same). Sets the encounter
 // message; no resource changes.
-export function noGoldResponse(state: State, prefix: string, cellId: number): State {
-  const rnd = RNG.createRunCopyRandom(state)
-  const line = rnd.perMoveLine(TOWN_NO_GOLD_LINES, { cellId })
+export function noGoldResponse(state: State, prefix: string): State {
+  const line = encounterStableLine(state, 'noGold', TOWN_NO_GOLD_LINES)
   return setEncounterMessage(state, prefix, line)
+}
+
+export function encounterStableLine(state: State, tag: string, pool: readonly string[]): string {
+  const enc = state.encounter
+  const salt = enc ? `${enc.kind}.${enc.sourceCellId}.${tag}` : tag
+  return RNG.createRunCopyRandom(state).stableLine(pool, { salt })
+}
+
+export function refuseCompanionHire(prevState: State, prefix: string, slot: string): State | null {
+  const party = prevState.resources.party
+  if (party.length >= MAX_PARTY_SLOTS) {
+    const line = encounterStableLine(prevState, 'party.full', PARTY_FULL_LINES)
+    return setEncounterMessage(prevState, prefix, line)
+  }
+  if (party.includes(slot)) {
+    const line = encounterStableLine(prevState, `companion.already.${slot}`, COMPANION_ALREADY_LINES)
+    return setEncounterMessage(prevState, prefix, line)
+  }
+  return null
 }
 
 // ---- Leave-encounter -----------------------------------------------------------
@@ -75,25 +144,48 @@ export type ApplyDeltasArgs = {
   run?: Run
   // The full message to set (already prefixed by the caller).
   message: string
-  // Per-resource deltas to animate. Zero-delta entries are silently skipped.
-  deltas: readonly ResourceDelta[]
+  // Per-resource pops. When omitted and `resources` is set, diffs `state.resources` → `resources`.
+  deltas?: readonly ResourceDelta[]
+}
+
+export function resourceDeltasFromDiff(prev: Resources, next: Resources): ResourceDelta[] {
+  const out: ResourceDelta[] = []
+  const food = next.food - prev.food
+  if (food) out.push({ target: 'food', delta: food })
+  const gold = next.gold - prev.gold
+  if (gold) out.push({ target: 'gold', delta: gold })
+  const army = next.armySize - prev.armySize
+  if (army) out.push({ target: 'army', delta: army })
+  return out
+}
+
+export function pushResourceDeltas(out: ResourceDelta[], target: DeltaAnimTarget, values: readonly number[]): void {
+  for (let i = 0; i < values.length; i++) {
+    const delta = values[i]!
+    if (delta) out.push({ target, delta })
+  }
 }
 
 // Apply an encounter action's effect: set the new message, optionally update resources/run,
 // and enqueue one delta-popup per non-zero entry in `args.deltas`.
 export function applyDeltas(state: State, args: ApplyDeltasArgs): State {
+  const resources = args.resources ?? state.resources
+  const run = args.run ?? state.run
+  const deltas =
+    args.deltas ?? (args.resources != null ? resourceDeltasFromDiff(state.resources, resources) : [])
+
   const baseUi: Ui = { ...state.ui, message: args.message }
   const baseNext: State = {
     ...state,
-    ...(args.resources ? { resources: args.resources } : {}),
-    ...(args.run ? { run: args.run } : {}),
+    resources,
+    run,
     ui: baseUi,
   }
   if (!ENABLE_ANIMATIONS) return baseNext
 
   let uiWith = baseUi
-  for (let i = 0; i < args.deltas.length; i++) {
-    const d = args.deltas[i]!
+  for (let i = 0; i < deltas.length; i++) {
+    const d = deltas[i]!
     uiWith = enqueueDeltas(uiWith, { target: d.target, deltas: [d.delta] })
   }
   return { ...baseNext, ui: uiWith }
@@ -168,6 +260,21 @@ export function buy(
   if (armyGain) deltas.push({ target: 'army', delta: armyGain })
 
   return { outcome: 'ok', resources: next, deltas }
+}
+
+export function hireCompanion(
+  prevState: State,
+  args: { prefix: string; slotId: string; goldCost: number; successLine: string },
+): State {
+  const refused = refuseCompanionHire(prevState, args.prefix, args.slotId)
+  if (refused) return refused
+  const result = buy(prevState.resources, { gold: args.goldCost, gain: { party: [args.slotId] } })
+  if (result.outcome === 'noFunds') return noGoldResponse(prevState, args.prefix)
+  return applyDeltas(prevState, {
+    resources: result.resources,
+    message: `${args.prefix}\n${args.successLine}`,
+    deltas: result.deltas,
+  })
 }
 
 // ---- Party-slot append --------------------------------------------------------
@@ -258,6 +365,43 @@ export function applyEnterAnims(ui: Ui, anims: readonly AnimSpec[], startFrame: 
   return next
 }
 
+// ---- Default tile enter + move-event roll --------------------------------------
+
+export function onEnterDefaultTerrain(
+  ctx: TileEnterCtx,
+): TileEnterResult & { message: string } {
+  const { cell, world, pos, stepCount } = ctx
+  const r = RNG.createTileRandom({ world, stepCount, pos })
+  return { message: r.perMoveLine(terrainLoreLinesForKind(cell.kind)) }
+}
+
+export function rollMoveEvent(args: {
+  policy: MoveEventPolicy
+  hasScout: boolean
+  source: MoveEventSource
+  rngKeys: { seed: number; stepCount: number; cellId: number }
+}): MoveEvent | null {
+  const { policy, hasScout, source, rngKeys } = args
+
+  const ambushPercent = policy.ambushPercent
+  let lostPercent = policy.lostPercent
+  if (hasScout && policy.scoutLostHalves) {
+    lostPercent = Math.floor(lostPercent / 2)
+  }
+
+  if (ambushPercent + lostPercent === 0) return null
+
+  const percentile = RNG.keyedIntExclusive(rngKeys, 100)
+
+  if (percentile < ambushPercent) {
+    return { kind: 'fight', source }
+  }
+  if (percentile < ambushPercent + lostPercent) {
+    return { kind: 'lost', source }
+  }
+  return null
+}
+
 // ---- Terrain move events -------------------------------------------------------
 
 export type TerrainQuietCtx = {
@@ -285,11 +429,17 @@ export function tryQuietFind(
   ctx: TerrainQuietCtx,
 ): TerrainQuietResult | undefined {
   const { rngKeys, tileRand, resources } = ctx
-  const findRoll = RNG.keyedIntExclusive({ ...rngKeys, salt: RNG.domainSalt(spec.rollSalt) }, 100)
+  const findRoll = RNG.keyedIntExclusive({ ...rngKeys, salt: spec.rollSalt }, 100)
   if (findRoll >= spec.findPercent) return undefined
 
-  const foodGain = RNG.keyedBoundedBase(rngKeys, spec.foodSalt, spec.foodBase, spec.amountNoise)
-  const goldGain = RNG.keyedBoundedBase(rngKeys, spec.goldSalt, spec.goldBase, spec.amountNoise)
+  const foodGain = Math.max(
+    0,
+    spec.foodBase + RNG.keyedIntInRange({ ...rngKeys, salt: spec.foodSalt }, -spec.amountNoise, spec.amountNoise),
+  )
+  const goldGain = Math.max(
+    0,
+    spec.goldBase + RNG.keyedIntInRange({ ...rngKeys, salt: spec.goldSalt }, -spec.amountNoise, spec.amountNoise),
+  )
   return {
     message: tileRand.perMoveLine(spec.lines),
     resources: {

@@ -61,7 +61,7 @@ describe('encounterHelpers', () => {
   describe('noGoldResponse', () => {
     it('sets a "<prefix>\\n<line>" message picked from TOWN_NO_GOLD_LINES', () => {
       const s = makeMinimalState()
-      const next = noGoldResponse(s, 'A Town Town', 42)
+      const next = noGoldResponse(s, 'A Town Town')
       const prefix = 'A Town Town\n'
       expect(next.ui.message.startsWith(prefix)).toBe(true)
       const line = next.ui.message.slice(prefix.length)
@@ -92,6 +92,19 @@ describe('encounterHelpers', () => {
   })
 
   describe('applyDeltas', () => {
+    it('diffs resources when deltas omitted', () => {
+      const s = makeMinimalState({ resources: makeResources({ food: 5, gold: 10, armySize: 3 }) })
+      const next = applyDeltas(s, {
+        message: 'ok',
+        resources: makeResources({ food: 5, gold: 9, armySize: 5 }),
+      })
+      expect(next.resources.gold).toBe(9)
+      expect(next.resources.armySize).toBe(5)
+      const pops = next.ui.anim.active.filter((a) => a.kind === 'delta')
+      expect(pops.some((a) => a.params.target === 'gold' && a.params.delta === -1)).toBe(true)
+      expect(pops.some((a) => a.params.target === 'army' && a.params.delta === 2)).toBe(true)
+    })
+
     it('applies new resources, run, and message', () => {
       const s = makeMinimalState()
       const newResources: Resources = { ...baseResources, gold: 5, food: 8 }

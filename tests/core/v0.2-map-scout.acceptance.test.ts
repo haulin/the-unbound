@@ -35,7 +35,18 @@ function makeWorld(seed: number, campNextReadyStep = 0): World {
     mapGenAlgorithm: 'TEST',
     cells: [
       [grass(), grass(), grass()],
-      [grass(), { kind: 'camp', id: 4, name: 'Ember Watch', nextReadyStep: campNextReadyStep }, grass()],
+      [
+        grass(),
+        {
+          kind: 'camp',
+          id: 4,
+          name: 'Ember Watch',
+          nextReadyStep: campNextReadyStep,
+          offers: ['CAMP_SEARCH'],
+          companionHireGold: 15,
+        },
+        grass(),
+      ],
       [grass(), grass(), grass()],
     ],
     rngState: 123,
@@ -147,14 +158,13 @@ describe('v0.2 map+scout acceptance', () => {
     if (campCell.kind === 'camp') expect(campCell.nextReadyStep).toBe(stepCount + CAMP_COOLDOWN_MOVES)
   })
 
-  it('camp does not offer Hire Scout (moved to towns)', () => {
+  it('camp with search-only offers shows Search on the grid', () => {
     const s0 = makeState(makeWorld(7))
     const onto = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     expect(onto.encounter?.kind).toBe('camp')
 
-    // North is unused in camp.
-    const north = getRightGridCellDef(onto, 0, 1)
-    expect(north.action).toBe(null)
+    const west = getRightGridCellDef(onto, 1, 0)
+    expect(west.action).toEqual({ type: ACTION_CAMP_SEARCH })
   })
 
   it('while lost, MOVE appends an unmapped path step', () => {

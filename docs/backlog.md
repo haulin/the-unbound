@@ -4,43 +4,36 @@ Tentative milestones plus ideas in other sections below. Each milestone should c
 
 ## Polish backlog (boy-scout each milestone)
 
-- **Wyrm config extraction follow-up.** Wyrm pay-success outcome is currently labeled `'recruit'` in the union (`combat.ts:223`) and `onWyrmCombatClosed` absorbs it as a synonym for victory. Either widen the outcome union to `'victory' | 'flee' | 'recruit' | 'paid'`, or rename `'recruit'` to `'paid'` across the dispatch + 4 handlers. Land alongside the variant split since the wyrm variant lives in its own file already.
-- **Lore-cycling audit + per-key strategy refactor.** Per-press cycling drains failure-line pools too quickly during a single encounter. Classify pools into per-tile-stable (cell ID), per-encounter-stable (encounter open), and per-press categories; refactor `RNG.advanceCursor` keying accordingly. Locksmith lines vary per step.
 - **Registry kind-coverage validation.** A mechanic declaring `moveEventPolicyByKind: { foo: { ambushPercent: 100 } }` without a matching `combatVariantByKind[foo]` falls through to the preview placeholder silently. Add a registry-time check (`docs/backlog.md` already tracks this in the broader registry hardening task).
 - **Recruit helper coupling (henge → mountain).** `henge.ts` imports `brigandRecruitCost` / `brigandRecruitEligibility` / `brigandRecruitLootScale` from `mountain.ts` because both use the same recruitable-bandit math. That ties a PoI encounter to a terrain file and makes brigand tuning silently affect henge. Extract neutral shared helpers (e.g. `recruitableBandit.ts` or combat-layer recruit utilities) when a third recruitable source appears—or sooner if recruit rules diverge per variant.
 
 ## Ideas
-- skip modal if nothing to do (not enough money or cooldown - camp/farm/town)
-- cap rumors to 3 per visit/town
-- maybe adjust worldgen as it feels like swamps & mountains are too common
+- loot drops in lore title +Ng/+Mf/+Os
+- controller support
+- buy tiles show prices on them instead of in plates
 - make rainbows modals - if player chooses to not take gold, next visit it increases
+- Fight hit/miss is shown in lore lines.
 - Consider making roads cost food only ~50% of the time (mechanics/balance change; would require tests + tuning).
-- Collectibles to find. Maybe just getting one of each creatures (healer/scout/beast) - shows on home page instead of question marks. Another home page challenge icon is - not using a map the whole run.
+- skip modal if nothing to do (not enough money or cooldown - camp/farm/town)
+- every 28 days a plague comes that kills half your army
 - buying scout shows animation - switch to show map, reveal tiles, hide map (if it was hidden)
+- battle log - every fight attempt marks ✓/✗ in the lore lines
+- morale modifying battle odds, +2, +5, +10% either way (curse could lower it, praying at altar could clear a curse)
 - active item that allows you to auto-win a fight or land a hit at least
 - passive item no food consumed for 10 steps
 - bank gives interest on deposits
-- battle log - every fight attempt marks ✓/✗ in the lore lines
 - an item that gives more gold from fights / selling
 - orchard get 5 free food
 - plant a tree to pick 5 free food every cooldown
-- morale modifying battle odds, +2, +5, +10% either way (curse could lower it, praying at altar could clear a curse)
-- every 28 days a plague comes that kills half your army
 - different types of enemies (magic/strength) or different loot drops
-
-**v0.8 — Camps, Towns & slot groundwork**
-
-- Slot system infrastructure: generalize the existing single-hire pattern at Camps/Towns into a per-PoI specialty (one of a small pool, fixed at worldgen by seed). Farms get the same pattern. Modal stays 3 buttons + Leave. See `docs/2026-05-27-slot-system-design.md`.
-- Scout becomes a Camp specialty (in addition to Towns) via the pool pattern. `CAMP_SCOUT_*` lines already in `lore.ts`.
-- Camp local map (Search / paid local reveal / Leave) — see *Camp local map* in Deferred backlog.
-- Lore pass.
+- companion that allows you to recruit goblins (goblin chief?)
+- Camp local map — see *Camp local map* in Deferred backlog.
+- maybe adjust worldgen as it feels like swamps & mountains are too common
 
 **v0.9 — Random Encounters & World Texture**
 
-- Random encounter pool on any tile (5-6 types): loot find / lone soldier joins / cursed tile / traps / abandoned supplies / fellow traveller with rumor / something negative TBD
-- Healer specialty hire added to Town pool. Revive 1 soldier per combat (define against current loss model) + upkeep gold on town visit. `HEALER_*` lines in `lore.ts`. See `docs/2026-05-27-slot-system-design.md`.
-- Multiple flavor text variations per tile type (deterministic rotation by seed+step)
-- Contextual first-visit lore for every mechanic introduced so far
+- Random encounter pool on specific tiles (probably road/grass): loot find / lone soldier joins / cursed tile / traps / fellow traveller with rumor / something negative TBD
+- Scout becomes a Camp specialty (in addition to Towns) via the pool pattern. `CAMP_SCOUT_*` lines already in `lore.ts`.
 - Lore pass.
 
 Polish for demo:
@@ -49,6 +42,7 @@ Polish for demo:
 - Hide debug stuff, pick seed for new game randomly
 - title screen, about screen, back to menu, resume
 - animations for left panel
+- lore audit and polish
 - more exciting win / lose
 
 **v0.10 — Slot System: Trading & Farm Animals**
@@ -62,7 +56,7 @@ See `docs/2026-05-27-slot-system-design.md` for the full design.
 
 **v0.11 — Slot System: People & Economy**
 
-- Captain specialty added to Camp pool. P4 +10% combat odds + N7 +ambush% in woods/mountains. New 16×16 sprite (head + shoulders + flag-on-pole). New lore pool `CAPTAIN_*`.
+- Captain specialty added to Camp pool. P4 +10% combat odds + N7 +ambush% in woods/mountains. New 16×16 sprite (head + shoulders + flag-on-pole). New lore pool `CAPTAIN_*`. Camp preview plate: drop +food on search (3-line cap).
 - Fisherman specialty added to Town pool. P8 double lake yields + N8 +1 troop loss per flee. New 16×16 sprite (rod-on-shoulder). New lore pool `FISHERMAN_*`.
 - Magpie specialty added to Farm pool. P probabilistic 30% refund on folk payments (Town food, Camp/Town hires, Locksmith fee); shows original price, gold check against original, refund visible. No demo negative; balanced by probability + higher purchase price. New 16×16 bird sprite. New lore pool `MAGPIE_*`.
 - Final slot-system audit against pairing rules in `the-unbound-learnings.md` (P+P slot exemptions, ledger consistency).
@@ -73,6 +67,7 @@ See `docs/2026-05-27-slot-system-design.md` for the full design.
 - Gambling mini-game (bet gold, contextual buttons, slight house edge)
 - Tavern flavor text pool (warmer, unreliable narrator register)
 - Tavern rumors may reveal which Town carries which specialty hire (Scout / Healer / Fisherman).
+- Collectibles to find. Maybe just getting one of each creatures (healer/scout/beast) - shows on home page instead of question marks. Another home page challenge icon is - not using a map the whole run.
 
 **v0.13 — Second Gate (Silver)**
 - Silver keyholder, silver gate, silver border
@@ -94,17 +89,20 @@ See `docs/2026-05-27-slot-system-design.md` for the full design.
 - Itch.io + web release, Android via Capacitor if viable
 
 ## Issues
-- Fleeing a fight from henge starts cooldown.
+- camps don't have entry lore lines
 - Leaving a camp shows no message.
 - Arriving in a farm with 1 food gives food, but game over as well.
 - When I accidentally leave a town I cannot return, have to step out and back.
-- It's a bit rough when neither town sells food.
 - Food delta UX: consider collapsing `-1` + `+N` into a single animated net delta when both occur on the same move.
 - Two signposts should not point to the same PoI?
 
 # Deferred backlog
 
 This file captures ideas discussed during design, kept out of the current phase's implementation plan. Nothing here is committed to; it is a parking lot for later phases.
+
+## Hover-focused preview plate
+
+When the player hovers a right-grid offer button, show only that offer's preview-plate lines (e.g. scout hire cost alone) instead of every offer on the PoI. Trade-off: clearer center sprite, but after moving to a modal the cursor often sits on one button and hides the other offers' prices. Revisit with explicit UX (e.g. only on deliberate hover delay, or terminal-only).
 
 ## Camp local map
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SPRITES } from '../../src/core/spriteIds'
+import { SPRITES, terminalPlateLabel } from '../../src/core/spriteIds'
 
 describe('SPRITES registry', () => {
   it('exposes the canonical sprite ids for each concept', () => {
@@ -9,8 +9,17 @@ describe('SPRITES registry', () => {
     expect(SPRITES.actions.restart).toBe(108)
     expect(SPRITES.inventory.gold).toBe(204)
     expect(SPRITES.inventory.beast).toBe(226)
+    expect(SPRITES.inventory.healer).toBe(232)
     expect(SPRITES.centers.farmBarn).toBe(162)
     expect(SPRITES.centers.locksmithKiln).toBe(164)
+  })
+
+  it('derives terminal plate labels from registry keys', () => {
+    expect(terminalPlateLabel(SPRITES.inventory.healer)).toBe('healer')
+    expect(terminalPlateLabel(SPRITES.inventory.army)).toBe('army')
+    expect(terminalPlateLabel(SPRITES.enemies.hp)).toBe('hp')
+    expect(terminalPlateLabel(SPRITES.enemies.goblin)).toBe('goblin')
+    expect(terminalPlateLabel(SPRITES.inventory.food)).toBe('food')
   })
 
   it('aligns thematically-related sprites into the same column', () => {
@@ -35,7 +44,7 @@ describe('SPRITES registry', () => {
 
     // Col 6: cave/heart/wyrm/blood (the "wyrm's lair" column).
     expect(col(SPRITES.terrain.cave)).toBe(6)
-    expect(col(SPRITES.enemies.heart)).toBe(6)
+    expect(col(SPRITES.enemies.hp)).toBe(6)
     expect(col(SPRITES.centers.wyrm)).toBe(6)
     expect(col(SPRITES.inventory.bloodVial)).toBe(6)
   })

@@ -32,14 +32,15 @@ export const SPRITES = {
     bloodVial: 198,
     beast: 226,
     bronzeKey: 196,
-    troop: 200,
+    army: 200,
     scout: 228,
+    healer: 232,
     gold: 204,
   },
 
   // 16x16 opponent-side stats.
   enemies: {
-    heart: 134,
+    hp: 134,
     enemy: 132,
     goblin: 130,
   },
@@ -85,3 +86,20 @@ export const SPRITES = {
     previewGrain: 308,
   },
 } as const
+
+type InventorySpriteKey = keyof typeof SPRITES.inventory
+
+// Party and inventory slot ids match `SPRITES.inventory` keys (beast, bloodVial, …).
+export function inventorySpriteId(slotId: string): number | undefined {
+  const key = slotId as InventorySpriteKey
+  return SPRITES.inventory[key]
+}
+
+export function terminalPlateLabel(spriteId: number): string {
+  for (const group of Object.values(SPRITES)) {
+    for (const [name, id] of Object.entries(group)) {
+      if (id === spriteId) return name
+    }
+  }
+  return `sprite_${spriteId}`
+}

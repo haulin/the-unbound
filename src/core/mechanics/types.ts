@@ -15,7 +15,7 @@ import type {
   World,
 } from '../types'
 import type { RightGridCellDef } from '../rightGrid'
-import type { CombatVariantConfig } from './defs/combat'
+import type { CombatCloseOutcome, CombatVariantConfig } from './defs/combat'
 
 // PoI signpost contribution. Ranks are conventionally multiples of 10 so new
 // PoIs can slot between existing ones without renumbering (e.g. Lair=15 between
@@ -84,10 +84,11 @@ export type OnEnterTile = (ctx: TileEnterCtx) => TileEnterResult
 export type ReduceEncounterAction = (state: State, action: Action) => State | null
 
 // Mechanic-owned feature placement during worldgen. The runner in `world.ts`
-// calls each mechanic's `placeWorld` in `MECHANICS` array order, threading
-// `rngState`. Peer-aware placers (locksmith ↔ gate) read already-placed cells
-// via `findCellByKind`.
-export type PlaceWorldProvider = (args: { cells: CellGrid; rngState: number }) => { rngState: number }
+// calls each mechanic's `placeWorld` in `MECHANICS` array order; each placer
+// draws from `place.<kind>` via `seed` and returns `rngState` unchanged.
+// Peer-aware placers (locksmith ↔ gate) read already-placed cells, not other
+// mechanics' RNG streams.
+export type PlaceWorldProvider = (args: { cells: CellGrid; rngState: number; seed: number }) => { rngState: number }
 
 // One line in an encounter preview plate: a 16x16 icon + a short value string.
 // Color is the renderer's job; mechanics return semantically-neutral lines.
@@ -146,5 +147,5 @@ export type MechanicDef = {
   // `isBled` flag on victory; henge uses it to maintain the persistent-band
   // state machine (flee syncs `currentGroup`, victory/recruit clears it and
   // starts cooldown).
-  onCombatClosed?: (state: State, outcome: 'victory' | 'flee' | 'recruit', encounter: CombatEncounter) => State
+  onCombatClosed?: (state: State, outcome: CombatCloseOutcome, encounter: CombatEncounter) => State
 }

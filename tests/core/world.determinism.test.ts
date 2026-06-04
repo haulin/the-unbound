@@ -19,10 +19,14 @@ function cellSignature(cell: Cell): string {
     case 'swamp':
     case 'woods':
       return cell.kind
-    case 'farm':
-      return `farm:${cell.id}:${cell.name}:beast=${cell.beastGoldCost}`
-    case 'camp':
-      return `camp:${cell.id}:${cell.name}:ready=${cell.nextReadyStep}`
+    case 'farm': {
+      const offers = cell.offers.join(',')
+      return `farm:${cell.id}:${cell.name}:offers=[${offers}]:hire=${cell.companionHireGold}`
+    }
+    case 'camp': {
+      const offers = cell.offers.join(',')
+      return `camp:${cell.id}:${cell.name}:offers=[${offers}]:ready=${cell.nextReadyStep}:hire=${cell.companionHireGold}`
+    }
     case 'henge':
       return `henge:${cell.id}:${cell.name}:ready=${cell.nextReadyStep}`
     case 'lair':
@@ -30,7 +34,7 @@ function cellSignature(cell: Cell): string {
     case 'town': {
       const offers = cell.offers.join(',')
       const p = cell.prices
-      return `town:${cell.id}:${cell.name}:offers=[${offers}]:prices=${p.foodGold}/${p.troopsGold}/${p.scoutGold}/${p.rumorGold}`
+      return `town:${cell.id}:${cell.name}:offers=[${offers}]:prices=${p.foodGold}/${p.troopsGold}/${p.companionHireGold}/${p.rumorGold}`
     }
     case 'fishingLake':
       return `fishingLake:${cell.id}:ready=${cell.nextReadyStep}`

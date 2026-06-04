@@ -1,5 +1,5 @@
 import type { CellKind, CombatEncounter, EncounterKind, State } from '../types'
-import type { CombatVariantConfig } from './defs/combat'
+import type { CombatCloseOutcome, CombatVariantConfig } from './defs/combat'
 import type {
   MechanicDef,
   MoveEventPolicy,
@@ -12,11 +12,7 @@ import type {
   RightGridProvider,
 } from './types'
 
-export type OnCombatClosedHook = (
-  state: State,
-  outcome: 'victory' | 'flee' | 'recruit',
-  encounter: CombatEncounter,
-) => State
+export type OnCombatClosedHook = (state: State, outcome: CombatCloseOutcome, encounter: CombatEncounter) => State
 
 export type MechanicIndex = {
   ownerByKind: Partial<Record<CellKind, string>>

@@ -26,7 +26,14 @@ function makeState(): State {
     player: { position: { x: 1, y: 1 } },
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
     resources: makeResources({ food: 5, gold: 0, armySize: 3 }),
-    encounter: { kind: 'combat', enemyArmySize: 4, initialSpawn: 4, sourceCellId: 4, restoreMessage: 'X' },
+    encounter: {
+      kind: 'combat',
+      enemyArmySize: 4,
+      initialSpawn: 4,
+      armyAtCombatStart: 10,
+      sourceCellId: 4,
+      restoreMessage: 'X',
+    },
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
 }

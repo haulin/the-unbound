@@ -31,9 +31,9 @@ function boxBlurIntGridWrap(grid: number[][], w: number, h: number) {
   return out
 }
 
-function generateBaseTerrainCells(rngState: number): { cells: CellGrid; rngState: number } {
+function generateBaseTerrainCells(seed: number): CellGrid {
   const vals: number[][] = []
-  const rng = RNG.createStreamRandom(rngState)
+  const rng = RNG.createStreamRandomFromSeed(seed, 'place.terrain')
   for (let y = 0; y < WORLD_HEIGHT; y++) {
     const row: number[] = []
     for (let x = 0; x < WORLD_WIDTH; x++) {
@@ -73,11 +73,11 @@ function generateBaseTerrainCells(rngState: number): { cells: CellGrid; rngState
     cells.push(row)
   }
 
-  return { cells, rngState: rng.rngState }
+  return cells
 }
 
-function pickStart({ rngState }: { rngState: number }) {
-  const rng = RNG.createStreamRandom(rngState)
+function pickStart(seed: number) {
+  const rng = RNG.createStreamRandomFromSeed(seed, 'place.start')
   const v = rng.intExclusive(WORLD_WIDTH * WORLD_HEIGHT)
   const x = v % WORLD_WIDTH
   const y = Math.floor(v / WORLD_WIDTH)
@@ -85,21 +85,21 @@ function pickStart({ rngState }: { rngState: number }) {
 }
 
 export function generateWorld(seed: number): GeneratedWorld {
-  let rngState = RNG.createStreamRandomFromSeed(seed).rngState
+  const cells = generateBaseTerrainCells(seed)
 
-  const base = generateBaseTerrainCells(rngState)
-  rngState = base.rngState
-  const cells = base.cells
+  // Legacy tape passthrough: placers use per-kind `place.*` streams and return
+  // `rngState` unchanged so one mechanic does not shift another's tiles.
+  let rngState = 0
 
   // Mechanic-owned placement. `MECHANICS` array order is the worldgen order;
   // see `src/core/mechanics/index.ts` for why gate/locksmith come first.
   for (let i = 0; i < MECHANICS.length; i++) {
     const m = MECHANICS[i]!
     if (!m.placeWorld) continue
-    rngState = m.placeWorld({ cells, rngState }).rngState
+    rngState = m.placeWorld({ cells, rngState, seed }).rngState
   }
 
-  const startPick = pickStart({ rngState })
+  const startPick = pickStart(seed)
   rngState = startPick.rngState
 
   const world: World = {

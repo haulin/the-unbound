@@ -14,7 +14,12 @@ function makeWorld(): World {
     height: 4,
     mapGenAlgorithm: 'TEST',
     cells: [
-      [{ kind: 'farm', id: 1, name: 'F', beastGoldCost: 10 }, { kind: 'camp', id: 2, name: 'C', nextReadyStep: 0 }, { kind: 'henge', id: 3, name: 'H', nextReadyStep: 0, currentGroup: null }, { kind: 'gate' }],
+      [
+        { kind: 'farm', id: 1, name: 'F', offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'], companionHireGold: 10 },
+        { kind: 'camp', id: 2, name: 'C', nextReadyStep: 0, offers: ['CAMP_SEARCH'], companionHireGold: 15 },
+        { kind: 'henge', id: 3, name: 'H', nextReadyStep: 0, currentGroup: null },
+        { kind: 'gate' },
+      ],
       [
         { kind: 'locksmith' },
         {
@@ -22,7 +27,7 @@ function makeWorld(): World {
           id: 5,
           name: 'Stonebridge',
           offers: ['buyFood', 'buyTroops', 'hireScout'],
-          prices: { foodGold: 3, troopsGold: 5, scoutGold: 12, rumorGold: 3 },
+          prices: { foodGold: 3, troopsGold: 5, companionHireGold: 12, rumorGold: 3 },
           bundles: { food: 3, troops: 2 },
         },
         grass(),

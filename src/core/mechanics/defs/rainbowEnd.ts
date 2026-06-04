@@ -34,19 +34,21 @@ const onEnterRainbowEnd: OnEnterTile = ({ cell, world, pos, stepCount, resources
 
 // Two rainbow-ends, kept at least `RAINBOW_END_MIN_DISTANCE` apart so they
 // don't pair up.
-const placeRainbowEnds: PlaceWorldProvider = ({ cells, rngState }) => {
-  const first = placeFeature(cells, rngState, {
+const placeRainbowEnds: PlaceWorldProvider = ({ cells, rngState, seed }) => {
+  let stream = RNG.createStreamRandomFromSeed(seed, 'place.rainbowEnd')
+  const first = placeFeature(cells, stream.rngState, {
     count: 1,
     canPlaceAt: (_x, _y, here) => isTerrainCell(here),
     buildCell: ({ x, y }) => ({ kind: 'rainbowEnd', id: cellId(x, y), hasPaidOut: false }),
   })
-  const second = placeFeature(cells, first.rngState, {
+  stream = RNG.createStreamRandom(first.rngState)
+  placeFeature(cells, stream.rngState, {
     count: 1,
     canPlaceAt: (_x, _y, here) => isTerrainCell(here),
     awayFrom: { pos: first.placed[0]!, minDistance: RAINBOW_END_MIN_DISTANCE },
     buildCell: ({ x, y }) => ({ kind: 'rainbowEnd', id: cellId(x, y), hasPaidOut: false }),
   })
-  return { rngState: second.rngState }
+  return { rngState }
 }
 
 export const rainbowEndMechanic: MechanicDef = {

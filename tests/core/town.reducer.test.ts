@@ -5,7 +5,7 @@ import {
   ENABLE_ANIMATIONS,
   TOWN_BUY_LINES,
   TOWN_NO_GOLD_LINES,
-  TOWN_SCOUT_ALREADY_HAVE_LINES,
+  COMPANION_ALREADY_LINES,
   TOWN_SCOUT_HIRE_LINES,
 } from '../../src/core/constants'
 import {
@@ -16,6 +16,7 @@ import {
   ACTION_TOWN_LEAVE,
 } from '../../src/core/mechanics/defs/town'
 import { FOOD_CARRY_FULL_MESSAGE } from '../../src/core/foodCarry'
+import { encounterStableLine } from '../../src/core/mechanics/encounterHelpers'
 import { RNG } from '../../src/core/rng'
 import type { Cell, DeltaAnim, GridTransitionAnim, State, TownCell, World } from '../../src/core/types'
 import { makeResources } from './_helpers/makeResources'
@@ -30,7 +31,7 @@ function makeWorld(seed: number): { world: World; town: TownCell } {
     id: 4,
     name: 'Stonebridge',
     offers: ['buyFood', 'buyTroops', 'hireScout'],
-    prices: { foodGold: 3, troopsGold: 5, scoutGold: 12, rumorGold: 3 },
+    prices: { foodGold: 3, troopsGold: 5, companionHireGold: 12, rumorGold: 3 },
     bundles: { food: 3, troops: 2 },
   }
   const world: World = {
@@ -55,7 +56,7 @@ function makeState(seed = 7): State {
     player: { position: { x: 1, y: 1 } },
     run: { stepCount: 10, hasWon: false, isGameOver: false, knowsPosition: true, path: [], lostBufferStartIndex: null },
     resources: makeResources({ food: 0, gold: 0, armySize: 5 }),
-    encounter: { kind: 'town', sourceCellId: 4, restoreMessage: 'restored' },
+    encounter: { kind: 'town', sourceCellId: 4, restoreMessage: 'restored', rumorsBought: 0 },
     ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
   }
 }
@@ -85,22 +86,19 @@ describe('town reducer', () => {
     expect(next.ui.message).toContain(FOOD_CARRY_FULL_MESSAGE)
   })
 
-  it('successful buy copy uses a run-global cursor (no repeats across purchases until cycling)', () => {
-    expect(TOWN_BUY_LINES.length).toBeGreaterThan(1)
+  it('repeated buy food in the same visit reuses the same success line', () => {
     const s0 = makeState()
     s0.resources.gold = 999
+    s0.resources.food = 0
 
     const s1 = processAction(s0, { type: ACTION_TOWN_BUY_FOOD })!
-    const s2 = processAction(s1, { type: ACTION_TOWN_BUY_TROOPS })!
+    const s2 = processAction(s1, { type: ACTION_TOWN_BUY_FOOD })!
 
-    expect(s1.run.copyCursors?.['town.buyFeedback']).toBe(1)
-    expect(s2.run.copyCursors?.['town.buyFeedback']).toBe(2)
-
-    const body1 = s1.ui.message.split('\n').slice(1).join('\n')
-    const body2 = s2.ui.message.split('\n').slice(1).join('\n')
-    expect(TOWN_BUY_LINES.some((l) => l === body1)).toBe(true)
-    expect(TOWN_BUY_LINES.some((l) => l === body2)).toBe(true)
-    expect(body1).not.toBe(body2)
+    const line1 = s1.ui.message.split('\n').slice(1).join('\n')
+    const line2 = s2.ui.message.split('\n').slice(1).join('\n')
+    expect(TOWN_BUY_LINES).toContain(line1)
+    expect(line2).toBe(line1)
+    expect(s2.run.copyCursors?.['town.buyFood']).toBeUndefined()
   })
 
   it('buy troops: pays gold and grants armySize', () => {
@@ -132,7 +130,7 @@ describe('town reducer', () => {
     const next = processAction(s0, { type: ACTION_TOWN_HIRE_SCOUT })!
     expect(next.resources).toEqual(s0.resources)
 
-    const expectedLine = RNG.createRunCopyRandom(s0).perMoveLine(TOWN_SCOUT_ALREADY_HAVE_LINES, { cellId: 4 })
+    const expectedLine = encounterStableLine(s0, 'companion.already.scout', COMPANION_ALREADY_LINES)
     expect(next.ui.message).toBe(`Stonebridge Town\n${expectedLine}`)
   })
 

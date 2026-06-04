@@ -25,7 +25,7 @@ import {
   previewEncounterProvider,
   setEncounterMessage,
 } from '../encounterHelpers'
-import { isTerrainCell, placeFeature } from '../../worldgen'
+import { isTerrainCell, placeFeatureFromSeed } from '../../worldgen'
 import type {
   MechanicDef,
   OnEnterTile,
@@ -63,7 +63,7 @@ const onEnterLocksmith: OnEnterTile = ({ cell, world, pos, stepCount, resources 
     return { message: `${LOCKSMITH_NAME}\n${line}` }
   }
 
-  if (!resources.inventory.includes('blood')) {
+  if (!resources.inventory.includes('bloodVial')) {
     const line = r.perMoveLine(LOCKSMITH_NO_BLOOD_LINES)
     return { message: `${LOCKSMITH_NAME}\n${line}` }
   }
@@ -109,16 +109,16 @@ function reduceLocksmithPayGold(prevState: State, enc: LocksmithEncounter): Stat
 
 // ---- Worldgen placement ----
 
-const placeLocksmith: PlaceWorldProvider = ({ cells, rngState }) => {
+const placeLocksmith: PlaceWorldProvider = ({ cells, rngState, seed }) => {
   const lairPos = findCellByKind(cells, 'lair')
   if (!lairPos) throw new Error('placeLocksmith: wyrm lair must be placed before locksmith')
-  const res = placeFeature(cells, rngState, {
+  placeFeatureFromSeed(cells, seed, 'place.locksmith', {
     count: 1,
     canPlaceAt: (_x, _y, here) => isTerrainCell(here),
     awayFrom: { pos: lairPos, minDistance: LOCKSMITH_LAIR_MIN_DISTANCE },
     buildCell: () => ({ kind: 'locksmith' }),
   })
-  return { rngState: res.rngState }
+  return { rngState }
 }
 
 // ---- Preview plate ----
@@ -142,8 +142,8 @@ function reduceLocksmithPayFood(prevState: State, _enc: LocksmithEncounter): Sta
 }
 
 function consumeBlood(resources: State['resources']): State['resources'] {
-  if (!resources.inventory.includes('blood')) return resources
-  return { ...resources, inventory: resources.inventory.filter((slot) => slot !== 'blood') }
+  if (!resources.inventory.includes('bloodVial')) return resources
+  return { ...resources, inventory: resources.inventory.filter((slot) => slot !== 'bloodVial') }
 }
 
 // ---- Mechanic registration ----

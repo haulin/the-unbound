@@ -5,7 +5,7 @@ import {
   WOODS_AMBUSH_PERCENT,
   WOODS_LOST_PERCENT,
 } from '../../src/core/constants'
-import { rollMoveEvent } from '../../src/core/mechanics/moveEvents'
+import { rollMoveEvent } from '../../src/core/mechanics/encounterHelpers'
 import type { MoveEventPolicy, MoveEventSource } from '../../src/core/mechanics/types'
 import { RNG } from '../../src/core/rng'
 

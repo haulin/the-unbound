@@ -32,6 +32,14 @@ No tutorial screens, no how-to-play modals, no first-launch walkthroughs. Mechan
 
 This is also the project's tonal default — see `lore-and-tone.md`'s *"Nothing is explained that can be discovered."*
 
+### Teach through interaction, not absence
+
+When a control cannot be used right now, prefer **pressing it and getting an in-world refusal** over **removing or hiding the button**. An empty slot does not teach; the player must guess whether the game broke, the offer sold out, or they are not meant to look there. A dead button with a short line teaches the rule in one mistake.
+
+Apply this to duplicate companion hires, no-gold failures, rumor caps, and similar gates. Do not hide hire buttons because the player already has that companion; do not reshuffle the modal to swap in the "next" offer unless fiction supports it (deferred: Crossing, per-PoI spent hires). Skipping the modal entirely when only Leave remains is a separate backlog idea — still not the same as hiding individual actions mid-visit.
+
+Pair with *Teach in line*: the lesson is the line you get **because you pressed**, not copy you read before you tried.
+
 ### Slot composition
 
 Pairing rules and the activation-flash convention for any current or future slot.
@@ -87,19 +95,45 @@ This means action constants, action union types, encounter shapes, signpost rank
 - **Anti-pattern**: per-mechanic explanatory comments that repeat the same rationale in every def. Document the principle once here; let the def files be self-evident.
 - **More**: `docs/plans/2026-05-04-mechanic-modules-registry-design.md`
 
-### RNG discipline: don’t perturb simulation for flavor
+### Seed stability: one stream per concern (pillar)
 
-Be explicit about which kind of “randomness” you need.
+**Player expectation:** the same seed should mean the same **terrain**, the same **tile positions** for each PoI kind, and the same **combat outcomes** on the same move script — unless we ship an intentional **map-breaking** or **content-breaking** change and say so in release notes.
 
-- **Flavor / copy**: use deterministic keyed picks that do **not** consume `world.rngState`.
-  - **Line from a pool**: `RNG.createTileRandom(…).perMoveLine(pool)` or `createRunCopyRandom(…).stableLine` / `advanceCursor` — keyed by `(seed, stepCount, cellId)` or place id; no extra salt needed when the pool identity differs.
-  - **Numeric roll on a tile step** (odds, amounts): `RNG.keyedIntExclusive` / `keyedIntInRange` with `{ seed, stepCount, cellId }`.
-  - **Second draw on the same step** (e.g. move-event percentile already used, then quiet-find %): the first draw consumes that key; add `salt: RNG.domainSalt('feature.draw')` with a stable string label. **Do not** add new exported salt constants — `domainSalt` lives only in `rng.ts`.
-  - **Base + bounded noise** (find amounts, goblin food, brigand gold jitter): `RNG.keyedBoundedBase(keys, label, base, noiseSpan)` or `RNG.streamBoundedBase(stream, base, noiseSpan)` — not ad-hoc `intExclusive(2*n+1)-n` at call sites.
-  - **Quiet-find payout** lives on the biome def (`SWAMP_QUIET_FIND`, …); `encounterHelpers.tryQuietFind` is generic; `resolveTerrainMove` takes `onQuiet`, not a kind registry.
-- **Simulation**: consume stream RNG and thread the returned `rngState` forward.
-- **No-repeat feedback**: store cursors in run state (data-only) and advance them explicitly.
-- **More**: `src/core/rng.ts` and `docs/plans/2026-05-02-rng-copy-policy-plan.md`
+**What went wrong before v0.8:** all worldgen shared one placement tape (`rngState` threaded through every `placeWorld`). Changing camps, town offer rolls, or town count shifted the tape for **every later placer** and for **`world.rngState` at run start**, so fights on the “same” seed diverged even when combat code did not change. Offers on domain streams (`town.offers`) were a start, but **positions and prices still used the shared tape** — so the expectation of stability was partly luck and partly misaligned docs.
+
+**Target architecture (normative for new work):**
+
+| Concern | Stream | Changing it affects |
+|--------|--------|---------------------|
+| Terrain noise | `place.terrain` (or root seed only) | Terrain only |
+| PoI positions + names for kind *K* | `place.<kind>` (e.g. `place.town`, `place.camp`) | That kind’s tiles only |
+| PoI menus/prices for kind *K* | `<kind>.offers` (already used for towns/camps/farms) | That kind’s cell data only |
+| Ambush/lost *whether* | Keyed `{ seed, stepCount, cellId }` | Nothing else |
+| Lore / shop feedback | Keyed or run `copyCursors` | Nothing else |
+| Combat at a given cell (round outcomes, spawn size for that fight) | Keyed `{ seed, cellId, salt: 'fight.' + roundIndex }` or a per-encounter fork — **target** | Other fights and unrelated actions on the run |
+| Run-wide sim tape | `world.rngState` — **legacy**; minimize new uses | Everything after each draw |
+
+**Rules:**
+
+1. **Do not** spend placement-tape draws for offer algorithms, flavor, or unrelated mechanics.
+2. **Do** use `RNG.createStreamRandomFromSeed(seed, 'place.town')` (etc.) for every random choice inside that mechanic’s `placeWorld`, including `placeFeature` position attempts and per-cell price rolls.
+3. **`MECHANICS` order** still matters for **reading the grid** (gate before locksmith distance checks), not for sharing dice between placers.
+4. **Classify PRs:** mechanical-only (reducers/combat) → layout + offers + fight script unchanged; content-only → offers/prices; map-breaking → positions or counts — re-snapshot `world.determinism.test.ts` and tell playtesters.
+5. **Witness tests:** layout golden for tiles; optional combat witness (fixed seed + moves file) so fight sequences are checkable when offers change.
+
+**Flavor / copy** (unchanged): `createTileRandom` / `createRunCopyRandom` / `keyedInt*` — never `world.rngState`.
+
+**TIC-80 text:** player-visible strings in `lore.ts` (and UI copy) must be **ASCII-only** — use `-` not em dash `—`, straight quotes `"` `'` not curly. TIC fonts cannot render many Unicode punctuation marks; garbled glyphs read as bugs.
+
+**Lore line selection (shop + encounter copy):** not a gameplay pillar — a pacing rule. Within one PoI visit, **denials and routine purchases** (no gold, carry full, buy food/troops, farm food, hire refusals) use `encounterStableLine` so button-mashing does not drain the pool. **Rumors** and **one-shot outcomes** (combat flee/victory/pay success) may advance `copyCursors` for variety. Revisit per pool when adding a mechanic; default to per-visit stable unless fiction wants a fresh line each press.
+
+**Lore-cycling audit (v0.8 and after):** for every random outcome, document *what it is keyed from*. v0.8 fixed **copy** (fail lines per encounter, split buy tags, no stream spend on flavor). **Combat hits** and **world placement** still used the legacy global tape — that was wrong relative to the product rule *“buying a scout must not change the fight waiting at D4”* and *“the wyrm fight script must not depend on how many ambushes you took earlier.”* Wyrm **enter lore** is keyed (`perMoveLine` / `stableLine`); wyrm **FIGHT rounds** are not — they consume `world.rngState` like any other combat.
+
+**Legacy sim tape:** `world.rngState` still threads combat today. New work should **not** add more global-tape consumers; migrate fights to keyed or per-`sourceCellId` streams. Worldgen should leave the tape at a predictable point (`place.start` only) so map edits do not re-roll unrelated fights.
+
+**Status:** v0.8+ should migrate placers to per-kind `place.*` streams; until then, treat any `placeWorld` edit as map-breaking until proven otherwise.
+
+- **More:** `src/core/rng.ts`, `tests/core/world.determinism.test.ts`, `docs/plans/2026-05-02-rng-copy-policy-plan.md`
 
 ### Single-source-of-truth is a rule, not a vibe
 

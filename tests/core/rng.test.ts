@@ -6,6 +6,20 @@ describe('rng', () => {
     expect(RNG.createStreamRandomFromSeed(1).rngState).toBe(2779096484)
   })
 
+  it('createStreamRandomFromSeed domain forks a stable sub-stream', () => {
+    const main = RNG.createStreamRandomFromSeed(1).rngState
+    const offers = RNG.createStreamRandomFromSeed(1, 'town.offers').rngState
+    expect(offers).not.toBe(main)
+    expect(RNG.createStreamRandomFromSeed(1, 'town.offers').rngState).toBe(offers)
+  })
+
+  it('keyedIntInRange accepts string salt labels', () => {
+    const keys = { seed: 1, stepCount: 2, cellId: 3 }
+    const a = RNG.keyedIntInRange({ ...keys, salt: 'food.find' }, -2, 2)
+    const b = RNG.keyedIntInRange({ ...keys, salt: 'food.find' }, -2, 2)
+    expect(a).toBe(b)
+  })
+
   it('createStreamRandom.intExclusive', () => {
     const r = RNG.createStreamRandom(1)
     expect(r.intExclusive(10)).toBe(9)

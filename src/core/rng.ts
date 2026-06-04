@@ -23,7 +23,7 @@ function seedToRngState(seed: number) {
   return s
 }
 
-type PickState = { seed: number; stepCount: number; cellId: number; salt?: number }
+type PickState = { seed: number; stepCount: number; cellId: number; salt?: number | string }
 
 function normalizeMaxExclusive(maxExclusive: number): number {
   if (!Number.isFinite(maxExclusive)) return 1
@@ -37,11 +37,24 @@ function randInt(rngState: number, maxExclusive: number) {
   return { rngState: next, value: next % m }
 }
 
+function domainSalt(label: string): number {
+  let h = 0
+  for (let i = 0; i < label.length; i++) {
+    h = (Math.imul(31, h) + label.charCodeAt(i)) | 0
+  }
+  return h >>> 0
+}
+
+function resolveSalt(salt?: number | string): number {
+  if (salt == null) return 0
+  return u32(typeof salt === 'string' ? domainSalt(salt) : salt)
+}
+
 function hashSeedStepCellInternal(opts: PickState): number {
   const base = seedToRngState(opts.seed | 0)
   const stepMix = u32(Math.imul(opts.stepCount | 0, 2654435761))
   const cellId = u32(opts.cellId | 0)
-  const salt = u32(opts.salt == null ? 0 : opts.salt | 0)
+  const salt = resolveSalt(opts.salt)
   return xorshift32(u32(base ^ stepMix ^ cellId ^ salt))
 }
 
@@ -68,7 +81,7 @@ function pickFromPool<T>(state: PickState, pool: readonly T[]): T | undefined {
   return pool[pickIndex(state, pool.length)]
 }
 
-function shuffledIndices(args: { seed: number; length: number; salt?: number }): number[] {
+function shuffledIndices(args: { seed: number; length: number; salt?: number | string }): number[] {
   const n = Number.isFinite(args.length) ? Math.trunc(args.length) : 0
   if (n <= 0) return []
 
@@ -76,7 +89,7 @@ function shuffledIndices(args: { seed: number; length: number; salt?: number }):
   for (let i = 0; i < n; i++) out.push(i)
   if (n <= 1) return out
 
-  const baseSalt = args.salt == null ? 0 : args.salt | 0
+  const baseSalt = resolveSalt(args.salt)
   const cellId = n | 0
 
   for (let i = n - 1; i > 0; i--) {
@@ -93,14 +106,14 @@ function shuffledIndices(args: { seed: number; length: number; salt?: number }):
 // Copy policies (pure)
 // ----------------------------
 
-function stable(args: { seed: number; placeId: number; pool: readonly string[]; salt?: number }): string {
+function stable(args: { seed: number; placeId: number; pool: readonly string[]; salt?: number | string }): string {
   const { seed, placeId, pool, salt } = args
   if (!pool.length) return ''
   const state = salt == null ? { seed, stepCount: 0, cellId: placeId } : { seed, stepCount: 0, cellId: placeId, salt }
   return pickFromPool(state, pool) || pool[0] || ''
 }
 
-function perMove(args: { seed: number; stepCount: number; cellId: number; pool: readonly string[]; salt?: number }): string {
+function perMove(args: { seed: number; stepCount: number; cellId: number; pool: readonly string[]; salt?: number | string }): string {
   const { seed, stepCount, cellId, pool, salt } = args
   if (!pool.length) return ''
   const state = salt == null ? { seed, stepCount, cellId } : { seed, stepCount, cellId, salt }
@@ -111,7 +124,7 @@ function cursorAdvance(args: {
   seed: number
   cursor: number
   pool: readonly string[]
-  salt?: number
+  salt?: number | string
 }): { line: string; nextCursor: number } {
   const { seed, pool } = args
   const n = pool.length
@@ -131,7 +144,7 @@ function getCopyCursors(run: Run): Record<string, number> {
   return run.copyCursors ?? {}
 }
 
-function advanceRunCursor(args: { run: Run; seed: number; tag: string; pool: readonly string[]; salt?: number }): { line: string; run: Run } {
+function advanceRunCursor(args: { run: Run; seed: number; tag: string; pool: readonly string[]; salt?: number | string }): { line: string; run: Run } {
   const cursors = getCopyCursors(args.run)
   const cursor = cursors[args.tag] ?? 0
   const pick =
@@ -148,11 +161,11 @@ function createTileRandom(args: { world: World; stepCount: number; pos: Vec2 }) 
   const stepCount = args.stepCount
 
   return {
-    stableLine: (pool: readonly string[], opts?: { placeId?: number; salt?: number }) =>
+    stableLine: (pool: readonly string[], opts?: { placeId?: number; salt?: number | string }) =>
       opts?.salt == null
         ? stable({ seed, placeId: opts?.placeId ?? cellId, pool })
         : stable({ seed, placeId: opts?.placeId ?? cellId, pool, salt: opts.salt }),
-    perMoveLine: (pool: readonly string[], opts?: { cellId?: number; salt?: number }) =>
+    perMoveLine: (pool: readonly string[], opts?: { cellId?: number; salt?: number | string }) =>
       opts?.salt == null
         ? perMove({ seed, stepCount, cellId: opts?.cellId ?? cellId, pool })
         : perMove({ seed, stepCount, cellId: opts?.cellId ?? cellId, pool, salt: opts.salt }),
@@ -165,15 +178,15 @@ function createRunCopyRandom(state: State) {
   const cellId = cellIdForPos(state.world, state.player.position)
 
   return {
-    stableLine: (pool: readonly string[], opts?: { placeId?: number; salt?: number }) =>
+    stableLine: (pool: readonly string[], opts?: { placeId?: number; salt?: number | string }) =>
       opts?.salt == null
         ? stable({ seed, placeId: opts?.placeId ?? cellId, pool })
         : stable({ seed, placeId: opts?.placeId ?? cellId, pool, salt: opts.salt }),
-    perMoveLine: (pool: readonly string[], opts?: { cellId?: number; stepCount?: number; salt?: number }) =>
+    perMoveLine: (pool: readonly string[], opts?: { cellId?: number; stepCount?: number; salt?: number | string }) =>
       opts?.salt == null
         ? perMove({ seed, stepCount: opts?.stepCount ?? stepCount, cellId: opts?.cellId ?? cellId, pool })
         : perMove({ seed, stepCount: opts?.stepCount ?? stepCount, cellId: opts?.cellId ?? cellId, pool, salt: opts.salt }),
-    advanceCursor: (tag: string, pool: readonly string[], opts?: { salt?: number }): { line: string; nextState: State } => {
+    advanceCursor: (tag: string, pool: readonly string[], opts?: { salt?: number | string }): { line: string; nextState: State } => {
       const next =
         opts?.salt == null ? advanceRunCursor({ run: state.run, seed, tag, pool }) : advanceRunCursor({ run: state.run, seed, tag, pool, salt: opts.salt })
       return { line: next.line, nextState: { ...state, run: next.run } }
@@ -203,37 +216,14 @@ function createStreamRandom(rngState: number) {
   }
 }
 
-function createStreamRandomFromSeed(seed: number) {
-  return createStreamRandom(seedToRngState(seed))
-}
-
-// Stable salt for a second (or third) keyed draw at the same seed/step/cellId.
-// Prefer `perMoveLine` / `stableLine` when picking copy; use `domainSalt` only for numeric rolls.
-function domainSalt(label: string): number {
-  let h = 0
-  for (let i = 0; i < label.length; i++) {
-    h = (Math.imul(31, h) + label.charCodeAt(i)) | 0
-  }
-  return h >>> 0
-}
-
-type KeyedRng = { seed: number; stepCount: number; cellId: number }
-
-function keyedBoundedBase(keys: KeyedRng, saltLabel: string, base: number, noiseSpan: number): number {
-  const noise = pickIntInRange({ ...keys, salt: domainSalt(saltLabel) }, -noiseSpan, noiseSpan)
-  return Math.max(0, base + noise)
-}
-
-function streamSignedNoise(r: ReturnType<typeof createStreamRandom>, noiseSpan: number): number {
-  return r.intExclusive(2 * noiseSpan + 1) - noiseSpan
-}
-
-function streamBoundedBase(r: ReturnType<typeof createStreamRandom>, base: number, noiseSpan: number): number {
-  return Math.max(0, base + streamSignedNoise(r, noiseSpan))
+// Optional `domain` forks a deterministic sub-stream (e.g. town offers) without
+// advancing the main worldgen placement `rngState`.
+function createStreamRandomFromSeed(seed: number, domain?: string) {
+  const mixed = domain == null ? (seed | 0) : ((seed | 0) ^ domainSalt(domain)) >>> 0
+  return createStreamRandom(seedToRngState(mixed))
 }
 
 export const RNG = {
-  domainSalt,
   // Facades (preferred)
   createTileRandom,
   createRunCopyRandom,
@@ -241,10 +231,8 @@ export const RNG = {
   createStreamRandomFromSeed,
 
   // Keyed deterministic helpers (stable, no global rngState consumption).
+  // `salt` may be a string label for a second draw at the same seed/step/cell.
   keyedIntExclusive: pickIntExclusive,
   keyedIntInRange: pickIntInRange,
-  keyedBoundedBase,
-  streamSignedNoise,
-  streamBoundedBase,
 } as const
 

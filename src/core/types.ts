@@ -7,13 +7,13 @@ import type {
   ACTION_TOGGLE_MAP,
   ACTION_TOGGLE_MINIMAP,
 } from './constants'
-import type { CampAction } from './mechanics/defs/camp'
 import type { CombatAction } from './mechanics/defs/combat'
-import type { FarmAction } from './mechanics/defs/farm'
 import type { LocksmithAction } from './mechanics/defs/locksmith'
+import type { CampAction, CampOfferKind } from './mechanics/defs/camp'
+import type { FarmAction, FarmOfferKind } from './mechanics/defs/farm'
 import type { TownAction, TownOfferKind } from './mechanics/defs/town'
 
-export type { TownOfferKind }
+export type { CampOfferKind, FarmOfferKind, TownOfferKind }
 
 export type Vec2 = { x: number; y: number }
 
@@ -38,8 +38,21 @@ export type GateOpenCell = { kind: 'gateOpen' }
 export type LocksmithCell = { kind: 'locksmith' }
 export type LairCell = { kind: 'lair'; id: number; isBled: boolean }
 export type SignpostCell = { kind: 'signpost' }
-export type FarmCell = { kind: 'farm'; id: number; name: string; beastGoldCost: number }
-export type CampCell = { kind: 'camp'; id: number; name: string; nextReadyStep: number }
+export type FarmCell = {
+  kind: 'farm'
+  id: number
+  name: string
+  offers: readonly FarmOfferKind[]
+  companionHireGold: number
+}
+export type CampCell = {
+  kind: 'camp'
+  id: number
+  name: string
+  nextReadyStep: number
+  offers: readonly CampOfferKind[]
+  companionHireGold: number
+}
 // `currentGroup` tracks the active enemy band so flee returns to the same
 // wounded count on re-entry. `null` = no active band (fresh cell, or post-
 // defeat-cooldown). Set on fresh roll in `henge.onEnterTile`, updated to
@@ -60,7 +73,7 @@ export type TownCell = {
   id: number
   name: string
   offers: readonly TownOfferKind[]
-  prices: { foodGold: number; troopsGold: number; scoutGold: number; rumorGold: number }
+  prices: { foodGold: number; troopsGold: number; rumorGold: number; companionHireGold: number }
   bundles: { food: number; troops: number }
 }
 
@@ -170,6 +183,7 @@ export type CombatEncounter = {
   // (henge persistence) resets this to the resumed count so recruit
   // means "you've struck them this engagement".
   initialSpawn: number
+  armyAtCombatStart: number
   sourceCellId: number
   restoreMessage: string
 }
@@ -184,6 +198,7 @@ export type TownEncounter = {
   kind: 'town'
   sourceCellId: number
   restoreMessage: string
+  rumorsBought: number
 }
 
 export type FarmEncounter = {

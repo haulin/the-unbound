@@ -18,8 +18,7 @@ import {
 import { gameOverMessage } from './gameOver'
 import { SPRITES } from './spriteIds'
 import { generateWorld } from './world'
-import { onEnterDefaultTerrain } from './mechanics/onEnter'
-import { applyEnterAnims } from './mechanics/encounterHelpers'
+import { applyEnterAnims, onEnterDefaultTerrain } from './mechanics/encounterHelpers'
 import { MECHANIC_INDEX } from './mechanics'
 import type { TileEnterResult } from './mechanics/types'
 import {
@@ -35,7 +34,8 @@ import {
   type Ui,
   type Cell,
 } from './types'
-import { enqueueAnim, enqueueDeltas, enqueueGridTransition } from './uiAnim'
+import { applyDeltas, pushResourceDeltas, type ResourceDelta } from './mechanics/encounterHelpers'
+import { enqueueAnim, enqueueGridTransition } from './uiAnim'
 import { applyFoodCapOnGain } from './foodCarry'
 import { updateRunPathMemoryAfterMove } from './gameMap'
 
@@ -242,7 +242,7 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
   const appliedFoodDelta = nextResources.food - baseResources.food
   if (appliedFoodDelta) foodDeltas.push(appliedFoodDelta)
   const appliedGoldDelta = nextResources.gold - baseResources.gold
-  if (appliedGoldDelta > 0) goldDeltas.push(appliedGoldDelta)
+  if (appliedGoldDelta) goldDeltas.push(appliedGoldDelta)
   const nextHasWon = prevState.run.hasWon || !!outcome.hasWon
 
   // wouldGameOver implies isGameOver (handler skipped, so resources unchanged from baseResources).
@@ -293,32 +293,36 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
 
   if (!ENABLE_ANIMATIONS) return baseState
 
-  const startFrame = baseUi.clock.frame
-  let uiWith = baseState.ui
-  uiWith = enqueueDeltas(uiWith, { target: 'food', deltas: foodDeltas, startFrame })
-  uiWith = enqueueDeltas(uiWith, { target: 'gold', deltas: goldDeltas, startFrame })
-  uiWith = enqueueDeltas(uiWith, { target: 'army', deltas: armyDeltas, startFrame })
+  const moveDeltas: ResourceDelta[] = []
+  pushResourceDeltas(moveDeltas, 'food', foodDeltas)
+  pushResourceDeltas(moveDeltas, 'gold', goldDeltas)
+  pushResourceDeltas(moveDeltas, 'army', armyDeltas)
+  let next = applyDeltas(baseState, { message, deltas: moveDeltas })
+  const slideStart = next.ui.clock.frame
 
   // Mechanic-supplied enter-anims (e.g. grid transitions into an encounter) play AFTER the
   // move-slide reveal completes.
   if (outcome.enterAnims && outcome.enterAnims.length) {
-    uiWith = applyEnterAnims(uiWith, outcome.enterAnims, startFrame + MOVE_SLIDE_FRAMES)
+    next = { ...next, ui: applyEnterAnims(next.ui, outcome.enterAnims, slideStart + MOVE_SLIDE_FRAMES) }
   }
 
   // Teleport flashes 'blank' → 'overworld' instead of sliding (the player doesn't walk there).
   if (teleported) {
-    uiWith = enqueueGridTransition(uiWith, { startFrame, from: 'blank', to: 'overworld' })
+    next = { ...next, ui: enqueueGridTransition(next.ui, { startFrame: slideStart, from: 'blank', to: 'overworld' }) }
   } else {
-    uiWith = enqueueAnim(uiWith, {
-      kind: 'moveSlide',
-      startFrame,
-      durationFrames: MOVE_SLIDE_FRAMES,
-      blocksInput: true,
-      params: { fromPos: { x: prevPos.x, y: prevPos.y }, toPos: { x: nextPos.x, y: nextPos.y }, dx, dy },
-    })
+    next = {
+      ...next,
+      ui: enqueueAnim(next.ui, {
+        kind: 'moveSlide',
+        startFrame: slideStart,
+        durationFrames: MOVE_SLIDE_FRAMES,
+        blocksInput: true,
+        params: { fromPos: { x: prevPos.x, y: prevPos.y }, toPos: { x: nextPos.x, y: nextPos.y }, dx, dy },
+      }),
+    }
   }
 
-  return { ...baseState, ui: uiWith }
+  return next
 }
 
 function reduceRestart(s: State): State {

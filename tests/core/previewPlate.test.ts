@@ -50,18 +50,32 @@ function lookup(kind: EncounterKind) {
 describe('previewPlate hooks', () => {
   describe('camp', () => {
     it('returns food + army lines when the camp is ready', () => {
-      const camp: Cell = { kind: 'camp', id: 4, name: 'Ember Watch', nextReadyStep: 0 }
+      const camp: Cell = {
+        kind: 'camp',
+        id: 4,
+        name: 'Ember Watch',
+        nextReadyStep: 0,
+        offers: ['CAMP_SEARCH'],
+        companionHireGold: 15,
+      }
       const state = makeState(camp, { kind: 'camp', sourceCellId: 4, restoreMessage: '' })
       const lines = lookup('camp')(state)
       expect(lines).not.toBeNull()
       expect(lines!.length).toBeGreaterThanOrEqual(2)
       expect(lines![0]).toMatchObject({ spriteId: SPRITES.inventory.food, text: `+${CAMP_FOOD_GAIN}` })
-      expect(lines![1]!.spriteId).toBe(SPRITES.inventory.troop)
+      expect(lines![1]!.spriteId).toBe(SPRITES.inventory.army)
       expect(lines![1]!.text.startsWith('+')).toBe(true)
     })
 
     it('returns null when the camp is on cooldown and no scout cost applies', () => {
-      const camp: Cell = { kind: 'camp', id: 4, name: 'Ember Watch', nextReadyStep: 100 }
+      const camp: Cell = {
+        kind: 'camp',
+        id: 4,
+        name: 'Ember Watch',
+        nextReadyStep: 100,
+        offers: ['CAMP_SEARCH'],
+        companionHireGold: 15,
+      }
       const state = makeState(camp, { kind: 'camp', sourceCellId: 4, restoreMessage: '' })
       const lines = lookup('camp')(state)
       expect(lines).toBeNull()
@@ -69,21 +83,21 @@ describe('previewPlate hooks', () => {
   })
 
   describe('town', () => {
-    it('one line per offer, in offer order, with the offer price', () => {
+    it('one line per offer, in left/top/bottom slot order, with the offer price', () => {
       const town: Cell = {
         kind: 'town',
         id: 9,
         name: 'Stonebridge',
         offers: ['buyFood', 'buyTroops', 'hireScout'],
-        prices: { foodGold: 3, troopsGold: 5, scoutGold: 12, rumorGold: 4 },
+        prices: { foodGold: 3, troopsGold: 5, companionHireGold: 12, rumorGold: 4 },
         bundles: { food: 3, troops: 2 },
       }
-      const state = makeState(town, { kind: 'town', sourceCellId: 9, restoreMessage: '' })
+      const state = makeState(town, { kind: 'town', sourceCellId: 9, restoreMessage: '', rumorsBought: 0 })
       const lines = lookup('town')(state)
       expect(lines).not.toBeNull()
       expect(lines!.length).toBe(3)
       expect(lines![0]).toEqual({ spriteId: SPRITES.inventory.food, text: '-3' })
-      expect(lines![1]).toEqual({ spriteId: SPRITES.inventory.troop, text: '-5' })
+      expect(lines![1]).toEqual({ spriteId: SPRITES.inventory.army, text: '-5' })
       expect(lines![2]).toEqual({ spriteId: SPRITES.inventory.scout, text: '-12' })
     })
 
@@ -93,10 +107,10 @@ describe('previewPlate hooks', () => {
         id: 9,
         name: 'Stonebridge',
         offers: ['buyRumors'],
-        prices: { foodGold: 0, troopsGold: 0, scoutGold: 0, rumorGold: 7 },
+        prices: { foodGold: 0, troopsGold: 0, companionHireGold: 0, rumorGold: 7 },
         bundles: { food: 3, troops: 2 },
       }
-      const state = makeState(town, { kind: 'town', sourceCellId: 9, restoreMessage: '' })
+      const state = makeState(town, { kind: 'town', sourceCellId: 9, restoreMessage: '', rumorsBought: 0 })
       const lines = lookup('town')(state)
       expect(lines).toEqual([{ spriteId: SPRITES.actions.rumor, text: '-7' }])
     })
@@ -104,7 +118,13 @@ describe('previewPlate hooks', () => {
 
   describe('farm', () => {
     it('returns the food buy cost line and the beast price line', () => {
-      const farm: Cell = { kind: 'farm', id: 4, name: 'Greyfield', beastGoldCost: 17 }
+      const farm: Cell = {
+        kind: 'farm',
+        id: 4,
+        name: 'Greyfield',
+        offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'],
+        companionHireGold: 17,
+      }
       const state = makeState(farm, { kind: 'farm', sourceCellId: 4, restoreMessage: '' })
       const lines = lookup('farm')(state)
       expect(lines).toEqual([
@@ -139,6 +159,7 @@ describe('previewPlate hooks', () => {
         kind: 'combat',
         enemyArmySize,
         initialSpawn,
+        armyAtCombatStart: 10,
         sourceCellId: 4,
         restoreMessage: '',
       })
@@ -157,6 +178,7 @@ describe('previewPlate hooks', () => {
           kind: 'combat',
           enemyArmySize,
           initialSpawn,
+          armyAtCombatStart: 10,
           sourceCellId: 4,
           restoreMessage: '',
         },
@@ -176,6 +198,7 @@ describe('previewPlate hooks', () => {
         kind: 'combat',
         enemyArmySize,
         initialSpawn,
+        armyAtCombatStart: 10,
         sourceCellId: 4,
         restoreMessage: '',
       })
@@ -198,6 +221,7 @@ describe('previewPlate hooks', () => {
         kind: 'combat',
         enemyArmySize: initialSpawn,
         initialSpawn,
+        armyAtCombatStart: 10,
         sourceCellId: 4,
         restoreMessage: '',
       })

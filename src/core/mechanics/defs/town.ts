@@ -1,5 +1,10 @@
 import {
   BARKEEP_TIPS,
+  COMPANION_HIRE_GOLD_MAX,
+  COMPANION_HIRE_GOLD_MIN,
+  HEALER_UPKEEP_GOLD,
+  POI_MAX_OFFERS,
+  POI_MIN_OFFERS,
   TOWN_BUY_LINES,
   TOWN_COUNT,
   TOWN_ENTER_LINES,
@@ -9,13 +14,13 @@ import {
   TOWN_PRICE_FOOD_MIN,
   TOWN_PRICE_RUMOR_MAX,
   TOWN_PRICE_RUMOR_MIN,
-  TOWN_PRICE_SCOUT_MAX,
-  TOWN_PRICE_SCOUT_MIN,
   TOWN_PRICE_TROOPS_MAX,
   TOWN_PRICE_TROOPS_MIN,
-  TOWN_SCOUT_ALREADY_HAVE_LINES,
+  TOWN_RUMOR_EXHAUSTED_LINES,
+  TOWN_RUMORS_PER_VISIT_MAX,
   TOWN_SCOUT_HIRE_LINES,
   TOWN_TROOPS_BUNDLE,
+  HEALER_BUY_LINES,
 } from '../../constants'
 import { cellIdForPos, getCellAt } from '../../cells'
 import { applyFoodCapOnGain, foodCarryCap, FOOD_CARRY_FULL_MESSAGE } from '../../foodCarry'
@@ -25,15 +30,22 @@ import type { Cell, State, TownCell, TownEncounter } from '../../types'
 import {
   applyDeltas,
   buy,
+  encounterStableLine,
   gridButton,
   leaveEncounter,
   makeRightGrid,
   noGoldResponse,
   previewEncounterProvider,
+  offersInGridOrder,
+  hireCompanion,
+  offersToGridLayout,
+  previewPlateForOffers,
+  refuseCompanionHire,
   setEncounterMessage,
   type RightGridActionCell,
 } from '../encounterHelpers'
-import { cellId, isTerrainCell, placeNamedFeature } from '../../worldgen'
+import { buildOfferSets, cellId, isTerrainCell, placeNamedFeatureFromSeed } from '../../worldgen'
+import type { OfferCategory } from '../../worldgen'
 import type {
   MechanicDef,
   OnEnterTile,
@@ -46,77 +58,71 @@ import type {
 export const ACTION_TOWN_BUY_FOOD = 'buyFood' as const
 export const ACTION_TOWN_BUY_TROOPS = 'buyTroops' as const
 export const ACTION_TOWN_HIRE_SCOUT = 'hireScout' as const
+export const ACTION_TOWN_HIRE_HEALER = 'hireHealer' as const
 export const ACTION_TOWN_BUY_RUMOR = 'buyRumors' as const
 export const ACTION_TOWN_LEAVE = 'TOWN_LEAVE' as const
 
+type TownPriceKey = keyof TownCell['prices']
+
+function townPriceLine(
+  s: State,
+  spriteId: number,
+  priceKey: TownPriceKey,
+): readonly { spriteId: number; text: string }[] {
+  const town = getCellAt(s.world, s.player.position) as TownCell
+  return [{ spriteId, text: `-${town.prices[priceKey]}` }]
+}
+
 type TownOfferSpec = {
+  category: OfferCategory
   spriteId: number
-  priceKey: keyof TownCell['prices']
+  priceKey: TownPriceKey
   reduce: (s: State, town: TownCell) => State
+  previewPlate: (s: State) => readonly { spriteId: number; text: string }[]
 }
 
 const TOWN_OFFERS = {
-  [ACTION_TOWN_BUY_FOOD]:   { spriteId: SPRITES.inventory.food,  priceKey: 'foodGold',   reduce: reduceTownBuyFood   },
-  [ACTION_TOWN_BUY_TROOPS]: { spriteId: SPRITES.inventory.troop, priceKey: 'troopsGold', reduce: reduceTownBuyTroops },
-  [ACTION_TOWN_HIRE_SCOUT]: { spriteId: SPRITES.inventory.scout, priceKey: 'scoutGold',  reduce: reduceTownHireScout },
-  [ACTION_TOWN_BUY_RUMOR]:  { spriteId: SPRITES.actions.rumor,   priceKey: 'rumorGold',  reduce: reduceTownBuyRumor  },
+  [ACTION_TOWN_BUY_FOOD]: {
+    category: 'economy',
+    spriteId: SPRITES.inventory.food,
+    priceKey: 'foodGold',
+    reduce: reduceTownBuyFood,
+    previewPlate: (s) => townPriceLine(s, SPRITES.inventory.food, 'foodGold'),
+  },
+  [ACTION_TOWN_BUY_TROOPS]: {
+    category: 'economy',
+    spriteId: SPRITES.inventory.army,
+    priceKey: 'troopsGold',
+    reduce: reduceTownBuyTroops,
+    previewPlate: (s) => townPriceLine(s, SPRITES.inventory.army, 'troopsGold'),
+  },
+  [ACTION_TOWN_HIRE_SCOUT]: {
+    category: 'companion_hire',
+    spriteId: SPRITES.inventory.scout,
+    priceKey: 'companionHireGold',
+    reduce: reduceTownHireScout,
+    previewPlate: (s) => townPriceLine(s, SPRITES.inventory.scout, 'companionHireGold'),
+  },
+  [ACTION_TOWN_HIRE_HEALER]: {
+    category: 'companion_hire',
+    spriteId: SPRITES.inventory.healer,
+    priceKey: 'companionHireGold',
+    reduce: reduceTownHireHealer,
+    previewPlate: (s) => townPriceLine(s, SPRITES.inventory.healer, 'companionHireGold'),
+  },
+  [ACTION_TOWN_BUY_RUMOR]: {
+    category: 'economy',
+    spriteId: SPRITES.actions.rumor,
+    priceKey: 'rumorGold',
+    reduce: reduceTownBuyRumor,
+    previewPlate: (s) => townPriceLine(s, SPRITES.actions.rumor, 'rumorGold'),
+  },
 } as const satisfies Record<string, TownOfferSpec>
 
 export type TownOfferKind = keyof typeof TOWN_OFFERS
 export type TownAction = { type: TownOfferKind } | { type: typeof ACTION_TOWN_LEAVE }
 
-const BASE_OFFERS = Object.keys(TOWN_OFFERS) as TownOfferKind[]
-
-const OFFERS_PER_TOWN = 3
-
-type TownRng = ReturnType<typeof RNG.createStreamRandom>
-
-function buildTownOfferSets(rng: TownRng): TownOfferKind[][] {
-  if (BASE_OFFERS.length > TOWN_COUNT * OFFERS_PER_TOWN) {
-    throw new Error('TOWN_COUNT is too low for BASE_OFFERS — bump TOWN_COUNT in constants.ts')
-  }
-
-  const townCount = TOWN_COUNT
-  const towns: TownOfferKind[][] = Array.from({ length: townCount }, () => [])
-
-  towns[0]!.push(ACTION_TOWN_HIRE_SCOUT)
-
-  const mustPlace = BASE_OFFERS.filter((o) => o !== ACTION_TOWN_HIRE_SCOUT)
-  for (let i = 0; i < mustPlace.length; i++) {
-    const offer = mustPlace[i]!
-    let placed = false
-    for (let t = 0; t < townCount; t++) {
-      const slot = towns[t]!
-      if (slot.length < OFFERS_PER_TOWN && !slot.includes(offer)) {
-        slot.push(offer)
-        placed = true
-        break
-      }
-    }
-    if (!placed) {
-      for (let t = 0; t < townCount; t++) {
-        const slot = towns[t]!
-        if (slot.length < OFFERS_PER_TOWN) {
-          slot.push(offer)
-          break
-        }
-      }
-    }
-  }
-
-  for (let t = 0; t < townCount; t++) {
-    const slot = towns[t]!
-    const available = BASE_OFFERS.filter((o) => !slot.includes(o))
-    while (slot.length < OFFERS_PER_TOWN && available.length > 0) {
-      const pick = available[rng.intExclusive(available.length)]!
-      slot.push(pick)
-      const idx = available.indexOf(pick)
-      if (idx >= 0) available.splice(idx, 1)
-    }
-  }
-
-  return towns
-}
+const TOWN_OFFER_POOL = Object.keys(TOWN_OFFERS) as TownOfferKind[]
 
 function townPrefix(town: TownCell): string {
   const name = town.name || 'A Town'
@@ -133,9 +139,7 @@ function rumorPool(): readonly string[] {
   return pool
 }
 
-// ---- Encounter open ----
-
-const onEnterTown: OnEnterTile = ({ cell, world, pos, stepCount }) => {
+const onEnterTown: OnEnterTile = ({ cell, world, pos, stepCount, resources }) => {
   if (cell.kind !== 'town') return {}
   const town = getCellAt(world, pos)
   if (!town || town.kind !== 'town') return {}
@@ -143,23 +147,27 @@ const onEnterTown: OnEnterTile = ({ cell, world, pos, stepCount }) => {
   const name = town.name || 'A Town'
   const r = RNG.createTileRandom({ world, stepCount, pos })
   const line = r.stableLine(TOWN_ENTER_LINES, { placeId: town.id })
+  let nextResources = resources
+  if (resources.party.includes('healer') && resources.gold >= HEALER_UPKEEP_GOLD) {
+    nextResources = { ...resources, gold: resources.gold - HEALER_UPKEEP_GOLD }
+  }
   const message = `${name} Town\n${line}`
   const cellId = cellIdForPos(world, pos)
   const encounter: TownEncounter = {
     kind: 'town',
     sourceCellId: cellId,
     restoreMessage: message,
+    rumorsBought: 0,
   }
   const result: TileEnterResult = {
     message,
     knowsPosition: true,
     encounter,
+    resources: nextResources,
     enterAnims: [{ kind: 'gridTransition', from: 'overworld', to: 'town' }],
   }
   return result
 }
-
-// ---- Encounter actions ----
 
 const reduceTownAction: ReduceEncounterAction = (prevState, action) => {
   if (action.type !== ACTION_TOWN_LEAVE && !(action.type in TOWN_OFFERS)) return null
@@ -176,17 +184,16 @@ function reduceTownBuyFood(prevState: State, town: TownCell): State {
   }
 
   const result = buy(prevState.resources, { gold: town.prices.foodGold, gain: { food: town.bundles.food } })
-  if (result.outcome === 'noFunds') return noGoldResponse(prevState, prefix, town.id)
+  if (result.outcome === 'noFunds') return noGoldResponse(prevState, prefix)
 
   const clamped = applyFoodCapOnGain(prevState.resources, result.resources)
   const appliedFoodDelta = clamped.food - prevState.resources.food
   const deltas = result.deltas.map((d) => (d.target === 'food' ? { ...d, delta: appliedFoodDelta } : d))
 
-  const pick = RNG.createRunCopyRandom(prevState).advanceCursor('town.buyFeedback', TOWN_BUY_LINES)
+  const line = encounterStableLine(prevState, 'town.buyFood', TOWN_BUY_LINES)
   return applyDeltas(prevState, {
     resources: clamped,
-    run: pick.nextState.run,
-    message: `${prefix}\n${pick.line}`,
+    message: `${prefix}\n${line}`,
     deltas,
   })
 }
@@ -194,27 +201,24 @@ function reduceTownBuyFood(prevState: State, town: TownCell): State {
 function reduceTownBuyTroops(prevState: State, town: TownCell): State {
   const prefix = townPrefix(town)
   const result = buy(prevState.resources, { gold: town.prices.troopsGold, gain: { armySize: town.bundles.troops } })
-  if (result.outcome === 'noFunds') return noGoldResponse(prevState, prefix, town.id)
+  if (result.outcome === 'noFunds') return noGoldResponse(prevState, prefix)
 
-  const pick = RNG.createRunCopyRandom(prevState).advanceCursor('town.buyFeedback', TOWN_BUY_LINES)
+  const line = encounterStableLine(prevState, 'town.buyTroops', TOWN_BUY_LINES)
   return applyDeltas(prevState, {
     resources: result.resources,
-    run: pick.nextState.run,
-    message: `${prefix}\n${pick.line}`,
+    message: `${prefix}\n${line}`,
     deltas: result.deltas,
   })
 }
 
 function reduceTownHireScout(prevState: State, town: TownCell): State {
   const prefix = townPrefix(town)
+  const refused = refuseCompanionHire(prevState, prefix, 'scout')
+  if (refused) return refused
+
   const rnd = RNG.createRunCopyRandom(prevState)
-
-  if (prevState.resources.party.includes('scout')) {
-    return setEncounterMessage(prevState, prefix, rnd.perMoveLine(TOWN_SCOUT_ALREADY_HAVE_LINES, { cellId: town.id }))
-  }
-
-  const result = buy(prevState.resources, { gold: town.prices.scoutGold, gain: { party: ['scout'] } })
-  if (result.outcome === 'noFunds') return noGoldResponse(prevState, prefix, town.id)
+  const result = buy(prevState.resources, { gold: town.prices.companionHireGold, gain: { party: ['scout'] } })
+  if (result.outcome === 'noFunds') return noGoldResponse(prevState, prefix)
 
   return applyDeltas(prevState, {
     resources: result.resources,
@@ -223,25 +227,63 @@ function reduceTownHireScout(prevState: State, town: TownCell): State {
   })
 }
 
-// ---- Worldgen placement ----
+function reduceTownHireHealer(prevState: State, town: TownCell): State {
+  const prefix = townPrefix(town)
+  const rnd = RNG.createRunCopyRandom(prevState)
+  return hireCompanion(prevState, {
+    prefix,
+    slotId: 'healer',
+    goldCost: town.prices.companionHireGold,
+    successLine: rnd.perMoveLine(HEALER_BUY_LINES, { cellId: town.id }),
+  })
+}
 
-// Every base offer appears at least once across all towns (3 offers per town).
-const placeNamedTowns: PlaceWorldProvider = ({ cells, rngState }) => {
-  const stream = RNG.createStreamRandom(rngState)
-  const offerSets = buildTownOfferSets(stream)
+function reduceTownBuyRumor(prevState: State, town: TownCell): State {
+  const prefix = townPrefix(town)
+  const enc = prevState.encounter
+  if (!enc || enc.kind !== 'town') return prevState
+  if (enc.rumorsBought >= TOWN_RUMORS_PER_VISIT_MAX) {
+    const line = encounterStableLine(prevState, 'rumor.cap', TOWN_RUMOR_EXHAUSTED_LINES)
+    return setEncounterMessage(prevState, prefix, line)
+  }
+
+  const result = buy(prevState.resources, { gold: town.prices.rumorGold, gain: {} })
+  if (result.outcome === 'noFunds') return noGoldResponse(prevState, prefix)
+
+  const pool = rumorPool()
+  const pick = RNG.createRunCopyRandom(prevState).advanceCursor(`town.rumor.${town.id}`, pool, { salt: town.id })
+  const nextEncounter: TownEncounter = { ...enc, rumorsBought: enc.rumorsBought + 1 }
+  return applyDeltas(
+    { ...prevState, encounter: nextEncounter, run: pick.nextState.run },
+    {
+      resources: result.resources,
+      message: `${prefix}\n${pick.line}`,
+      deltas: result.deltas,
+    },
+  )
+}
+
+const placeNamedTowns: PlaceWorldProvider = ({ cells, rngState, seed }) => {
+  const offerSets = buildOfferSets({
+    poiCount: TOWN_COUNT,
+    minOffers: POI_MIN_OFFERS,
+    maxOffers: POI_MAX_OFFERS,
+    pool: TOWN_OFFER_POOL,
+    categoryOf: (offer) => TOWN_OFFERS[offer].category,
+    rng: RNG.createStreamRandomFromSeed(seed, 'town.offers'),
+  })
   let townIndex = 0
 
-  const next = placeNamedFeature(cells, stream.rngState, {
+  placeNamedFeatureFromSeed(cells, seed, 'place.town', {
     count: TOWN_COUNT,
     namePool: TOWN_NAME_POOL,
     fallbackName: 'A Town',
     canPlaceAt: (_x, _y, here) => isTerrainCell(here),
     buildCell: ({ x, y, name, rng }) => {
       const offers = [...offerSets[townIndex]!]
-
       const foodGold = rng.intInRange(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX)
       const troopsGold = rng.intInRange(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX)
-      const scoutGold = rng.intInRange(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX)
+      const companionHireGold = rng.intInRange(COMPANION_HIRE_GOLD_MIN, COMPANION_HIRE_GOLD_MAX)
       const rumorGold = rng.intInRange(TOWN_PRICE_RUMOR_MIN, TOWN_PRICE_RUMOR_MAX)
 
       const cell: Cell = {
@@ -249,50 +291,29 @@ const placeNamedTowns: PlaceWorldProvider = ({ cells, rngState }) => {
         id: cellId(x, y),
         name,
         offers,
-        prices: { foodGold, troopsGold, scoutGold, rumorGold },
+        prices: { foodGold, troopsGold, companionHireGold, rumorGold },
         bundles: { food: TOWN_FOOD_BUNDLE, troops: TOWN_TROOPS_BUNDLE },
       }
       townIndex++
       return cell
     },
   })
-  return { rngState: next }
+  return { rngState }
 }
 
-// ---- Preview plate ----
-
-function townOfferSlot(s: State, idx: number): RightGridActionCell | null {
+function townOfferSlot(s: State, slot: keyof ReturnType<typeof offersToGridLayout<TownOfferKind>>): RightGridActionCell | null {
   const town = getCellAt(s.world, s.player.position) as TownCell
-  const o = town.offers[idx]
-  return o ? gridButton(TOWN_OFFERS, o) : null
+  const offer = offersToGridLayout(town.offers)[slot]
+  return offer ? gridButton(TOWN_OFFERS, offer) : null
 }
 
 const townPreviewPlate: PreviewPlateProvider = (s) => {
   const here = getCellAt(s.world, s.player.position)
   if (!here || here.kind !== 'town') return null
-  if (!here.offers.length) return null
-  return here.offers.map((o) => {
-    const spec = TOWN_OFFERS[o]
-    return { spriteId: spec.spriteId, text: `-${here.prices[spec.priceKey]}` }
-  })
+  const layout = offersToGridLayout(here.offers)
+  const order = offersInGridOrder(here.offers, layout)
+  return previewPlateForOffers(s, order, TOWN_OFFERS)
 }
-
-function reduceTownBuyRumor(prevState: State, town: TownCell): State {
-  const prefix = townPrefix(town)
-  const result = buy(prevState.resources, { gold: town.prices.rumorGold, gain: {} })
-  if (result.outcome === 'noFunds') return noGoldResponse(prevState, prefix, town.id)
-
-  const pool = rumorPool()
-  const pick = RNG.createRunCopyRandom(prevState).advanceCursor(`town.rumor.${town.id}`, pool, { salt: town.id })
-  return applyDeltas(prevState, {
-    resources: result.resources,
-    run: pick.nextState.run,
-    message: `${prefix}\n${pick.line}`,
-    deltas: result.deltas,
-  })
-}
-
-// ---- Mechanic registration ----
 
 export const townMechanic: MechanicDef = {
   id: 'town',
@@ -312,9 +333,9 @@ export const townMechanic: MechanicDef = {
     rightGrid: makeRightGrid({
       leaveAction: { type: ACTION_TOWN_LEAVE },
       centerSpriteId: SPRITES.centers.marketStall,
-      top: (s) => townOfferSlot(s, 0),
-      left: (s) => townOfferSlot(s, 1),
-      bottom: (s) => townOfferSlot(s, 2),
+      top: (s) => townOfferSlot(s, 'top'),
+      left: (s) => townOfferSlot(s, 'left'),
+      bottom: (s) => townOfferSlot(s, 'bottom'),
     }),
   },
 }

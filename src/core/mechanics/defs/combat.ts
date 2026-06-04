@@ -5,8 +5,16 @@ import { gameOverMessage } from '../../gameOver'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
 import type { Action, CombatEncounter, Encounter, Resources, State, Ui, Vec2, World } from '../../types'
-import { enqueueDeltas, enqueueGridTransition } from '../../uiAnim'
-import { gridButton, makeRightGrid } from '../encounterHelpers'
+import { enqueueGridTransition } from '../../uiAnim'
+import {
+  applyDeltas,
+  encounterStableLine,
+  gridButton,
+  makeRightGrid,
+  pushResourceDeltas,
+  resourceDeltasFromDiff,
+} from '../encounterHelpers'
+import type { ResourceDelta } from '../encounterHelpers'
 import type {
   MechanicDef,
   PreviewPlateProvider,
@@ -90,16 +98,41 @@ function combatVariantForEncounter(state: State): CombatVariantConfig {
   return MECHANIC_INDEX.combatVariantByKind[cell.kind] ?? previewPlaceholderVariant
 }
 
-function applyCombatClosed(
-  state: State,
-  outcome: 'victory' | 'flee' | 'recruit',
-  encounter: CombatEncounter,
-): State {
+export type CombatCloseOutcome = 'victory' | 'flee' | 'recruit' | 'paid'
+
+// Mend round losses from this encounter (victory or pay). Not used on flee.
+export function applyHealerMend(resources: Resources, enc: CombatEncounter): Resources {
+  if (!resources.party.includes('healer')) return resources
+  const roundLosses = Math.max(0, enc.armyAtCombatStart - resources.armySize)
+  const mend = Math.min(2, roundLosses)
+  if (mend <= 0) return resources
+  return { ...resources, armySize: resources.armySize + mend }
+}
+
+function applyCombatClosed(state: State, outcome: CombatCloseOutcome, encounter: CombatEncounter): State {
   if (isPreviewSentinel(encounter.sourceCellId)) return state
   const cell = getCellAt(state.world, posForCellId(state.world, encounter.sourceCellId))
   const hook = MECHANIC_INDEX.onCombatClosedByKind[cell.kind]
   if (!hook) return state
   return hook(state, outcome, encounter)
+}
+
+function finishCombatClose(
+  intermediate: State,
+  enc: CombatEncounter,
+  outcome: CombatCloseOutcome,
+  extraDeltas: readonly ResourceDelta[],
+): State {
+  const beforeMend = intermediate.resources
+  const afterMend = applyHealerMend(beforeMend, enc)
+  const closed = applyCombatClosed({ ...intermediate, resources: afterMend }, outcome, enc)
+  const deltas = [...extraDeltas, ...resourceDeltasFromDiff(beforeMend, afterMend)]
+  return applyDeltas(closed, {
+    message: closed.ui.message,
+    resources: afterMend,
+    run: closed.run,
+    deltas,
+  })
 }
 
 // Top slot is the pay/recruit button — always rendered. Variants that
@@ -135,14 +168,11 @@ function reduceCombatPay(prevState: State): State {
     if (!lines || lines.length === 0) {
       throw new Error(`combat.pay: variant has no failLines.${eligibility}`)
     }
-    const pick = RNG.createRunCopyRandom(prevState).advanceCursor(`combat.pay.${eligibility}`, lines)
+    const line = encounterStableLine(prevState, `combat.pay.${eligibility}`, lines)
     return {
-      world: prevState.world,
-      player: prevState.player,
-      run: pick.nextState.run,
-      resources: prevState.resources,
+      ...prevState,
       encounter: enc,
-      ui: { ...prevState.ui, message: pick.line || prevState.ui.message },
+      ui: { ...prevState.ui, message: line || prevState.ui.message },
     }
   }
 
@@ -186,21 +216,13 @@ function reduceCombatPay(prevState: State): State {
     encounter: null,
     ui: baseUi,
   }
-  const closed = applyCombatClosed(intermediate, 'recruit', enc)
-  if (!ENABLE_ANIMATIONS) {
-    return closed
-  }
-
-  // Cost deduction + partial-loot gains animate as separate deltas so
-  // the UI fades each independently.
-  const goldDeltas: number[] = [-cost]
-  if (lootGoldGain > 0) goldDeltas.push(lootGoldGain)
-  let uiWith = enqueueDeltas(closed.ui, { target: 'gold', deltas: goldDeltas })
-  if (lootFoodGain > 0) {
-    uiWith = enqueueDeltas(uiWith, { target: 'food', deltas: [lootFoodGain] })
-  }
-  uiWith = enqueueGridTransition(uiWith, { from: 'combat', to: 'overworld' })
-  return { ...closed, ui: uiWith }
+  const closeOutcome: CombatCloseOutcome = variant.recruitLootScale ? 'recruit' : 'paid'
+  const payDeltas: ResourceDelta[] = []
+  pushResourceDeltas(payDeltas, 'gold', [-cost, ...(lootGoldGain > 0 ? [lootGoldGain] : [])])
+  if (lootFoodGain > 0) pushResourceDeltas(payDeltas, 'food', [lootFoodGain])
+  let next = finishCombatClose(intermediate, enc, closeOutcome, payDeltas)
+  if (!ENABLE_ANIMATIONS) return next
+  return { ...next, ui: enqueueGridTransition(next.ui, { from: 'combat', to: 'overworld' }) }
 }
 
 function reduceCombatReturn(prevState: State): State {
@@ -229,14 +251,16 @@ function reduceCombatReturn(prevState: State): State {
     ui: baseUi,
   }
   const closed = isGameOver ? intermediate : applyCombatClosed(intermediate, 'flee', enc)
-  if (!ENABLE_ANIMATIONS) {
-    return closed
-  }
-
-  let uiWith = enqueueDeltas(closed.ui, { target: 'army', deltas: [-1] })
+  let next = applyDeltas(closed, {
+    message: closed.ui.message,
+    resources: nextResources,
+    run: closed.run,
+    deltas: [{ target: 'army', delta: -1 }],
+  })
+  if (!ENABLE_ANIMATIONS) return next
   return {
-    ...closed,
-    ui: isGameOver ? uiWith : enqueueGridTransition(uiWith, { from: 'combat', to: 'overworld' }),
+    ...next,
+    ui: isGameOver ? next.ui : enqueueGridTransition(next.ui, { from: 'combat', to: 'overworld' }),
   }
 }
 
@@ -313,23 +337,30 @@ function reduceCombatFight(prevState: State): State {
     encounter: isGameOver ? null : nextEncounter,
     ui: baseUi,
   }
-  const closed =
-    !isGameOver && nextEncounter == null ? applyCombatClosed(intermediate, 'victory', enc) : intermediate
-  if (!ENABLE_ANIMATIONS) {
-    return closed
-  }
+  const fightDeltas: ResourceDelta[] = []
+  pushResourceDeltas(fightDeltas, 'food', foodDeltas)
+  pushResourceDeltas(fightDeltas, 'gold', goldDeltas)
+  pushResourceDeltas(fightDeltas, 'army', armyDeltas)
+  pushResourceDeltas(fightDeltas, 'enemyArmy', enemyDeltas)
 
-  let uiWith = closed.ui
-  uiWith = enqueueDeltas(uiWith, { target: 'food', deltas: foodDeltas })
-  uiWith = enqueueDeltas(uiWith, { target: 'gold', deltas: goldDeltas })
-  uiWith = enqueueDeltas(uiWith, { target: 'army', deltas: armyDeltas })
-  uiWith = enqueueDeltas(uiWith, { target: 'enemyArmy', deltas: enemyDeltas })
+  let next: State
+  if (!isGameOver && nextEncounter == null) {
+    next = finishCombatClose(intermediate, enc, 'victory', fightDeltas)
+  } else {
+    next = applyDeltas(intermediate, {
+      message: intermediate.ui.message,
+      resources: nextResources,
+      run: nextRun,
+      deltas: fightDeltas,
+    })
+  }
+  next = { ...next, encounter: isGameOver ? null : nextEncounter }
+  if (!ENABLE_ANIMATIONS) return next
 
   if (!isGameOver && nextEncounter == null) {
-    uiWith = enqueueGridTransition(uiWith, { from: 'combat', to: 'overworld' })
+    next = { ...next, ui: enqueueGridTransition(next.ui, { from: 'combat', to: 'overworld' }) }
   }
-
-  return { ...closed, ui: uiWith }
+  return next
 }
 
 // Source mechanics pick their `spawnEnemy` (rolled vs fixed) and own the
@@ -349,6 +380,7 @@ export function fixedEnemySpawn(enemyArmy: number): EnemySpawn {
 export function startCombatEncounter(args: {
   world: World
   pos: Vec2
+  playerArmySize: number
   spawnEnemy: EnemySpawn
   encounterMessage: string
   restoreMessage: string
@@ -359,6 +391,7 @@ export function startCombatEncounter(args: {
     kind: 'combat',
     enemyArmySize: spawned.enemyArmy,
     initialSpawn: spawned.enemyArmy,
+    armyAtCombatStart: Math.max(0, args.playerArmySize),
     sourceCellId: cellIdForPos(nextWorld, args.pos),
     restoreMessage: args.restoreMessage,
   }
@@ -470,6 +503,7 @@ export const combatMechanic: MechanicDef = {
       kind: 'combat',
       enemyArmySize: 0,
       initialSpawn: 0,
+      armyAtCombatStart: 0,
       sourceCellId: -1,
       restoreMessage: '',
     }),

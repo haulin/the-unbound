@@ -63,7 +63,7 @@ For first-blind playtests we want the agent to discover the game, not to use a d
 
 ### 3. Encounter plate stats are paint-from-model, not bespoke
 
-The terminal does not re-implement price/cost/army-size logic. It calls `previewPlateByEncounterKind[encounter.kind](state)` and gets back the same `{spriteId, text}` lines the TIC build paints. A small `PLATE_LABEL_BY_SPRITE` lookup in [`render.ts`](../../src/platform/terminal/render.ts) maps each plate-icon sprite to a one-word semantic label (`food`, `enemy`, `gold`, `army`, `hp`, `rumor`, `beast`, `scout`). New mechanics that ship a `previewPlate` provider get terminal display for free.
+The terminal does not re-implement price/cost/army-size logic. It calls `previewPlateByEncounterKind[encounter.kind](state)` and gets back the same `{spriteId, text}` lines the TIC build paints. `terminalPlateLabel(spriteId)` in [`spriteIds.ts`](../../src/core/spriteIds.ts) derives one-word labels from `SPRITES` registry keys (aliases: `troop`→`army`, `heart`→`hp`). New inventory/enemy/action sprites get terminal plate labels without touching [`render.ts`](../../src/platform/terminal/render.ts).
 
 ### 4. Map view is a 9×9 rolling viewport, matching the TIC build
 

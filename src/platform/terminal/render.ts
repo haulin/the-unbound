@@ -4,7 +4,7 @@ import { computeGameMapView } from '../../core/gameMap'
 import { torusDelta, wrapIndex } from '../../core/math'
 import { MECHANIC_INDEX } from '../../core/mechanics'
 import { getRightGridCellDef, type RightGridCellDef } from '../../core/rightGrid'
-import { SPRITES } from '../../core/spriteIds'
+import { terminalPlateLabel } from '../../core/spriteIds'
 import {
   LEFT_PANEL_KIND_MAP,
   LEFT_PANEL_KIND_MINIMAP,
@@ -14,23 +14,6 @@ import { labelForAction } from './labels'
 
 export type RenderOptions = { blind: boolean }
 const DEFAULT_OPTIONS: RenderOptions = { blind: false }
-
-// Plate icons → short text-mode labels. Mechanics emit (spriteId, text) lines;
-// terminal turns the icon into a one-word label. Keeping this lookup local
-// rather than asking mechanics to ship labels themselves: the icon is already
-// the source of truth on the TIC side, and adding a label field every mechanic
-// has to fill would be a bigger churn than this 8-row table.
-const PLATE_LABEL_BY_SPRITE: Record<number, string> = {
-  [SPRITES.inventory.food]: 'food',
-  [SPRITES.enemies.enemy]: 'enemy',
-  [SPRITES.enemies.goblin]: 'goblin',
-  [SPRITES.inventory.scout]: 'scout',
-  [SPRITES.inventory.troop]: 'army',
-  [SPRITES.inventory.gold]: 'gold',
-  [SPRITES.enemies.heart]: 'hp',
-  [SPRITES.actions.rumor]: 'rumor',
-  [SPRITES.inventory.beast]: 'beast',
-}
 
 // Numpad layout: top-row keys are 7/8/9, mid 4/5/6, bottom 1/2/3. The 3x3
 // position matches the right-grid the TIC build clicks on, so the agent's
@@ -200,7 +183,7 @@ function renderResources(s: State): string {
   const party = r.party.length ? ` | party: ${r.party.join(', ')}` : ''
   // Food cap is invisible in the TIC build (no spare pixels). Terminal has
   // no such constraint, so we surface it as `food N/M`. Same source of truth
-  // as the reducer (`foodCarryCap`) — picks up army growth + mule's +50 for
+  // as the reducer (`foodCarryCap`) — picks up army growth + beast's +50 for
   // free.
   return `army ${r.armySize} | food ${r.food}/${foodCarryCap(r)} | gold ${r.gold}${inv}${party}`
 }
@@ -214,7 +197,7 @@ function renderEncounter(s: State): string[] {
 
   const stats: string[] = []
   for (const line of plate) {
-    const label = PLATE_LABEL_BY_SPRITE[line.spriteId] ?? `sprite_${line.spriteId}`
+    const label = terminalPlateLabel(line.spriteId)
     stats.push(`${label} ${line.text}`)
   }
   return [`${head}  [${stats.join(', ')}]`]

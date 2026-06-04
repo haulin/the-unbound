@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SWAMP_LOST_PERCENT, WOODS_AMBUSH_PERCENT, WOODS_LOST_PERCENT } from '../../src/core/constants'
 import { RNG } from '../../src/core/rng'
-import { rollMoveEvent } from '../../src/core/mechanics/moveEvents'
+import { rollMoveEvent } from '../../src/core/mechanics/encounterHelpers'
 import type { MoveEventPolicy } from '../../src/core/mechanics/types'
 
 const woodsPolicy: MoveEventPolicy = {

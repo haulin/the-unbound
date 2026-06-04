@@ -13,7 +13,11 @@ function makeWorld(): World {
     mapGenAlgorithm: 'TEST',
     cells: [
       [{ kind: 'grass' }, { kind: 'grass' }, { kind: 'grass' }],
-      [{ kind: 'grass' }, { kind: 'farm', id: 4, name: 'Greyfield', beastGoldCost: 10 }, { kind: 'grass' }],
+      [
+        { kind: 'grass' },
+        { kind: 'farm', id: 4, name: 'Greyfield', offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'], companionHireGold: 10 },
+        { kind: 'grass' },
+      ],
       [{ kind: 'grass' }, { kind: 'grass' }, { kind: 'grass' }],
     ],
     rngState: 123,

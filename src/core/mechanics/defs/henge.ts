@@ -32,10 +32,11 @@ import {
   fixedEnemySpawn,
   recruitablePreviewPlateLines,
   startCombatEncounter,
+  type CombatCloseOutcome,
   type CombatVariantConfig,
   type EnemySpawn,
 } from './combat'
-import { cellId, isTerrainCell, placeNamedFeature } from '../../worldgen'
+import { cellId, isTerrainCell, placeNamedFeatureFromSeed } from '../../worldgen'
 
 function hengeVictoryReward(
   resources: Resources,
@@ -44,8 +45,9 @@ function hengeVictoryReward(
 ): { resources: Resources; rngState: number } {
   const r = RNG.createStreamRandom(rngState)
   const baseGold =
-    Math.max(0, enc.initialSpawn + RNG.streamSignedNoise(r, HENGE_GOLD_NOISE)) + HENGE_GOLD_BONUS
-  const food = RNG.streamBoundedBase(r, Math.round(HENGE_FOOD_FACTOR * enc.initialSpawn), HENGE_FOOD_NOISE)
+    Math.max(0, enc.initialSpawn + r.intInRange(-HENGE_GOLD_NOISE, HENGE_GOLD_NOISE)) + HENGE_GOLD_BONUS
+  const foodBase = Math.round(HENGE_FOOD_FACTOR * enc.initialSpawn)
+  const food = Math.max(0, foodBase + r.intInRange(-HENGE_FOOD_NOISE, HENGE_FOOD_NOISE))
   const next: Resources = {
     ...resources,
     gold: resources.gold + baseGold,
@@ -85,11 +87,7 @@ const hengeSpawn: EnemySpawn = (rngState) => {
   return { rngState: r.rngState, enemyArmy }
 }
 
-const onHengeCombatClosed = (
-  state: State,
-  outcome: 'victory' | 'flee' | 'recruit',
-  encounter: CombatEncounter,
-): State => {
+const onHengeCombatClosed = (state: State, outcome: CombatCloseOutcome, encounter: CombatEncounter): State => {
   const pos = posForCellId(state.world, encounter.sourceCellId)
   const cell = getCellAt(state.world, pos)
   if (cell.kind !== 'henge') return state
@@ -106,7 +104,7 @@ const onHengeCombatClosed = (
   return { ...state, world: setCellAt(state.world, pos, next) }
 }
 
-const onEnterHenge: OnEnterTile = ({ cell, world, pos, stepCount }) => {
+const onEnterHenge: OnEnterTile = ({ cell, world, pos, stepCount, resources }) => {
   if (cell.kind !== 'henge') return {}
 
   const hengeCell = getCellAt(world, pos)
@@ -126,6 +124,7 @@ const onEnterHenge: OnEnterTile = ({ cell, world, pos, stepCount }) => {
     return startCombatEncounter({
       world,
       pos,
+      playerArmySize: resources.armySize,
       spawnEnemy: fixedEnemySpawn(hengeCell.currentGroup),
       encounterMessage: tileMessage,
       restoreMessage: tileMessage,
@@ -136,6 +135,7 @@ const onEnterHenge: OnEnterTile = ({ cell, world, pos, stepCount }) => {
   const result = startCombatEncounter({
     world,
     pos,
+    playerArmySize: resources.armySize,
     spawnEnemy: hengeSpawn,
     encounterMessage: tileMessage,
     restoreMessage: tileMessage,
@@ -144,15 +144,15 @@ const onEnterHenge: OnEnterTile = ({ cell, world, pos, stepCount }) => {
   return { ...result, world: setCellAt(result.world, pos, nextHenge) }
 }
 
-const placeHenges: PlaceWorldProvider = ({ cells, rngState }) => {
-  const next = placeNamedFeature(cells, rngState, {
+const placeHenges: PlaceWorldProvider = ({ cells, rngState, seed }) => {
+  placeNamedFeatureFromSeed(cells, seed, 'place.henge', {
     count: HENGE_COUNT,
     namePool: HENGE_NAME_POOL,
     fallbackName: 'A Henge',
     canPlaceAt: (_x, _y, here) => isTerrainCell(here),
     buildCell: ({ x, y, name }) => ({ kind: 'henge', id: cellId(x, y), name, nextReadyStep: 0, currentGroup: null }),
   })
-  return { rngState: next }
+  return { rngState }
 }
 
 export const hengeMechanic: MechanicDef = {

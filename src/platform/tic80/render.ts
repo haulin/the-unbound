@@ -4,7 +4,7 @@ import {
   LORE_MAX_CHARS_PER_LINE,
   LOST_COORD_LABEL,
 } from '../../core/constants'
-import { SPRITES } from '../../core/spriteIds'
+import { inventorySpriteId, SPRITES } from '../../core/spriteIds'
 import { MECHANIC_INDEX } from '../../core/mechanics'
 import type { PreviewPlateLine, PreviewPlateDeltaAnchor } from '../../core/mechanics/types'
 import { computeGameMapView } from '../../core/gameMap'
@@ -245,7 +245,7 @@ function drawMap(s: State, x: number, y: number, sizePx: number) {
 function panelFrameTopLeftFor(s: State): number {
   const inv = s.resources.inventory
   if (inv.includes('bronzeKey')) return SPRITES.ui.panelBorderBronze
-  if (inv.includes('blood')) return SPRITES.ui.panelBorderBlood
+  if (inv.includes('bloodVial')) return SPRITES.ui.panelBorderBlood
   return SPRITES.ui.panelBorder
 }
 
@@ -304,7 +304,7 @@ function drawLeftPanel(s: State) {
 
   const armyX = statusX
   const armyY = statusY
-  spr(SPRITES.inventory.troop, armyX, armyY, -1, 1, 0, 0, 2, 2)
+  spr(SPRITES.inventory.army, armyX, armyY, -1, 1, 0, 0, 2, 2)
   const armyValueX = armyX + UI.UI_ARMY_VALUE_OFFSET_X
   const armyValueY = armyY + UI.UI_ARMY_VALUE_OFFSET_Y
   const armyColor = s.resources.armySize < 6 ? UI.UI_COLOR_WARN : UI.UI_COLOR_TEXT
@@ -436,20 +436,19 @@ function drawLeftPanelDividers(illX: number, illY: number, illSize: number, hori
   rect(Layout.LEFT_PANEL_INNER_X, horizontalY, Layout.LEFT_PANEL_INNER_W, 1, UI.UI_COLOR_LEFT_PANEL_DIVIDER)
 }
 
-// Status-bar icon manifest: display order, predicate, sprite. Adding a new
-// held thing (e.g. silver key) is one row.
-type StatusIconSlot = { collection: 'inventory' | 'party'; id: string; spriteId: number }
-const STATUS_ICON_SLOTS: readonly StatusIconSlot[] = [
-  { collection: 'inventory', id: 'bronzeKey', spriteId: SPRITES.inventory.bronzeKey },
-  { collection: 'inventory', id: 'blood', spriteId: SPRITES.inventory.bloodVial },
-  { collection: 'party', id: 'scout', spriteId: SPRITES.inventory.scout },
-  { collection: 'party', id: 'mule', spriteId: SPRITES.inventory.beast },
-]
+const INVENTORY_STATUS_ORDER = ['bronzeKey', 'bloodVial'] as const
 
 function heldStatusIcons(s: State): readonly number[] {
   const out: number[] = []
-  for (const slot of STATUS_ICON_SLOTS) {
-    if (s.resources[slot.collection].includes(slot.id)) out.push(slot.spriteId)
+  for (let i = 0; i < INVENTORY_STATUS_ORDER.length; i++) {
+    const id = INVENTORY_STATUS_ORDER[i]!
+    if (!s.resources.inventory.includes(id)) continue
+    const spriteId = inventorySpriteId(id)
+    if (spriteId != null) out.push(spriteId)
+  }
+  for (let i = 0; i < s.resources.party.length; i++) {
+    const spriteId = inventorySpriteId(s.resources.party[i]!)
+    if (spriteId != null) out.push(spriteId)
   }
   return out
 }

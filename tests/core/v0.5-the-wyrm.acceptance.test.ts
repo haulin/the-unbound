@@ -142,7 +142,7 @@ describe('v0.5 the wyrm acceptance', () => {
     const previewPlate = MECHANIC_INDEX.previewPlateByEncounterKind.combat
     if (!previewPlate) throw new Error('no combat preview-plate registered')
     expect(previewPlate(after)).toEqual([
-      { spriteId: SPRITES.enemies.heart, text: `${WYRM_INITIAL_HEALTH}` },
+      { spriteId: SPRITES.enemies.hp, text: `${WYRM_INITIAL_HEALTH}` },
       { spriteId: SPRITES.inventory.gold, text: `-${WYRM_PAY_GOLD_COST}` },
     ])
   })
@@ -163,7 +163,7 @@ describe('v0.5 the wyrm acceptance', () => {
       if (safety > 200) throw new Error('wyrm fight did not terminate within 200 rounds')
     }
 
-    expect(s.resources.inventory).toContain('blood')
+    expect(s.resources.inventory).toContain('bloodVial')
     const lairAfter = lairCellAt(s, 1, 1)
     expect(lairAfter.isBled).toBe(true)
     expect(WYRM_VICTORY_LINES.some((line) => s.ui.message.includes(line))).toBe(true)
@@ -179,7 +179,7 @@ describe('v0.5 the wyrm acceptance', () => {
     s = processAction(s, { type: ACTION_COMBAT_PAY })!
     expect(s.encounter).toBe(null)
     expect(s.resources.gold).toBe(goldBefore - WYRM_PAY_GOLD_COST)
-    expect(s.resources.inventory).toContain('blood')
+    expect(s.resources.inventory).toContain('bloodVial')
     const lairAfter = lairCellAt(s, 1, 1)
     expect(lairAfter.isBled).toBe(true)
     expect(WYRM_PAYOFF_LINES.some((line) => s.ui.message.includes(line))).toBe(true)
@@ -194,7 +194,7 @@ describe('v0.5 the wyrm acceptance', () => {
     s = processAction(s, { type: ACTION_COMBAT_PAY })!
     expect(s.encounter?.kind).toBe('combat')
     expect(s.resources.gold).toBe(goldBefore)
-    expect(s.resources.inventory).not.toContain('blood')
+    expect(s.resources.inventory).not.toContain('bloodVial')
     expect(WYRM_NO_GOLD_LINES.some((line) => s.ui.message.includes(line))).toBe(true)
   })
 
@@ -207,7 +207,7 @@ describe('v0.5 the wyrm acceptance', () => {
     s = processAction(s, { type: ACTION_RETURN })!
     expect(s.encounter).toBe(null)
     expect(s.resources.armySize).toBe(armyBefore - 1)
-    expect(s.resources.inventory).not.toContain('blood')
+    expect(s.resources.inventory).not.toContain('bloodVial')
     const lairAfter = lairCellAt(s, 1, 1)
     expect(lairAfter.isBled).toBe(false)
     expect(WYRM_FLEE_LINES.some((line) => s.ui.message.includes(line))).toBe(true)
@@ -216,13 +216,13 @@ describe('v0.5 the wyrm acceptance', () => {
   // H. Locksmith with the Blood + gold payment
   it('H. locksmith pay-gold (with blood) grants the key, removes blood, and uses purchase lines', () => {
     const s0 = makeState(makeWorld({ kind: 'locksmith' }), { gold: LOCKSMITH_KEY_GOLD_COST })
-    s0.resources.inventory.push('blood')
+    s0.resources.inventory.push('bloodVial')
     const onto = processAction(s0, moveSouth)!
     expect(onto.encounter?.kind).toBe('locksmith')
 
     const paid = processAction(onto, { type: ACTION_LOCKSMITH_PAY_GOLD })!
     expect(paid.resources.inventory).toContain('bronzeKey')
-    expect(paid.resources.inventory).not.toContain('blood')
+    expect(paid.resources.inventory).not.toContain('bloodVial')
     expect(paid.resources.gold).toBe(0)
     expect(LOCKSMITH_PURCHASE_LINES.some((line) => paid.ui.message.includes(line))).toBe(true)
 
@@ -246,11 +246,11 @@ describe('v0.5 the wyrm acceptance', () => {
   // I. Locksmith with the Blood + food payment
   it('I. locksmith pay-food (with blood) grants the key, removes blood, and uses purchase lines', () => {
     const s0 = makeState(makeWorld({ kind: 'locksmith' }), { food: LOCKSMITH_KEY_FOOD_COST + 1 })
-    s0.resources.inventory.push('blood')
+    s0.resources.inventory.push('bloodVial')
     const onto = processAction(s0, moveSouth)!
     const paid = processAction(onto, { type: ACTION_LOCKSMITH_PAY_FOOD })!
     expect(paid.resources.inventory).toContain('bronzeKey')
-    expect(paid.resources.inventory).not.toContain('blood')
+    expect(paid.resources.inventory).not.toContain('bloodVial')
     expect(paid.resources.food).toBe(0)
     expect(LOCKSMITH_PURCHASE_LINES.some((line) => paid.ui.message.includes(line))).toBe(true)
 
@@ -267,7 +267,7 @@ describe('v0.5 the wyrm acceptance', () => {
     const s0 = makeState(makeWorld(lair({ isBled: true })))
     const after = processAction(s0, moveSouth)!
     expect(after.encounter).toBe(null)
-    expect(after.resources.inventory).not.toContain('blood')
+    expect(after.resources.inventory).not.toContain('bloodVial')
     expect(WYRM_BLED_LINES.some((line) => after.ui.message.includes(line))).toBe(true)
   })
 

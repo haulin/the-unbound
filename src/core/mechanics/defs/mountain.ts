@@ -71,7 +71,7 @@ function brigandVictoryReward(
   enc: CombatEncounter,
 ): { resources: Resources; rngState: number } {
   const r = RNG.createStreamRandom(rngState)
-  const baseGold = Math.max(0, enc.initialSpawn + RNG.streamSignedNoise(r, BRIGAND_GOLD_NOISE))
+  const baseGold = Math.max(0, enc.initialSpawn + r.intInRange(-BRIGAND_GOLD_NOISE, BRIGAND_GOLD_NOISE))
   const foodBonus = r.intExclusive(BRIGAND_FOOD_MAX + 1)
   const next: Resources = {
     ...resources,
@@ -125,6 +125,7 @@ const onEnterMountain: OnEnterTile = ({ cell, world, pos, stepCount, resources }
     startCombatEncounter({
       world,
       pos,
+      playerArmySize: resources.armySize,
       spawnEnemy: rolledEnemySpawn(resources.armySize),
       encounterMessage: tileRand.perMoveLine(brigandCombatVariant.encounterLines),
       restoreMessage,

@@ -113,10 +113,14 @@ agent playtest opus-4-7-high:
 
 v0.7:
 
-composer-2-5:
+composer-2.5-fast, 3.7m tokens, US$3.87:
 - 6 restarts, but super fast execution. I was not able to follow
-- enemy still 30; food cap 20→18 -> that's a regression, that should not happen
 -> it is batching commands and barely speaking. Composer should probably be prompted to output more thoughts and not batch commands. Also restarted without dying.
 - echo -n "444444" >> /tmp/agent-run.txt && npm run play -- --seed=51 --blind --moves-file=/tmp/agent-run.txt 2>&1 | grep -E "^step |^army |encounter|GAME|^[A-Z]|^Their|^You" -> It is using grep to only look at limited output. That's weird. Maybe it helps with coherency, but it misses out on a lot of hints.
 - Blind + no action labels until you arrive — easy to buy food when you meant troops (key 4 means different things in town vs farm vs combat). -> yeah well don't grep partial output then :D
 - Next key I’d press on a fresh run: spawn with lair adjacent (seed 56: 6 east) → one 4 at lair → grind to blood → fishingLake → locksmith → signpost-hunt gate with key — with camp search first if spawn is camp. -> basically nailed it
+
+human s/a/f/g/t:
+47/10/24/35/59 - the world gen changed, so seed not the same; pretty easy, got both rainbows, donkey, didn't win any henge fight, got lost 1 tile before gate, would finish with more troops, but tried like 10 times in a last fight to land a hit
+47/21/11/20/53 - pretty comfy, both rainbows, donkey, wyrm didn't land one hit
+

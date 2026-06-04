@@ -42,15 +42,15 @@ describe('renderState — header and resources', () => {
     expect(out).toMatch(/army \d+ \| food \d+\/\d+ \| gold \d+/)
   })
 
-  it('renders the food cap as army×2 by default and bumps it when mule is in the party', () => {
-    const noMule = freshState()
-    noMule.resources = { ...noMule.resources, armySize: 10, food: 5, party: [] }
-    expect(renderState(noMule)).toMatch(/food 5\/20 /)
+  it('renders the food cap as army×2 by default and bumps it when beast is in the party', () => {
+    const noBeast = freshState()
+    noBeast.resources = { ...noBeast.resources, armySize: 10, food: 5, party: [] }
+    expect(renderState(noBeast)).toMatch(/food 5\/20 /)
 
-    const withMule = freshState()
-    withMule.resources = { ...withMule.resources, armySize: 10, food: 5, party: ['mule'] }
-    // BEAST_CARRY_CAP_BONUS = 50 → cap becomes 70 with army 10 + mule.
-    expect(renderState(withMule)).toMatch(/food 5\/70 /)
+    const withBeast = freshState()
+    withBeast.resources = { ...withBeast.resources, armySize: 10, food: 5, party: ['beast'] }
+    // BEAST_CARRY_CAP_BONUS = 50 → cap becomes 70 with army 10 + beast.
+    expect(renderState(withBeast)).toMatch(/food 5\/70 /)
   })
 
   it('appends [GAME OVER] to the header when the run is over', () => {
@@ -141,7 +141,14 @@ describe('renderState — left panels', () => {
 describe('renderState — encounter plate', () => {
   it('renders the encounter kind and the preview plate stats inline', () => {
     const s = freshState()
-    s.encounter = { kind: 'combat', enemyArmySize: 8, initialSpawn: 8, sourceCellId: 0, restoreMessage: '' }
+    s.encounter = {
+      kind: 'combat',
+      enemyArmySize: 8,
+      initialSpawn: 8,
+      armyAtCombatStart: 10,
+      sourceCellId: 0,
+      restoreMessage: '',
+    }
     const out = renderState(s)
     expect(out).toContain('encounter: combat')
     // Plate provider emits enemy stat → renderer translates the sprite id into

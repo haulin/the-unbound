@@ -40,11 +40,8 @@ function goblinVictoryReward(
 ): { resources: Resources; rngState: number } {
   const r = RNG.createStreamRandom(rngState)
   const gold = r.intExclusive(GOBLIN_GOLD_MAX + 1)
-  const food = RNG.streamBoundedBase(
-    r,
-    Math.round(GOBLIN_FOOD_FACTOR * enc.initialSpawn),
-    GOBLIN_FOOD_NOISE,
-  )
+  const foodBase = Math.round(GOBLIN_FOOD_FACTOR * enc.initialSpawn)
+  const food = Math.max(0, foodBase + r.intInRange(-GOBLIN_FOOD_NOISE, GOBLIN_FOOD_NOISE))
   const next: Resources = {
     ...resources,
     gold: resources.gold + gold,
@@ -91,6 +88,7 @@ const onEnterWoods: OnEnterTile = ({ cell, world, pos, stepCount, resources }) =
     startCombatEncounter({
       world,
       pos,
+      playerArmySize: resources.armySize,
       spawnEnemy: rolledEnemySpawn(resources.armySize),
       encounterMessage: tileRand.perMoveLine(goblinCombatVariant.encounterLines),
       restoreMessage,

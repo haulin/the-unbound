@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  FARM_BEAST_GOLD_MAX,
-  FARM_BEAST_GOLD_MIN,
+  COMPANION_HIRE_GOLD_MAX,
+  COMPANION_HIRE_GOLD_MIN,
   FISHING_LAKE_COUNT,
   RAINBOW_END_COUNT,
   RAINBOW_END_MIN_DISTANCE,
@@ -55,7 +55,7 @@ describe('world v0.4 features', () => {
     }
   })
 
-  it('gives each farm beastGoldCost in [FARM_BEAST_GOLD_MIN..FARM_BEAST_GOLD_MAX] (spot-check seeds)', () => {
+  it('gives each farm companionHireGold in [COMPANION_HIRE_GOLD_MIN..COMPANION_HIRE_GOLD_MAX] (spot-check seeds)', () => {
     const seeds = [1, 2, 3, 7, 13, 42, 100, 500, 999, 12345, 99999]
     for (const seed of seeds) {
       const { world } = generateWorld(seed)
@@ -64,8 +64,8 @@ describe('world v0.4 features', () => {
           const c = world.cells[y]![x]!
           if (c.kind !== 'farm') continue
           const f = c as FarmCell
-          expect(f.beastGoldCost).toBeGreaterThanOrEqual(FARM_BEAST_GOLD_MIN)
-          expect(f.beastGoldCost).toBeLessThanOrEqual(FARM_BEAST_GOLD_MAX)
+          expect(f.companionHireGold).toBeGreaterThanOrEqual(COMPANION_HIRE_GOLD_MIN)
+          expect(f.companionHireGold).toBeLessThanOrEqual(COMPANION_HIRE_GOLD_MAX)
         }
       }
     }

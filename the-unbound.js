@@ -72,7 +72,7 @@
     ],
     combat: [
       "You can meet goblins in the woods and brigands in the mountains.",
-      "Only a small wounded band will march for coin \u2014 never a full war party."
+      "Only a small wounded band will march for coin - never a full war party."
     ],
     fisherman: [
       "A fisherman doubles what a lake gives you. He's heavy gear though. You'll feel it if you run."
@@ -179,7 +179,7 @@
     ]
   };
   var SWAMP_FIND_LINES = [
-    "A corpse in the reeds. Tangled roots hide a rotted sack \u2014 mushrooms and tarnished coin.",
+    "A corpse in the reeds. Tangled roots hide a rotted sack - mushrooms and tarnished coin.",
     "A sunken pack, half swallowed. Edible reeds and a bent penny.",
     "A journeyman's bones in the mud. Roots, berries, a few dull coins left behind.",
     "The mud coughs up a meal and pocket change. You do not ask who lost it."
@@ -229,11 +229,6 @@
     "The barn still trades - food for coin, and whatever the farmer has at hand for those with the purse for it.",
     "Stalls line the yard: rations, and a price scratched beside something else.",
     "Someone left this place open. Stock and prices are scratched on the door."
-  ];
-  var MULE_ALREADY_LINES = [
-    "You already have a beast at heel. Another would be trouble.",
-    "One is enough - the pen is closed to you.",
-    "Your pack-beast is already yours. No second sale today."
   ];
   var FARM_BUY_FOOD_LINES = [
     "Sacks changed hands. The barn nod is all the thanks you get.",
@@ -301,9 +296,28 @@
     `"When you have your bearings, I'll mark what matters."`,
     `"Woods and bog won't steal you as often with me ahead."`
   ];
-  var TOWN_SCOUT_ALREADY_HAVE_LINES = [
-    `"I'm already watching the road."`,
-    '"You kept me for a reason. Let me do it."'
+  var CAMP_SCOUT_HIRE_LINES = [
+    `He spits in the fire. "Aye. I know these woods. Pay's pay."`,
+    "She looks you over, then your soldiers. Decides you'll do. Takes her share of the rations."
+  ];
+  var HEALER_BUY_LINES = [
+    "She brings her own bag. Wax stopper, dark glass, dried things you don't recognize.",
+    "A hedge-healer. The hands are stained with old work. She names her price; you pay it."
+  ];
+  var COMPANION_ALREADY_LINES = [
+    "You already have one like that at heel. The road doesn't need two.",
+    "That place in your company is taken. The offer stands open, but not for you.",
+    "Same face, same pack - you cannot hire what you already keep."
+  ];
+  var PARTY_FULL_LINES = [
+    "Your party is full. Someone must leave before another can join.",
+    "Three is all the road will carry. Make room first.",
+    "No more hands to hire - the company is crowded enough."
+  ];
+  var TOWN_RUMOR_EXHAUSTED_LINES = [
+    `The barkeep turns the cup in his hands. "That's all I've got for you this visit."`,
+    `He shakes his head once. "Come back when you've walked off what I told you."`,
+    "No more whispers today. The room has heard enough of your coin."
   ];
   var LOST_FLAVOR_LINES = [
     "The road loops. You do not.",
@@ -453,13 +467,14 @@
       bloodVial: 198,
       beast: 226,
       bronzeKey: 196,
-      troop: 200,
+      army: 200,
       scout: 228,
+      healer: 232,
       gold: 204
     },
     // 16x16 opponent-side stats.
     enemies: {
-      heart: 134,
+      hp: 134,
       enemy: 132,
       goblin: 130
     },
@@ -502,6 +517,10 @@
       previewGrain: 308
     }
   };
+  function inventorySpriteId(slotId) {
+    const key = slotId;
+    return SPRITES.inventory[key];
+  }
 
   // src/core/constants.ts
   var SCOUT_GLOBAL_REVEAL_KINDS = ["farm", "camp", "henge", "town"];
@@ -515,17 +534,21 @@
   var CAMP_COUNT = 3;
   var CAMP_COOLDOWN_MOVES = 3;
   var CAMP_FOOD_GAIN = 2;
-  var TOWN_COUNT = 2;
+  var TOWN_COUNT = 3;
   var TOWN_FOOD_BUNDLE = 3;
   var TOWN_TROOPS_BUNDLE = 2;
   var TOWN_PRICE_FOOD_MIN = 5;
   var TOWN_PRICE_FOOD_MAX = 8;
   var TOWN_PRICE_TROOPS_MIN = 5;
   var TOWN_PRICE_TROOPS_MAX = 10;
-  var TOWN_PRICE_SCOUT_MIN = 10;
-  var TOWN_PRICE_SCOUT_MAX = 15;
   var TOWN_PRICE_RUMOR_MIN = 2;
   var TOWN_PRICE_RUMOR_MAX = 4;
+  var COMPANION_HIRE_GOLD_MIN = 15;
+  var COMPANION_HIRE_GOLD_MAX = 20;
+  var HEALER_UPKEEP_GOLD = 1;
+  var TOWN_RUMORS_PER_VISIT_MAX = 3;
+  var POI_MIN_OFFERS = 1;
+  var POI_MAX_OFFERS = 3;
   var HENGE_COUNT = 3;
   var INITIAL_ARMY_SIZE = 10;
   var MAP_GEN_NOISE = "NOISE";
@@ -545,13 +568,11 @@
   var RAINBOW_END_GOLD_PAYOUT = 30;
   var FARM_BUY_FOOD_GOLD_COST = 3;
   var FARM_BUY_FOOD_AMOUNT = 3;
-  var FARM_BEAST_GOLD_MIN = 10;
-  var FARM_BEAST_GOLD_MAX = 15;
   var BEAST_CARRY_CAP_BONUS = 50;
   var LOCKSMITH_KEY_FOOD_COST = 10;
   var LOCKSMITH_KEY_GOLD_COST = 20;
   var WYRM_PAY_GOLD_COST = 30;
-  var WYRM_INITIAL_HEALTH = 30;
+  var WYRM_INITIAL_HEALTH = 40;
   var MAX_PARTY_SLOTS = 3;
   var TERRAIN_KINDS = ["grass", "road", "mountain", "grass", "swamp", "woods", "road"];
   var FEATURE_KINDS = [
@@ -631,7 +652,7 @@
         return [];
     }
   }
-  var FOOD_DELTA_FRAMES = 24;
+  var FOOD_DELTA_FRAMES = 36;
   var WOODS_AMBUSH_PERCENT = 25;
   var WOODS_LOST_PERCENT = 10;
   var SWAMP_LOST_PERCENT = 20;
@@ -758,11 +779,22 @@
     const m = normalizeMaxExclusive(maxExclusive);
     return { rngState: next, value: next % m };
   }
+  function domainSalt(label) {
+    let h = 0;
+    for (let i = 0; i < label.length; i++) {
+      h = Math.imul(31, h) + label.charCodeAt(i) | 0;
+    }
+    return h >>> 0;
+  }
+  function resolveSalt(salt) {
+    if (salt == null) return 0;
+    return u32(typeof salt === "string" ? domainSalt(salt) : salt);
+  }
   function hashSeedStepCellInternal(opts) {
     const base = seedToRngState(opts.seed | 0);
     const stepMix = u32(Math.imul(opts.stepCount | 0, 2654435761));
     const cellId2 = u32(opts.cellId | 0);
-    const salt = u32(opts.salt == null ? 0 : opts.salt | 0);
+    const salt = resolveSalt(opts.salt);
     return xorshift32(u32(base ^ stepMix ^ cellId2 ^ salt));
   }
   function pickIndex(state2, length) {
@@ -790,7 +822,7 @@
     const out = [];
     for (let i = 0; i < n; i++) out.push(i);
     if (n <= 1) return out;
-    const baseSalt = args.salt == null ? 0 : args.salt | 0;
+    const baseSalt = resolveSalt(args.salt);
     const cellId2 = n | 0;
     for (let i = n - 1; i > 0; i--) {
       const j = pickIntExclusive({ seed: args.seed, stepCount: 0, cellId: cellId2, salt: baseSalt ^ i }, i + 1);
@@ -871,39 +903,20 @@
       }
     };
   }
-  function createStreamRandomFromSeed(seed) {
-    return createStreamRandom(seedToRngState(seed));
-  }
-  function domainSalt(label) {
-    let h = 0;
-    for (let i = 0; i < label.length; i++) {
-      h = Math.imul(31, h) + label.charCodeAt(i) | 0;
-    }
-    return h >>> 0;
-  }
-  function keyedBoundedBase(keys, saltLabel, base, noiseSpan) {
-    const noise = pickIntInRange({ ...keys, salt: domainSalt(saltLabel) }, -noiseSpan, noiseSpan);
-    return Math.max(0, base + noise);
-  }
-  function streamSignedNoise(r, noiseSpan) {
-    return r.intExclusive(2 * noiseSpan + 1) - noiseSpan;
-  }
-  function streamBoundedBase(r, base, noiseSpan) {
-    return Math.max(0, base + streamSignedNoise(r, noiseSpan));
+  function createStreamRandomFromSeed(seed, domain) {
+    const mixed = domain == null ? seed | 0 : ((seed | 0) ^ domainSalt(domain)) >>> 0;
+    return createStreamRandom(seedToRngState(mixed));
   }
   var RNG = {
-    domainSalt,
     // Facades (preferred)
     createTileRandom,
     createRunCopyRandom,
     createStreamRandom,
     createStreamRandomFromSeed,
     // Keyed deterministic helpers (stable, no global rngState consumption).
+    // `salt` may be a string label for a second draw at the same seed/step/cell.
     keyedIntExclusive: pickIntExclusive,
-    keyedIntInRange: pickIntInRange,
-    keyedBoundedBase,
-    streamSignedNoise,
-    streamBoundedBase
+    keyedIntInRange: pickIntInRange
   };
 
   // src/core/gameOver.ts
@@ -1071,6 +1084,83 @@
     });
     return res.rngState;
   }
+  function placeFeatureFromSeed(cells, seed, domain, opts) {
+    const stream = RNG.createStreamRandomFromSeed(seed, domain);
+    return placeFeature(cells, stream.rngState, opts);
+  }
+  function placeNamedFeatureFromSeed(cells, seed, domain, opts) {
+    const stream = RNG.createStreamRandomFromSeed(seed, domain);
+    placeNamedFeature(cells, stream.rngState, opts);
+  }
+  function buildOfferSets(args) {
+    const mustCover = args.mustCover ?? args.pool;
+    const { poiCount, minOffers, maxOffers, pool, categoryOf, requiredOnEveryPoi, rng } = args;
+    if (minOffers < 1) throw new Error("minOffers must be >= 1");
+    if (maxOffers < minOffers) throw new Error("maxOffers must be >= minOffers");
+    const slots = Array.from({ length: poiCount }, () => []);
+    const place = (offer) => {
+      for (let t = 0; t < poiCount; t++) {
+        const row = slots[t];
+        if (row.length < maxOffers && !row.includes(offer)) {
+          row.push(offer);
+          return;
+        }
+      }
+      for (let t = 0; t < poiCount; t++) {
+        const row = slots[t];
+        if (row.length < maxOffers) {
+          row.push(offer);
+          return;
+        }
+      }
+    };
+    for (const offer of mustCover) place(offer);
+    for (let t = 0; t < poiCount; t++) {
+      const row = slots[t];
+      for (const required of requiredOnEveryPoi ?? []) {
+        if (row.includes(required)) continue;
+        if (row.length < maxOffers) row.push(required);
+        else replaceLastHireWith(row, required, categoryOf);
+      }
+    }
+    for (let t = 0; t < poiCount; t++) {
+      ensureNonHireOffer(slots[t], pool, categoryOf, maxOffers);
+      const target = rng.intInRange(minOffers, maxOffers);
+      backfillPoi(slots[t], pool, target, maxOffers, rng);
+      ensureNonHireOffer(slots[t], pool, categoryOf, maxOffers);
+      if (slots[t].length < minOffers) {
+        throw new Error(`buildOfferSets: poi ${t} has fewer than minOffers after backfill`);
+      }
+      if (slots[t].length > maxOffers) {
+        throw new Error(`buildOfferSets: poi ${t} exceeds maxOffers`);
+      }
+    }
+    return slots;
+  }
+  function replaceLastHireWith(row, offer, categoryOf) {
+    for (let i = row.length - 1; i >= 0; i--) {
+      if (categoryOf(row[i]) === "companion_hire") {
+        row[i] = offer;
+        return;
+      }
+    }
+    row[row.length - 1] = offer;
+  }
+  function ensureNonHireOffer(row, pool, categoryOf, maxOffers) {
+    if (row.some((o) => categoryOf(o) !== "companion_hire")) return;
+    const economy = pool.find((o) => categoryOf(o) !== "companion_hire" && !row.includes(o));
+    if (!economy) return;
+    if (row.length < maxOffers) row.push(economy);
+    else replaceLastHireWith(row, economy, categoryOf);
+  }
+  function backfillPoi(row, pool, target, maxOffers, rng) {
+    const cap = Math.min(target, maxOffers);
+    while (row.length < cap) {
+      const available = pool.filter((o) => !row.includes(o));
+      if (available.length === 0) break;
+      row.push(available[rng.intExclusive(available.length)]);
+    }
+  }
 
   // src/core/mechanics/defs/gate.ts
   var onEnterGate = ({ cell, world, pos, stepCount, resources }) => {
@@ -1086,16 +1176,16 @@ ${line2}` };
     return { world: nextWorld, hasWon: true, message: `${GATE_NAME}
 ${line}` };
   };
-  var placeGate = ({ cells, rngState }) => {
+  var placeGate = ({ cells, rngState, seed }) => {
     const locksmithPos = findCellByKind(cells, "locksmith");
     if (!locksmithPos) throw new Error("placeGate: locksmith must be placed before gate");
-    const res = placeFeature(cells, rngState, {
+    placeFeatureFromSeed(cells, seed, "place.gate", {
       count: 1,
       canPlaceAt: (_x, _y, here) => isTerrainCell(here),
       awayFrom: { pos: locksmithPos, minDistance: GATE_LOCKSMITH_MIN_DISTANCE },
       buildCell: () => ({ kind: "gate" })
     });
-    return { rngState: res.rngState };
+    return { rngState };
   };
   var gateMechanic = {
     id: "gate",
@@ -1142,25 +1232,6 @@ ${line}` };
     return { destination: { x: pick.x, y: pick.y }, rngState: r.rngState };
   }
 
-  // src/core/mechanics/moveEvents.ts
-  function rollMoveEvent(args) {
-    const { policy, hasScout, source, rngKeys } = args;
-    const ambushPercent = policy.ambushPercent;
-    let lostPercent = policy.lostPercent;
-    if (hasScout && policy.scoutLostHalves) {
-      lostPercent = Math.floor(lostPercent / 2);
-    }
-    if (ambushPercent + lostPercent === 0) return null;
-    const percentile = RNG.keyedIntExclusive(rngKeys, 100);
-    if (percentile < ambushPercent) {
-      return { kind: "fight", source };
-    }
-    if (percentile < ambushPercent + lostPercent) {
-      return { kind: "lost", source };
-    }
-    return null;
-  }
-
   // src/core/uiAnim.ts
   function enqueueAnim(ui, anim) {
     const id = Math.max(1, Math.trunc(ui.anim.nextId));
@@ -1204,14 +1275,61 @@ ${line}` };
   }
 
   // src/core/mechanics/encounterHelpers.ts
+  var GRID_SLOT_FILL_ORDER = ["left", "top", "bottom"];
+  function offersToGridLayout(offers) {
+    const layout = { left: null, top: null, bottom: null };
+    for (let i = 0; i < GRID_SLOT_FILL_ORDER.length && i < offers.length; i++) {
+      layout[GRID_SLOT_FILL_ORDER[i]] = offers[i];
+    }
+    return layout;
+  }
+  function offersInGridOrder(offers, layout, slots = GRID_SLOT_FILL_ORDER) {
+    const ordered = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const slot of slots) {
+      const o = layout[slot];
+      if (o != null && offers.includes(o) && !seen.has(o)) {
+        ordered.push(o);
+        seen.add(o);
+      }
+    }
+    for (const o of offers) {
+      if (!seen.has(o)) ordered.push(o);
+    }
+    return ordered;
+  }
+  function previewPlateForOffers(state2, offers, table) {
+    const lines = [];
+    for (const offer of offers) {
+      const part = table[offer]?.previewPlate?.(state2);
+      if (part) lines.push(...part);
+    }
+    return lines.length > 0 ? lines : null;
+  }
   function setEncounterMessage(state2, prefix, line) {
     return { ...state2, ui: { ...state2.ui, message: `${prefix}
 ${line}` } };
   }
-  function noGoldResponse(state2, prefix, cellId2) {
-    const rnd = RNG.createRunCopyRandom(state2);
-    const line = rnd.perMoveLine(TOWN_NO_GOLD_LINES, { cellId: cellId2 });
+  function noGoldResponse(state2, prefix) {
+    const line = encounterStableLine(state2, "noGold", TOWN_NO_GOLD_LINES);
     return setEncounterMessage(state2, prefix, line);
+  }
+  function encounterStableLine(state2, tag, pool) {
+    const enc = state2.encounter;
+    const salt = enc ? `${enc.kind}.${enc.sourceCellId}.${tag}` : tag;
+    return RNG.createRunCopyRandom(state2).stableLine(pool, { salt });
+  }
+  function refuseCompanionHire(prevState, prefix, slot) {
+    const party = prevState.resources.party;
+    if (party.length >= MAX_PARTY_SLOTS) {
+      const line = encounterStableLine(prevState, "party.full", PARTY_FULL_LINES);
+      return setEncounterMessage(prevState, prefix, line);
+    }
+    if (party.includes(slot)) {
+      const line = encounterStableLine(prevState, `companion.already.${slot}`, COMPANION_ALREADY_LINES);
+      return setEncounterMessage(prevState, prefix, line);
+    }
+    return null;
   }
   function leaveEncounter(state2, fromGrid) {
     const enc = state2.encounter;
@@ -1223,18 +1341,37 @@ ${line}` } };
     const uiWith = enqueueGridTransition(baseUi, { from: fromGrid, to: "overworld" });
     return { ...state2, encounter: null, ui: uiWith };
   }
+  function resourceDeltasFromDiff(prev, next) {
+    const out = [];
+    const food = next.food - prev.food;
+    if (food) out.push({ target: "food", delta: food });
+    const gold = next.gold - prev.gold;
+    if (gold) out.push({ target: "gold", delta: gold });
+    const army = next.armySize - prev.armySize;
+    if (army) out.push({ target: "army", delta: army });
+    return out;
+  }
+  function pushResourceDeltas(out, target, values) {
+    for (let i = 0; i < values.length; i++) {
+      const delta = values[i];
+      if (delta) out.push({ target, delta });
+    }
+  }
   function applyDeltas(state2, args) {
+    const resources = args.resources ?? state2.resources;
+    const run = args.run ?? state2.run;
+    const deltas = args.deltas ?? (args.resources != null ? resourceDeltasFromDiff(state2.resources, resources) : []);
     const baseUi = { ...state2.ui, message: args.message };
     const baseNext = {
       ...state2,
-      ...args.resources ? { resources: args.resources } : {},
-      ...args.run ? { run: args.run } : {},
+      resources,
+      run,
       ui: baseUi
     };
     if (!ENABLE_ANIMATIONS) return baseNext;
     let uiWith = baseUi;
-    for (let i = 0; i < args.deltas.length; i++) {
-      const d = args.deltas[i];
+    for (let i = 0; i < deltas.length; i++) {
+      const d = deltas[i];
       uiWith = enqueueDeltas(uiWith, { target: d.target, deltas: [d.delta] });
     }
     return { ...baseNext, ui: uiWith };
@@ -1277,6 +1414,18 @@ ${line}` } };
     if (armyGain) deltas.push({ target: "army", delta: armyGain });
     return { outcome: "ok", resources: next, deltas };
   }
+  function hireCompanion(prevState, args) {
+    const refused = refuseCompanionHire(prevState, args.prefix, args.slotId);
+    if (refused) return refused;
+    const result = buy(prevState.resources, { gold: args.goldCost, gain: { party: [args.slotId] } });
+    if (result.outcome === "noFunds") return noGoldResponse(prevState, args.prefix);
+    return applyDeltas(prevState, {
+      resources: result.resources,
+      message: `${args.prefix}
+${args.successLine}`,
+      deltas: result.deltas
+    });
+  }
   function appendPartySlot(party, slot) {
     if (party.includes(slot)) return [...party];
     if (party.length >= MAX_PARTY_SLOTS) return [...party];
@@ -1314,12 +1463,40 @@ ${line}` } };
     }
     return next;
   }
+  function onEnterDefaultTerrain(ctx) {
+    const { cell, world, pos, stepCount } = ctx;
+    const r = RNG.createTileRandom({ world, stepCount, pos });
+    return { message: r.perMoveLine(terrainLoreLinesForKind(cell.kind)) };
+  }
+  function rollMoveEvent(args) {
+    const { policy, hasScout, source, rngKeys } = args;
+    const ambushPercent = policy.ambushPercent;
+    let lostPercent = policy.lostPercent;
+    if (hasScout && policy.scoutLostHalves) {
+      lostPercent = Math.floor(lostPercent / 2);
+    }
+    if (ambushPercent + lostPercent === 0) return null;
+    const percentile = RNG.keyedIntExclusive(rngKeys, 100);
+    if (percentile < ambushPercent) {
+      return { kind: "fight", source };
+    }
+    if (percentile < ambushPercent + lostPercent) {
+      return { kind: "lost", source };
+    }
+    return null;
+  }
   function tryQuietFind(spec, ctx) {
     const { rngKeys, tileRand, resources } = ctx;
-    const findRoll = RNG.keyedIntExclusive({ ...rngKeys, salt: RNG.domainSalt(spec.rollSalt) }, 100);
+    const findRoll = RNG.keyedIntExclusive({ ...rngKeys, salt: spec.rollSalt }, 100);
     if (findRoll >= spec.findPercent) return void 0;
-    const foodGain = RNG.keyedBoundedBase(rngKeys, spec.foodSalt, spec.foodBase, spec.amountNoise);
-    const goldGain = RNG.keyedBoundedBase(rngKeys, spec.goldSalt, spec.goldBase, spec.amountNoise);
+    const foodGain = Math.max(
+      0,
+      spec.foodBase + RNG.keyedIntInRange({ ...rngKeys, salt: spec.foodSalt }, -spec.amountNoise, spec.amountNoise)
+    );
+    const goldGain = Math.max(
+      0,
+      spec.goldBase + RNG.keyedIntInRange({ ...rngKeys, salt: spec.goldSalt }, -spec.amountNoise, spec.amountNoise)
+    );
     return {
       message: tileRand.perMoveLine(spec.lines),
       resources: {
@@ -1404,7 +1581,7 @@ ${line}` } };
       return { message: `${LOCKSMITH_NAME}
 ${line2}` };
     }
-    if (!resources.inventory.includes("blood")) {
+    if (!resources.inventory.includes("bloodVial")) {
       const line2 = r.perMoveLine(LOCKSMITH_NO_BLOOD_LINES);
       return { message: `${LOCKSMITH_NAME}
 ${line2}` };
@@ -1444,16 +1621,16 @@ ${rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)}`,
       deltas: result.deltas
     }, "locksmith");
   }
-  var placeLocksmith = ({ cells, rngState }) => {
+  var placeLocksmith = ({ cells, rngState, seed }) => {
     const lairPos = findCellByKind(cells, "lair");
     if (!lairPos) throw new Error("placeLocksmith: wyrm lair must be placed before locksmith");
-    const res = placeFeature(cells, rngState, {
+    placeFeatureFromSeed(cells, seed, "place.locksmith", {
       count: 1,
       canPlaceAt: (_x, _y, here) => isTerrainCell(here),
       awayFrom: { pos: lairPos, minDistance: LOCKSMITH_LAIR_MIN_DISTANCE },
       buildCell: () => ({ kind: "locksmith" })
     });
-    return { rngState: res.rngState };
+    return { rngState };
   };
   var locksmithPreviewPlate = () => [
     { spriteId: LOCKSMITH_ACTIONS[ACTION_LOCKSMITH_PAY_GOLD].spriteId, text: `-${LOCKSMITH_KEY_GOLD_COST}` },
@@ -1473,8 +1650,8 @@ ${rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)}`,
     }, "locksmith");
   }
   function consumeBlood(resources) {
-    if (!resources.inventory.includes("blood")) return resources;
-    return { ...resources, inventory: resources.inventory.filter((slot) => slot !== "blood") };
+    if (!resources.inventory.includes("bloodVial")) return resources;
+    return { ...resources, inventory: resources.inventory.filter((slot) => slot !== "bloodVial") };
   }
   var locksmithMechanic = {
     id: "locksmith",
@@ -1549,13 +1726,13 @@ ${dir}, ${chosen.d} leagues away.`;
     message: formatNearestPoiSignpostMessage(pos, world),
     knowsPosition: true
   });
-  var placeSignposts = ({ cells, rngState }) => {
-    const res = placeFeature(cells, rngState, {
+  var placeSignposts = ({ cells, rngState, seed }) => {
+    placeFeatureFromSeed(cells, seed, "place.signpost", {
       count: SIGNPOST_COUNT,
       canPlaceAt: (_x, _y, here) => isTerrainCell(here),
       buildCell: () => ({ kind: "signpost" })
     });
-    return { rngState: res.rngState };
+    return { rngState };
   };
   var signpostMechanic = {
     id: "signpost",
@@ -1567,7 +1744,7 @@ ${dir}, ${chosen.d} leagues away.`;
   // src/core/foodCarry.ts
   function foodCarryCap(res) {
     const cap = 2 * Math.max(0, Math.trunc(res.armySize));
-    return res.party.includes("mule") ? cap + BEAST_CARRY_CAP_BONUS : cap;
+    return res.party.includes("beast") ? cap + BEAST_CARRY_CAP_BONUS : cap;
   }
   var FOOD_CARRY_FULL_MESSAGE = "You can't carry more food.";
   function applyFoodCapOnGain(prev, next) {
@@ -1581,10 +1758,28 @@ ${dir}, ${chosen.d} leagues away.`;
   var ACTION_FARM_BUY_FOOD = "FARM_BUY_FOOD";
   var ACTION_FARM_BUY_BEAST = "FARM_BUY_BEAST";
   var ACTION_FARM_LEAVE = "FARM_LEAVE";
-  var FARM_ACTIONS = {
-    [ACTION_FARM_BUY_FOOD]: { spriteId: SPRITES.inventory.food, reduce: reduceFarmBuyFood },
-    [ACTION_FARM_BUY_BEAST]: { spriteId: SPRITES.inventory.beast, reduce: reduceFarmBuyBeast }
+  function farmBuyFoodPreview(_s) {
+    return [{ spriteId: SPRITES.inventory.food, text: `-${FARM_BUY_FOOD_GOLD_COST}` }];
+  }
+  function farmHireMulePreview(s) {
+    const farm = getCellAt(s.world, s.player.position);
+    return [{ spriteId: SPRITES.inventory.beast, text: `-${farm.companionHireGold}` }];
+  }
+  var FARM_OFFERS = {
+    [ACTION_FARM_BUY_FOOD]: {
+      category: "economy",
+      spriteId: SPRITES.inventory.food,
+      reduce: reduceFarmBuyFood,
+      previewPlate: farmBuyFoodPreview
+    },
+    [ACTION_FARM_BUY_BEAST]: {
+      category: "companion_hire",
+      spriteId: SPRITES.inventory.beast,
+      reduce: reduceFarmBuyBeast,
+      previewPlate: farmHireMulePreview
+    }
   };
+  var FARM_OFFER_POOL = Object.keys(FARM_OFFERS);
   function farmPrefix(farm) {
     const name = farm.name || "A Farm";
     return `${name} Farm`;
@@ -1613,10 +1808,10 @@ ${line}`;
     return result;
   };
   var reduceFarmAction = (prevState, action) => {
-    if (action.type !== ACTION_FARM_LEAVE && !(action.type in FARM_ACTIONS)) return null;
+    if (action.type !== ACTION_FARM_LEAVE && !(action.type in FARM_OFFERS)) return null;
     if (action.type === ACTION_FARM_LEAVE) return leaveEncounter(prevState, "farm");
     const farm = getCellAt(prevState.world, prevState.player.position);
-    return FARM_ACTIONS[action.type].reduce(prevState, farm);
+    return FARM_OFFERS[action.type].reduce(prevState, farm);
   };
   function reduceFarmBuyFood(prevState, farm) {
     const prefix = farmPrefix(farm);
@@ -1624,53 +1819,63 @@ ${line}`;
       return setEncounterMessage(prevState, prefix, FOOD_CARRY_FULL_MESSAGE);
     }
     const result = buy(prevState.resources, { gold: FARM_BUY_FOOD_GOLD_COST, gain: { food: FARM_BUY_FOOD_AMOUNT } });
-    if (result.outcome === "noFunds") return noGoldResponse(prevState, prefix, farm.id);
+    if (result.outcome === "noFunds") return noGoldResponse(prevState, prefix);
     const clamped = applyFoodCapOnGain(prevState.resources, result.resources);
     const appliedFoodDelta = clamped.food - prevState.resources.food;
     const deltas = result.deltas.map((d) => d.target === "food" ? { ...d, delta: appliedFoodDelta } : d);
-    const pick = RNG.createRunCopyRandom(prevState).advanceCursor("farm.buyFoodFeedback", FARM_BUY_FOOD_LINES);
+    const line = encounterStableLine(prevState, "farm.buyFood", FARM_BUY_FOOD_LINES);
     return applyDeltas(prevState, {
       resources: clamped,
-      run: pick.nextState.run,
       message: `${prefix}
-${pick.line}`,
+${line}`,
       deltas
     });
   }
-  var placeNamedFarms = ({ cells, rngState }) => {
-    const next = placeNamedFeature(cells, rngState, {
+  var placeNamedFarms = ({ cells, rngState, seed }) => {
+    const offerSets = buildOfferSets({
+      poiCount: FARM_COUNT,
+      minOffers: POI_MIN_OFFERS,
+      maxOffers: POI_MAX_OFFERS,
+      pool: FARM_OFFER_POOL,
+      categoryOf: (offer) => FARM_OFFERS[offer].category,
+      requiredOnEveryPoi: [ACTION_FARM_BUY_FOOD],
+      rng: RNG.createStreamRandomFromSeed(seed, "farm.offers")
+    });
+    let farmIndex = 0;
+    placeNamedFeatureFromSeed(cells, seed, "place.farm", {
       count: FARM_COUNT,
       namePool: FARM_NAME_POOL,
       fallbackName: "A Farm",
       canPlaceAt: (_x, _y, here) => isTerrainCell(here),
       buildCell: ({ x, y, name, rng }) => {
-        const beastGoldCost = rng.intInRange(FARM_BEAST_GOLD_MIN, FARM_BEAST_GOLD_MAX);
-        return { kind: "farm", id: cellId(x, y), name, beastGoldCost };
+        const offers = [...offerSets[farmIndex]];
+        const companionHireGold = rng.intInRange(COMPANION_HIRE_GOLD_MIN, COMPANION_HIRE_GOLD_MAX);
+        farmIndex++;
+        return { kind: "farm", id: cellId(x, y), name, offers, companionHireGold };
       }
     });
-    return { rngState: next };
+    return { rngState };
   };
+  function farmOfferSlot(s, slot) {
+    const farm = getCellAt(s.world, s.player.position);
+    const offer = offersToGridLayout(farm.offers)[slot];
+    return offer ? gridButton(FARM_OFFERS, offer) : null;
+  }
   var farmPreviewPlate = (s) => {
     const here = getCellAt(s.world, s.player.position);
     if (!here || here.kind !== "farm") return null;
-    return [
-      { spriteId: FARM_ACTIONS[ACTION_FARM_BUY_FOOD].spriteId, text: `-${FARM_BUY_FOOD_GOLD_COST}` },
-      { spriteId: FARM_ACTIONS[ACTION_FARM_BUY_BEAST].spriteId, text: `-${here.beastGoldCost}` }
-    ];
+    const layout = offersToGridLayout(here.offers);
+    const order = offersInGridOrder(here.offers, layout);
+    return previewPlateForOffers(s, order, FARM_OFFERS);
   };
   function reduceFarmBuyBeast(prevState, farm) {
     const prefix = farmPrefix(farm);
     const rnd = RNG.createRunCopyRandom(prevState);
-    if (prevState.resources.party.includes("mule")) {
-      return setEncounterMessage(prevState, prefix, rnd.perMoveLine(MULE_ALREADY_LINES, { cellId: farm.id }));
-    }
-    const result = buy(prevState.resources, { gold: farm.beastGoldCost, gain: { party: ["mule"] } });
-    if (result.outcome === "noFunds") return noGoldResponse(prevState, prefix, farm.id);
-    return applyDeltas(prevState, {
-      resources: result.resources,
-      message: `${prefix}
-${rnd.perMoveLine(MULE_BUY_LINES, { cellId: farm.id })}`,
-      deltas: result.deltas
+    return hireCompanion(prevState, {
+      prefix,
+      slotId: "beast",
+      goldCost: farm.companionHireGold,
+      successLine: rnd.perMoveLine(MULE_BUY_LINES, { cellId: farm.id })
     });
   }
   var farmMechanic = {
@@ -1691,40 +1896,84 @@ ${rnd.perMoveLine(MULE_BUY_LINES, { cellId: farm.id })}`,
       rightGrid: makeRightGrid({
         leaveAction: { type: ACTION_FARM_LEAVE },
         centerSpriteId: SPRITES.centers.farmBarn,
-        top: gridButton(FARM_ACTIONS, ACTION_FARM_BUY_FOOD),
-        left: gridButton(FARM_ACTIONS, ACTION_FARM_BUY_BEAST)
+        top: (s) => farmOfferSlot(s, "top"),
+        left: (s) => farmOfferSlot(s, "left")
       })
     }
   };
 
   // src/core/mechanics/defs/camp.ts
   var ACTION_CAMP_SEARCH = "CAMP_SEARCH";
+  var ACTION_CAMP_HIRE_SCOUT = "hireScout";
   var ACTION_CAMP_LEAVE = "CAMP_LEAVE";
-  var CAMP_ACTIONS = {
-    [ACTION_CAMP_SEARCH]: { spriteId: SPRITES.actions.search, reduce: reduceCampSearch }
-  };
-  function computeCampArmyGain(args) {
-    return RNG.keyedIntInRange({ seed: args.seed, stepCount: args.stepCount, cellId: args.campId }, 1, 2);
-  }
-  var placeNamedCamps = ({ cells, rngState }) => {
-    const next = placeNamedFeature(cells, rngState, {
-      count: CAMP_COUNT,
-      namePool: CAMP_NAME_POOL,
-      fallbackName: "A Camp",
-      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
-      buildCell: ({ x, y, name }) => ({ kind: "camp", id: cellId(x, y), name, nextReadyStep: 0 })
-    });
-    return { rngState: next };
-  };
-  var campPreviewPlate = (s) => {
+  function campSearchPreviewPlate(s) {
     const camp = getCellAt(s.world, s.player.position);
+    if (!camp.offers.includes(ACTION_CAMP_SEARCH)) return null;
     const stepCount = s.run.stepCount;
     if (stepCount < (camp.nextReadyStep ?? 0)) return null;
     const armyGain = computeCampArmyGain({ seed: s.world.seed, campId: camp.id, stepCount });
     return [
       { spriteId: SPRITES.inventory.food, text: `+${CAMP_FOOD_GAIN}` },
-      { spriteId: SPRITES.inventory.troop, text: `+${armyGain}` }
+      { spriteId: SPRITES.inventory.army, text: `+${armyGain}` }
     ];
+  }
+  function campHireScoutPreviewPlate(s) {
+    const camp = getCellAt(s.world, s.player.position);
+    if (!camp.offers.includes(ACTION_CAMP_HIRE_SCOUT)) return null;
+    return [{ spriteId: SPRITES.inventory.scout, text: `-${camp.companionHireGold}` }];
+  }
+  var CAMP_OFFERS = {
+    [ACTION_CAMP_SEARCH]: {
+      category: "economy",
+      spriteId: SPRITES.actions.search,
+      reduce: reduceCampSearch,
+      previewPlate: campSearchPreviewPlate
+    },
+    [ACTION_CAMP_HIRE_SCOUT]: {
+      category: "companion_hire",
+      spriteId: SPRITES.inventory.scout,
+      reduce: reduceCampHireScout,
+      previewPlate: campHireScoutPreviewPlate
+    }
+  };
+  var CAMP_OFFER_POOL = Object.keys(CAMP_OFFERS);
+  function computeCampArmyGain(args) {
+    return RNG.keyedIntInRange({ seed: args.seed, stepCount: args.stepCount, cellId: args.campId }, 1, 2);
+  }
+  var placeNamedCamps = ({ cells, rngState, seed }) => {
+    const offerSets = buildOfferSets({
+      poiCount: CAMP_COUNT,
+      minOffers: POI_MIN_OFFERS,
+      maxOffers: POI_MAX_OFFERS,
+      pool: CAMP_OFFER_POOL,
+      categoryOf: (offer) => CAMP_OFFERS[offer].category,
+      rng: RNG.createStreamRandomFromSeed(seed, "camp.offers")
+    });
+    let campIndex = 0;
+    placeNamedFeatureFromSeed(cells, seed, "place.camp", {
+      count: CAMP_COUNT,
+      namePool: CAMP_NAME_POOL,
+      fallbackName: "A Camp",
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: ({ x, y, name, rng }) => {
+        const offers = [...offerSets[campIndex]];
+        const companionHireGold = rng.intInRange(COMPANION_HIRE_GOLD_MIN, COMPANION_HIRE_GOLD_MAX);
+        campIndex++;
+        return { kind: "camp", id: cellId(x, y), name, nextReadyStep: 0, offers, companionHireGold };
+      }
+    });
+    return { rngState };
+  };
+  function campOfferSlot(s, slot) {
+    const camp = getCellAt(s.world, s.player.position);
+    const offer = offersToGridLayout(camp.offers)[slot];
+    return offer ? gridButton(CAMP_OFFERS, offer) : null;
+  }
+  var campPreviewPlate = (s) => {
+    const camp = getCellAt(s.world, s.player.position);
+    const layout = offersToGridLayout(camp.offers);
+    const order = offersInGridOrder(camp.offers, layout);
+    return previewPlateForOffers(s, order, CAMP_OFFERS);
   };
   var onEnterCamp = ({ cell, world, pos }) => {
     if (cell.kind !== "camp") return {};
@@ -1746,9 +1995,9 @@ ${rnd.perMoveLine(MULE_BUY_LINES, { cellId: farm.id })}`,
     return result;
   };
   var reduceCampAction = (prevState, action) => {
-    if (action.type !== ACTION_CAMP_LEAVE && !(action.type in CAMP_ACTIONS)) return null;
+    if (action.type !== ACTION_CAMP_LEAVE && !(action.type in CAMP_OFFERS)) return null;
     if (action.type === ACTION_CAMP_LEAVE) return leaveEncounter(prevState, "camp");
-    return CAMP_ACTIONS[action.type].reduce(prevState);
+    return CAMP_OFFERS[action.type].reduce(prevState);
   };
   function reduceCampSearch(prevState) {
     const campCell = getCellAt(prevState.world, prevState.player.position);
@@ -1781,6 +2030,17 @@ ${line}`,
       }
     );
   }
+  function reduceCampHireScout(prevState) {
+    const camp = getCellAt(prevState.world, prevState.player.position);
+    const prefix = `${camp.name || "A Camp"} Camp`;
+    const rnd = RNG.createRunCopyRandom(prevState);
+    return hireCompanion(prevState, {
+      prefix,
+      slotId: "scout",
+      goldCost: camp.companionHireGold,
+      successLine: rnd.perMoveLine(CAMP_SCOUT_HIRE_LINES, { cellId: camp.id, salt: "camp.scout.hire" })
+    });
+  }
   var campMechanic = {
     id: "camp",
     kinds: ["camp"],
@@ -1799,7 +2059,9 @@ ${line}`,
       rightGrid: makeRightGrid({
         leaveAction: { type: ACTION_CAMP_LEAVE },
         centerSpriteId: SPRITES.centers.campfire,
-        left: gridButton(CAMP_ACTIONS, ACTION_CAMP_SEARCH)
+        top: (s) => campOfferSlot(s, "top"),
+        left: (s) => campOfferSlot(s, "left"),
+        bottom: (s) => campOfferSlot(s, "bottom")
       })
     }
   };
@@ -1843,12 +2105,31 @@ ${line}`,
     const cell = getCellAt(state2.world, posForCellId(state2.world, enc.sourceCellId));
     return MECHANIC_INDEX.combatVariantByKind[cell.kind] ?? previewPlaceholderVariant;
   }
+  function applyHealerMend(resources, enc) {
+    if (!resources.party.includes("healer")) return resources;
+    const roundLosses = Math.max(0, enc.armyAtCombatStart - resources.armySize);
+    const mend = Math.min(2, roundLosses);
+    if (mend <= 0) return resources;
+    return { ...resources, armySize: resources.armySize + mend };
+  }
   function applyCombatClosed(state2, outcome, encounter) {
     if (isPreviewSentinel(encounter.sourceCellId)) return state2;
     const cell = getCellAt(state2.world, posForCellId(state2.world, encounter.sourceCellId));
     const hook = MECHANIC_INDEX.onCombatClosedByKind[cell.kind];
     if (!hook) return state2;
     return hook(state2, outcome, encounter);
+  }
+  function finishCombatClose(intermediate, enc, outcome, extraDeltas) {
+    const beforeMend = intermediate.resources;
+    const afterMend = applyHealerMend(beforeMend, enc);
+    const closed = applyCombatClosed({ ...intermediate, resources: afterMend }, outcome, enc);
+    const deltas = [...extraDeltas, ...resourceDeltasFromDiff(beforeMend, afterMend)];
+    return applyDeltas(closed, {
+      message: closed.ui.message,
+      resources: afterMend,
+      run: closed.run,
+      deltas
+    });
   }
   var combatRightGrid = makeRightGrid({
     leaveAction: { type: ACTION_RETURN },
@@ -1877,14 +2158,11 @@ ${line}`,
       if (!lines || lines.length === 0) {
         throw new Error(`combat.pay: variant has no failLines.${eligibility}`);
       }
-      const pick = RNG.createRunCopyRandom(prevState).advanceCursor(`combat.pay.${eligibility}`, lines);
+      const line = encounterStableLine(prevState, `combat.pay.${eligibility}`, lines);
       return {
-        world: prevState.world,
-        player: prevState.player,
-        run: pick.nextState.run,
-        resources: prevState.resources,
+        ...prevState,
         encounter: enc,
-        ui: { ...prevState.ui, message: pick.line || prevState.ui.message }
+        ui: { ...prevState.ui, message: line || prevState.ui.message }
       };
     }
     const cost = payment.computeCost(enc);
@@ -1923,18 +2201,13 @@ ${line}`,
       encounter: null,
       ui: baseUi
     };
-    const closed = applyCombatClosed(intermediate, "recruit", enc);
-    if (!ENABLE_ANIMATIONS) {
-      return closed;
-    }
-    const goldDeltas = [-cost];
-    if (lootGoldGain > 0) goldDeltas.push(lootGoldGain);
-    let uiWith = enqueueDeltas(closed.ui, { target: "gold", deltas: goldDeltas });
-    if (lootFoodGain > 0) {
-      uiWith = enqueueDeltas(uiWith, { target: "food", deltas: [lootFoodGain] });
-    }
-    uiWith = enqueueGridTransition(uiWith, { from: "combat", to: "overworld" });
-    return { ...closed, ui: uiWith };
+    const closeOutcome = variant.recruitLootScale ? "recruit" : "paid";
+    const payDeltas = [];
+    pushResourceDeltas(payDeltas, "gold", [-cost, ...lootGoldGain > 0 ? [lootGoldGain] : []]);
+    if (lootFoodGain > 0) pushResourceDeltas(payDeltas, "food", [lootFoodGain]);
+    let next = finishCombatClose(intermediate, enc, closeOutcome, payDeltas);
+    if (!ENABLE_ANIMATIONS) return next;
+    return { ...next, ui: enqueueGridTransition(next.ui, { from: "combat", to: "overworld" }) };
   }
   function reduceCombatReturn(prevState) {
     if (!prevState.encounter) return prevState;
@@ -1959,13 +2232,16 @@ ${line}`,
       ui: baseUi
     };
     const closed = isGameOver ? intermediate : applyCombatClosed(intermediate, "flee", enc);
-    if (!ENABLE_ANIMATIONS) {
-      return closed;
-    }
-    let uiWith = enqueueDeltas(closed.ui, { target: "army", deltas: [-1] });
+    let next = applyDeltas(closed, {
+      message: closed.ui.message,
+      resources: nextResources,
+      run: closed.run,
+      deltas: [{ target: "army", delta: -1 }]
+    });
+    if (!ENABLE_ANIMATIONS) return next;
     return {
-      ...closed,
-      ui: isGameOver ? uiWith : enqueueGridTransition(uiWith, { from: "combat", to: "overworld" })
+      ...next,
+      ui: isGameOver ? next.ui : enqueueGridTransition(next.ui, { from: "combat", to: "overworld" })
     };
   }
   function reduceCombatFight(prevState) {
@@ -2024,19 +2300,28 @@ ${line}`,
       encounter: isGameOver ? null : nextEncounter,
       ui: baseUi
     };
-    const closed = !isGameOver && nextEncounter == null ? applyCombatClosed(intermediate, "victory", enc) : intermediate;
-    if (!ENABLE_ANIMATIONS) {
-      return closed;
-    }
-    let uiWith = closed.ui;
-    uiWith = enqueueDeltas(uiWith, { target: "food", deltas: foodDeltas });
-    uiWith = enqueueDeltas(uiWith, { target: "gold", deltas: goldDeltas });
-    uiWith = enqueueDeltas(uiWith, { target: "army", deltas: armyDeltas });
-    uiWith = enqueueDeltas(uiWith, { target: "enemyArmy", deltas: enemyDeltas });
+    const fightDeltas = [];
+    pushResourceDeltas(fightDeltas, "food", foodDeltas);
+    pushResourceDeltas(fightDeltas, "gold", goldDeltas);
+    pushResourceDeltas(fightDeltas, "army", armyDeltas);
+    pushResourceDeltas(fightDeltas, "enemyArmy", enemyDeltas);
+    let next;
     if (!isGameOver && nextEncounter == null) {
-      uiWith = enqueueGridTransition(uiWith, { from: "combat", to: "overworld" });
+      next = finishCombatClose(intermediate, enc, "victory", fightDeltas);
+    } else {
+      next = applyDeltas(intermediate, {
+        message: intermediate.ui.message,
+        resources: nextResources,
+        run: nextRun,
+        deltas: fightDeltas
+      });
     }
-    return { ...closed, ui: uiWith };
+    next = { ...next, encounter: isGameOver ? null : nextEncounter };
+    if (!ENABLE_ANIMATIONS) return next;
+    if (!isGameOver && nextEncounter == null) {
+      next = { ...next, ui: enqueueGridTransition(next.ui, { from: "combat", to: "overworld" }) };
+    }
+    return next;
   }
   function rolledEnemySpawn(playerArmy) {
     return (rngState) => spawnEnemyArmy({ rngState, playerArmy });
@@ -2052,6 +2337,7 @@ ${line}`,
       kind: "combat",
       enemyArmySize: spawned.enemyArmy,
       initialSpawn: spawned.enemyArmy,
+      armyAtCombatStart: Math.max(0, args.playerArmySize),
       sourceCellId: cellIdForPos(nextWorld, args.pos),
       restoreMessage: args.restoreMessage
     };
@@ -2119,6 +2405,7 @@ ${line}`,
         kind: "combat",
         enemyArmySize: 0,
         initialSpawn: 0,
+        armyAtCombatStart: 0,
         sourceCellId: -1,
         restoreMessage: ""
       })
@@ -2152,7 +2439,7 @@ ${line}`,
   }
   function brigandVictoryReward(resources, rngState, enc) {
     const r = RNG.createStreamRandom(rngState);
-    const baseGold = Math.max(0, enc.initialSpawn + RNG.streamSignedNoise(r, BRIGAND_GOLD_NOISE));
+    const baseGold = Math.max(0, enc.initialSpawn + r.intInRange(-BRIGAND_GOLD_NOISE, BRIGAND_GOLD_NOISE));
     const foodBonus = r.intExclusive(BRIGAND_FOOD_MAX + 1);
     const next = {
       ...resources,
@@ -2203,6 +2490,7 @@ ${line}`,
       () => startCombatEncounter({
         world,
         pos,
+        playerArmySize: resources.armySize,
         spawnEnemy: rolledEnemySpawn(resources.armySize),
         encounterMessage: tileRand.perMoveLine(brigandCombatVariant.encounterLines),
         restoreMessage
@@ -2221,8 +2509,9 @@ ${line}`,
   // src/core/mechanics/defs/henge.ts
   function hengeVictoryReward(resources, rngState, enc) {
     const r = RNG.createStreamRandom(rngState);
-    const baseGold = Math.max(0, enc.initialSpawn + RNG.streamSignedNoise(r, HENGE_GOLD_NOISE)) + HENGE_GOLD_BONUS;
-    const food = RNG.streamBoundedBase(r, Math.round(HENGE_FOOD_FACTOR * enc.initialSpawn), HENGE_FOOD_NOISE);
+    const baseGold = Math.max(0, enc.initialSpawn + r.intInRange(-HENGE_GOLD_NOISE, HENGE_GOLD_NOISE)) + HENGE_GOLD_BONUS;
+    const foodBase = Math.round(HENGE_FOOD_FACTOR * enc.initialSpawn);
+    const food = Math.max(0, foodBase + r.intInRange(-HENGE_FOOD_NOISE, HENGE_FOOD_NOISE));
     const next = {
       ...resources,
       gold: resources.gold + baseGold,
@@ -2273,7 +2562,7 @@ ${line}`,
     };
     return { ...state2, world: setCellAt(state2.world, pos, next) };
   };
-  var onEnterHenge = ({ cell, world, pos, stepCount }) => {
+  var onEnterHenge = ({ cell, world, pos, stepCount, resources }) => {
     if (cell.kind !== "henge") return {};
     const hengeCell = getCellAt(world, pos);
     if (!hengeCell || hengeCell.kind !== "henge") return {};
@@ -2291,6 +2580,7 @@ ${r.perMoveLine(HENGE_ARRIVAL_LINES, { cellId: hengeCell.id })}`;
       return startCombatEncounter({
         world,
         pos,
+        playerArmySize: resources.armySize,
         spawnEnemy: fixedEnemySpawn(hengeCell.currentGroup),
         encounterMessage: tileMessage2,
         restoreMessage: tileMessage2
@@ -2301,6 +2591,7 @@ ${r.perMoveLine(HENGE_ARRIVAL_LINES, { cellId: hengeCell.id })}`;
     const result = startCombatEncounter({
       world,
       pos,
+      playerArmySize: resources.armySize,
       spawnEnemy: hengeSpawn,
       encounterMessage: tileMessage,
       restoreMessage: tileMessage
@@ -2308,15 +2599,15 @@ ${r.perMoveLine(HENGE_ARRIVAL_LINES, { cellId: hengeCell.id })}`;
     const nextHenge = { ...hengeCell, currentGroup: result.encounter.enemyArmySize };
     return { ...result, world: setCellAt(result.world, pos, nextHenge) };
   };
-  var placeHenges = ({ cells, rngState }) => {
-    const next = placeNamedFeature(cells, rngState, {
+  var placeHenges = ({ cells, rngState, seed }) => {
+    placeNamedFeatureFromSeed(cells, seed, "place.henge", {
       count: HENGE_COUNT,
       namePool: HENGE_NAME_POOL,
       fallbackName: "A Henge",
       canPlaceAt: (_x, _y, here) => isTerrainCell(here),
       buildCell: ({ x, y, name }) => ({ kind: "henge", id: cellId(x, y), name, nextReadyStep: 0, currentGroup: null })
     });
-    return { rngState: next };
+    return { rngState };
   };
   var hengeMechanic = {
     id: "henge",
@@ -2337,57 +2628,51 @@ ${r.perMoveLine(HENGE_ARRIVAL_LINES, { cellId: hengeCell.id })}`;
   var ACTION_TOWN_BUY_FOOD = "buyFood";
   var ACTION_TOWN_BUY_TROOPS = "buyTroops";
   var ACTION_TOWN_HIRE_SCOUT = "hireScout";
+  var ACTION_TOWN_HIRE_HEALER = "hireHealer";
   var ACTION_TOWN_BUY_RUMOR = "buyRumors";
   var ACTION_TOWN_LEAVE = "TOWN_LEAVE";
-  var TOWN_OFFERS = {
-    [ACTION_TOWN_BUY_FOOD]: { spriteId: SPRITES.inventory.food, priceKey: "foodGold", reduce: reduceTownBuyFood },
-    [ACTION_TOWN_BUY_TROOPS]: { spriteId: SPRITES.inventory.troop, priceKey: "troopsGold", reduce: reduceTownBuyTroops },
-    [ACTION_TOWN_HIRE_SCOUT]: { spriteId: SPRITES.inventory.scout, priceKey: "scoutGold", reduce: reduceTownHireScout },
-    [ACTION_TOWN_BUY_RUMOR]: { spriteId: SPRITES.actions.rumor, priceKey: "rumorGold", reduce: reduceTownBuyRumor }
-  };
-  var BASE_OFFERS = Object.keys(TOWN_OFFERS);
-  var OFFERS_PER_TOWN = 3;
-  function buildTownOfferSets(rng) {
-    if (BASE_OFFERS.length > TOWN_COUNT * OFFERS_PER_TOWN) {
-      throw new Error("TOWN_COUNT is too low for BASE_OFFERS \u2014 bump TOWN_COUNT in constants.ts");
-    }
-    const townCount = TOWN_COUNT;
-    const towns = Array.from({ length: townCount }, () => []);
-    towns[0].push(ACTION_TOWN_HIRE_SCOUT);
-    const mustPlace = BASE_OFFERS.filter((o) => o !== ACTION_TOWN_HIRE_SCOUT);
-    for (let i = 0; i < mustPlace.length; i++) {
-      const offer = mustPlace[i];
-      let placed = false;
-      for (let t = 0; t < townCount; t++) {
-        const slot = towns[t];
-        if (slot.length < OFFERS_PER_TOWN && !slot.includes(offer)) {
-          slot.push(offer);
-          placed = true;
-          break;
-        }
-      }
-      if (!placed) {
-        for (let t = 0; t < townCount; t++) {
-          const slot = towns[t];
-          if (slot.length < OFFERS_PER_TOWN) {
-            slot.push(offer);
-            break;
-          }
-        }
-      }
-    }
-    for (let t = 0; t < townCount; t++) {
-      const slot = towns[t];
-      const available = BASE_OFFERS.filter((o) => !slot.includes(o));
-      while (slot.length < OFFERS_PER_TOWN && available.length > 0) {
-        const pick = available[rng.intExclusive(available.length)];
-        slot.push(pick);
-        const idx = available.indexOf(pick);
-        if (idx >= 0) available.splice(idx, 1);
-      }
-    }
-    return towns;
+  function townPriceLine(s, spriteId, priceKey) {
+    const town = getCellAt(s.world, s.player.position);
+    return [{ spriteId, text: `-${town.prices[priceKey]}` }];
   }
+  var TOWN_OFFERS = {
+    [ACTION_TOWN_BUY_FOOD]: {
+      category: "economy",
+      spriteId: SPRITES.inventory.food,
+      priceKey: "foodGold",
+      reduce: reduceTownBuyFood,
+      previewPlate: (s) => townPriceLine(s, SPRITES.inventory.food, "foodGold")
+    },
+    [ACTION_TOWN_BUY_TROOPS]: {
+      category: "economy",
+      spriteId: SPRITES.inventory.army,
+      priceKey: "troopsGold",
+      reduce: reduceTownBuyTroops,
+      previewPlate: (s) => townPriceLine(s, SPRITES.inventory.army, "troopsGold")
+    },
+    [ACTION_TOWN_HIRE_SCOUT]: {
+      category: "companion_hire",
+      spriteId: SPRITES.inventory.scout,
+      priceKey: "companionHireGold",
+      reduce: reduceTownHireScout,
+      previewPlate: (s) => townPriceLine(s, SPRITES.inventory.scout, "companionHireGold")
+    },
+    [ACTION_TOWN_HIRE_HEALER]: {
+      category: "companion_hire",
+      spriteId: SPRITES.inventory.healer,
+      priceKey: "companionHireGold",
+      reduce: reduceTownHireHealer,
+      previewPlate: (s) => townPriceLine(s, SPRITES.inventory.healer, "companionHireGold")
+    },
+    [ACTION_TOWN_BUY_RUMOR]: {
+      category: "economy",
+      spriteId: SPRITES.actions.rumor,
+      priceKey: "rumorGold",
+      reduce: reduceTownBuyRumor,
+      previewPlate: (s) => townPriceLine(s, SPRITES.actions.rumor, "rumorGold")
+    }
+  };
+  var TOWN_OFFER_POOL = Object.keys(TOWN_OFFERS);
   function townPrefix(town) {
     const name = town.name || "A Town";
     return `${name} Town`;
@@ -2401,25 +2686,31 @@ ${r.perMoveLine(HENGE_ARRIVAL_LINES, { cellId: hengeCell.id })}`;
     }
     return pool;
   }
-  var onEnterTown = ({ cell, world, pos, stepCount }) => {
+  var onEnterTown = ({ cell, world, pos, stepCount, resources }) => {
     if (cell.kind !== "town") return {};
     const town = getCellAt(world, pos);
     if (!town || town.kind !== "town") return {};
     const name = town.name || "A Town";
     const r = RNG.createTileRandom({ world, stepCount, pos });
     const line = r.stableLine(TOWN_ENTER_LINES, { placeId: town.id });
+    let nextResources = resources;
+    if (resources.party.includes("healer") && resources.gold >= HEALER_UPKEEP_GOLD) {
+      nextResources = { ...resources, gold: resources.gold - HEALER_UPKEEP_GOLD };
+    }
     const message = `${name} Town
 ${line}`;
     const cellId2 = cellIdForPos(world, pos);
     const encounter = {
       kind: "town",
       sourceCellId: cellId2,
-      restoreMessage: message
+      restoreMessage: message,
+      rumorsBought: 0
     };
     const result = {
       message,
       knowsPosition: true,
       encounter,
+      resources: nextResources,
       enterAnims: [{ kind: "gridTransition", from: "overworld", to: "town" }]
     };
     return result;
@@ -2436,40 +2727,37 @@ ${line}`;
       return setEncounterMessage(prevState, prefix, FOOD_CARRY_FULL_MESSAGE);
     }
     const result = buy(prevState.resources, { gold: town.prices.foodGold, gain: { food: town.bundles.food } });
-    if (result.outcome === "noFunds") return noGoldResponse(prevState, prefix, town.id);
+    if (result.outcome === "noFunds") return noGoldResponse(prevState, prefix);
     const clamped = applyFoodCapOnGain(prevState.resources, result.resources);
     const appliedFoodDelta = clamped.food - prevState.resources.food;
     const deltas = result.deltas.map((d) => d.target === "food" ? { ...d, delta: appliedFoodDelta } : d);
-    const pick = RNG.createRunCopyRandom(prevState).advanceCursor("town.buyFeedback", TOWN_BUY_LINES);
+    const line = encounterStableLine(prevState, "town.buyFood", TOWN_BUY_LINES);
     return applyDeltas(prevState, {
       resources: clamped,
-      run: pick.nextState.run,
       message: `${prefix}
-${pick.line}`,
+${line}`,
       deltas
     });
   }
   function reduceTownBuyTroops(prevState, town) {
     const prefix = townPrefix(town);
     const result = buy(prevState.resources, { gold: town.prices.troopsGold, gain: { armySize: town.bundles.troops } });
-    if (result.outcome === "noFunds") return noGoldResponse(prevState, prefix, town.id);
-    const pick = RNG.createRunCopyRandom(prevState).advanceCursor("town.buyFeedback", TOWN_BUY_LINES);
+    if (result.outcome === "noFunds") return noGoldResponse(prevState, prefix);
+    const line = encounterStableLine(prevState, "town.buyTroops", TOWN_BUY_LINES);
     return applyDeltas(prevState, {
       resources: result.resources,
-      run: pick.nextState.run,
       message: `${prefix}
-${pick.line}`,
+${line}`,
       deltas: result.deltas
     });
   }
   function reduceTownHireScout(prevState, town) {
     const prefix = townPrefix(town);
+    const refused = refuseCompanionHire(prevState, prefix, "scout");
+    if (refused) return refused;
     const rnd = RNG.createRunCopyRandom(prevState);
-    if (prevState.resources.party.includes("scout")) {
-      return setEncounterMessage(prevState, prefix, rnd.perMoveLine(TOWN_SCOUT_ALREADY_HAVE_LINES, { cellId: town.id }));
-    }
-    const result = buy(prevState.resources, { gold: town.prices.scoutGold, gain: { party: ["scout"] } });
-    if (result.outcome === "noFunds") return noGoldResponse(prevState, prefix, town.id);
+    const result = buy(prevState.resources, { gold: town.prices.companionHireGold, gain: { party: ["scout"] } });
+    if (result.outcome === "noFunds") return noGoldResponse(prevState, prefix);
     return applyDeltas(prevState, {
       resources: result.resources,
       message: `${prefix}
@@ -2477,11 +2765,50 @@ ${rnd.perMoveLine(TOWN_SCOUT_HIRE_LINES, { cellId: town.id })}`,
       deltas: result.deltas
     });
   }
-  var placeNamedTowns = ({ cells, rngState }) => {
-    const stream = RNG.createStreamRandom(rngState);
-    const offerSets = buildTownOfferSets(stream);
+  function reduceTownHireHealer(prevState, town) {
+    const prefix = townPrefix(town);
+    const rnd = RNG.createRunCopyRandom(prevState);
+    return hireCompanion(prevState, {
+      prefix,
+      slotId: "healer",
+      goldCost: town.prices.companionHireGold,
+      successLine: rnd.perMoveLine(HEALER_BUY_LINES, { cellId: town.id })
+    });
+  }
+  function reduceTownBuyRumor(prevState, town) {
+    const prefix = townPrefix(town);
+    const enc = prevState.encounter;
+    if (!enc || enc.kind !== "town") return prevState;
+    if (enc.rumorsBought >= TOWN_RUMORS_PER_VISIT_MAX) {
+      const line = encounterStableLine(prevState, "rumor.cap", TOWN_RUMOR_EXHAUSTED_LINES);
+      return setEncounterMessage(prevState, prefix, line);
+    }
+    const result = buy(prevState.resources, { gold: town.prices.rumorGold, gain: {} });
+    if (result.outcome === "noFunds") return noGoldResponse(prevState, prefix);
+    const pool = rumorPool();
+    const pick = RNG.createRunCopyRandom(prevState).advanceCursor(`town.rumor.${town.id}`, pool, { salt: town.id });
+    const nextEncounter = { ...enc, rumorsBought: enc.rumorsBought + 1 };
+    return applyDeltas(
+      { ...prevState, encounter: nextEncounter, run: pick.nextState.run },
+      {
+        resources: result.resources,
+        message: `${prefix}
+${pick.line}`,
+        deltas: result.deltas
+      }
+    );
+  }
+  var placeNamedTowns = ({ cells, rngState, seed }) => {
+    const offerSets = buildOfferSets({
+      poiCount: TOWN_COUNT,
+      minOffers: POI_MIN_OFFERS,
+      maxOffers: POI_MAX_OFFERS,
+      pool: TOWN_OFFER_POOL,
+      categoryOf: (offer) => TOWN_OFFERS[offer].category,
+      rng: RNG.createStreamRandomFromSeed(seed, "town.offers")
+    });
     let townIndex = 0;
-    const next = placeNamedFeature(cells, stream.rngState, {
+    placeNamedFeatureFromSeed(cells, seed, "place.town", {
       count: TOWN_COUNT,
       namePool: TOWN_NAME_POOL,
       fallbackName: "A Town",
@@ -2490,50 +2817,34 @@ ${rnd.perMoveLine(TOWN_SCOUT_HIRE_LINES, { cellId: town.id })}`,
         const offers = [...offerSets[townIndex]];
         const foodGold = rng.intInRange(TOWN_PRICE_FOOD_MIN, TOWN_PRICE_FOOD_MAX);
         const troopsGold = rng.intInRange(TOWN_PRICE_TROOPS_MIN, TOWN_PRICE_TROOPS_MAX);
-        const scoutGold = rng.intInRange(TOWN_PRICE_SCOUT_MIN, TOWN_PRICE_SCOUT_MAX);
+        const companionHireGold = rng.intInRange(COMPANION_HIRE_GOLD_MIN, COMPANION_HIRE_GOLD_MAX);
         const rumorGold = rng.intInRange(TOWN_PRICE_RUMOR_MIN, TOWN_PRICE_RUMOR_MAX);
         const cell = {
           kind: "town",
           id: cellId(x, y),
           name,
           offers,
-          prices: { foodGold, troopsGold, scoutGold, rumorGold },
+          prices: { foodGold, troopsGold, companionHireGold, rumorGold },
           bundles: { food: TOWN_FOOD_BUNDLE, troops: TOWN_TROOPS_BUNDLE }
         };
         townIndex++;
         return cell;
       }
     });
-    return { rngState: next };
+    return { rngState };
   };
-  function townOfferSlot(s, idx) {
+  function townOfferSlot(s, slot) {
     const town = getCellAt(s.world, s.player.position);
-    const o = town.offers[idx];
-    return o ? gridButton(TOWN_OFFERS, o) : null;
+    const offer = offersToGridLayout(town.offers)[slot];
+    return offer ? gridButton(TOWN_OFFERS, offer) : null;
   }
   var townPreviewPlate = (s) => {
     const here = getCellAt(s.world, s.player.position);
     if (!here || here.kind !== "town") return null;
-    if (!here.offers.length) return null;
-    return here.offers.map((o) => {
-      const spec = TOWN_OFFERS[o];
-      return { spriteId: spec.spriteId, text: `-${here.prices[spec.priceKey]}` };
-    });
+    const layout = offersToGridLayout(here.offers);
+    const order = offersInGridOrder(here.offers, layout);
+    return previewPlateForOffers(s, order, TOWN_OFFERS);
   };
-  function reduceTownBuyRumor(prevState, town) {
-    const prefix = townPrefix(town);
-    const result = buy(prevState.resources, { gold: town.prices.rumorGold, gain: {} });
-    if (result.outcome === "noFunds") return noGoldResponse(prevState, prefix, town.id);
-    const pool = rumorPool();
-    const pick = RNG.createRunCopyRandom(prevState).advanceCursor(`town.rumor.${town.id}`, pool, { salt: town.id });
-    return applyDeltas(prevState, {
-      resources: result.resources,
-      run: pick.nextState.run,
-      message: `${prefix}
-${pick.line}`,
-      deltas: result.deltas
-    });
-  }
   var townMechanic = {
     id: "town",
     kinds: ["town"],
@@ -2552,9 +2863,9 @@ ${pick.line}`,
       rightGrid: makeRightGrid({
         leaveAction: { type: ACTION_TOWN_LEAVE },
         centerSpriteId: SPRITES.centers.marketStall,
-        top: (s) => townOfferSlot(s, 0),
-        left: (s) => townOfferSlot(s, 1),
-        bottom: (s) => townOfferSlot(s, 2)
+        top: (s) => townOfferSlot(s, "top"),
+        left: (s) => townOfferSlot(s, "left"),
+        bottom: (s) => townOfferSlot(s, "bottom")
       })
     }
   };
@@ -2568,11 +2879,8 @@ ${pick.line}`,
   function goblinVictoryReward(resources, rngState, enc) {
     const r = RNG.createStreamRandom(rngState);
     const gold = r.intExclusive(GOBLIN_GOLD_MAX + 1);
-    const food = RNG.streamBoundedBase(
-      r,
-      Math.round(GOBLIN_FOOD_FACTOR * enc.initialSpawn),
-      GOBLIN_FOOD_NOISE
-    );
+    const foodBase = Math.round(GOBLIN_FOOD_FACTOR * enc.initialSpawn);
+    const food = Math.max(0, foodBase + r.intInRange(-GOBLIN_FOOD_NOISE, GOBLIN_FOOD_NOISE));
     const next = {
       ...resources,
       gold: resources.gold + gold,
@@ -2616,6 +2924,7 @@ ${pick.line}`,
       () => startCombatEncounter({
         world,
         pos,
+        playerArmySize: resources.armySize,
         spawnEnemy: rolledEnemySpawn(resources.armySize),
         encounterMessage: tileRand.perMoveLine(goblinCombatVariant.encounterLines),
         restoreMessage
@@ -2697,13 +3006,13 @@ ${pick.line}`,
       message: line
     };
   };
-  var placeFishingLakes = ({ cells, rngState }) => {
-    const res = placeFeature(cells, rngState, {
+  var placeFishingLakes = ({ cells, rngState, seed }) => {
+    placeFeatureFromSeed(cells, seed, "place.fishingLake", {
       count: FISHING_LAKE_COUNT,
       canPlaceAt: (_x, _y, here) => isTerrainCell(here),
       buildCell: ({ x, y }) => ({ kind: "fishingLake", id: cellId(x, y), nextReadyStep: 0 })
     });
-    return { rngState: res.rngState };
+    return { rngState };
   };
   var fishingLakeMechanic = {
     id: "fishingLake",
@@ -2729,19 +3038,21 @@ ${pick.line}`,
       message: tileRand.perMoveLine(RAINBOW_END_PAYOUT_LINES, { cellId: rainbowEndCell.id })
     };
   };
-  var placeRainbowEnds = ({ cells, rngState }) => {
-    const first = placeFeature(cells, rngState, {
+  var placeRainbowEnds = ({ cells, rngState, seed }) => {
+    let stream = RNG.createStreamRandomFromSeed(seed, "place.rainbowEnd");
+    const first = placeFeature(cells, stream.rngState, {
       count: 1,
       canPlaceAt: (_x, _y, here) => isTerrainCell(here),
       buildCell: ({ x, y }) => ({ kind: "rainbowEnd", id: cellId(x, y), hasPaidOut: false })
     });
-    const second = placeFeature(cells, first.rngState, {
+    stream = RNG.createStreamRandom(first.rngState);
+    placeFeature(cells, stream.rngState, {
       count: 1,
       canPlaceAt: (_x, _y, here) => isTerrainCell(here),
       awayFrom: { pos: first.placed[0], minDistance: RAINBOW_END_MIN_DISTANCE },
       buildCell: ({ x, y }) => ({ kind: "rainbowEnd", id: cellId(x, y), hasPaidOut: false })
     });
-    return { rngState: second.rngState };
+    return { rngState };
   };
   var rainbowEndMechanic = {
     id: "rainbowEnd",
@@ -2758,7 +3069,7 @@ ${pick.line}`,
       const enc = s.encounter;
       if (!enc || enc.kind !== "combat") return [];
       return [
-        { spriteId: SPRITES.enemies.heart, text: `${enc.enemyArmySize}` },
+        { spriteId: SPRITES.enemies.hp, text: `${enc.enemyArmySize}` },
         { spriteId: SPRITES.inventory.gold, text: `-${WYRM_PAY_GOLD_COST}` }
       ];
     },
@@ -2773,19 +3084,19 @@ ${pick.line}`,
       successLines: WYRM_PAYOFF_LINES,
       failLines: { noFunds: WYRM_NO_GOLD_LINES },
       onSuccess: (resources) => {
-        if (resources.inventory.includes("blood")) return resources;
-        return { ...resources, inventory: [...resources.inventory, "blood"] };
+        if (resources.inventory.includes("bloodVial")) return resources;
+        return { ...resources, inventory: [...resources.inventory, "bloodVial"] };
       }
     },
     victoryReward: (resources, rngState) => {
-      if (resources.inventory.includes("blood")) return { resources, rngState };
+      if (resources.inventory.includes("bloodVial")) return { resources, rngState };
       return {
-        resources: { ...resources, inventory: [...resources.inventory, "blood"] },
+        resources: { ...resources, inventory: [...resources.inventory, "bloodVial"] },
         rngState
       };
     }
   };
-  var onEnterWyrm = ({ cell, world, pos, stepCount }) => {
+  var onEnterWyrm = ({ cell, world, pos, stepCount, resources }) => {
     if (cell.kind !== "lair") return {};
     const lair = getCellAt(world, pos);
     if (lair.kind !== "lair") return {};
@@ -2800,21 +3111,22 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     return startCombatEncounter({
       world,
       pos,
+      playerArmySize: resources.armySize,
       spawnEnemy: fixedEnemySpawn(WYRM_INITIAL_HEALTH),
       encounterMessage: tileMessage,
       restoreMessage: tileMessage
     });
   };
-  var placeWyrm = ({ cells, rngState }) => {
-    const res = placeFeature(cells, rngState, {
+  var placeWyrm = ({ cells, rngState, seed }) => {
+    placeFeatureFromSeed(cells, seed, "place.wyrm", {
       count: 1,
       canPlaceAt: (_x, _y, here) => here.kind === "mountain",
       buildCell: ({ x, y }) => ({ kind: "lair", id: cellId(x, y), isBled: false })
     });
-    return { rngState: res.rngState };
+    return { rngState };
   };
   function onWyrmCombatClosed(state2, outcome, encounter) {
-    if (outcome !== "victory" && outcome !== "recruit") return state2;
+    if (outcome === "flee") return state2;
     const pos = posForCellId(state2.world, encounter.sourceCellId);
     const cell = getCellAt(state2.world, pos);
     if (cell.kind !== "lair") return state2;
@@ -2875,9 +3187,9 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     }
     return out;
   }
-  function generateBaseTerrainCells(rngState) {
+  function generateBaseTerrainCells(seed) {
     const vals = [];
-    const rng = RNG.createStreamRandom(rngState);
+    const rng = RNG.createStreamRandomFromSeed(seed, "place.terrain");
     for (let y = 0; y < WORLD_HEIGHT; y++) {
       const row = [];
       for (let x = 0; x < WORLD_WIDTH; x++) {
@@ -2912,26 +3224,24 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
       }
       cells.push(row);
     }
-    return { cells, rngState: rng.rngState };
+    return cells;
   }
-  function pickStart({ rngState }) {
-    const rng = RNG.createStreamRandom(rngState);
+  function pickStart(seed) {
+    const rng = RNG.createStreamRandomFromSeed(seed, "place.start");
     const v = rng.intExclusive(WORLD_WIDTH * WORLD_HEIGHT);
     const x = v % WORLD_WIDTH;
     const y = Math.floor(v / WORLD_WIDTH);
     return { startPosition: { x, y }, rngState: rng.rngState };
   }
   function generateWorld(seed) {
-    let rngState = RNG.createStreamRandomFromSeed(seed).rngState;
-    const base = generateBaseTerrainCells(rngState);
-    rngState = base.rngState;
-    const cells = base.cells;
+    const cells = generateBaseTerrainCells(seed);
+    let rngState = 0;
     for (let i = 0; i < MECHANICS.length; i++) {
       const m = MECHANICS[i];
       if (!m.placeWorld) continue;
-      rngState = m.placeWorld({ cells, rngState }).rngState;
+      rngState = m.placeWorld({ cells, rngState, seed }).rngState;
     }
-    const startPick = pickStart({ rngState });
+    const startPick = pickStart(seed);
     rngState = startPick.rngState;
     const world = {
       seed,
@@ -2943,12 +3253,6 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     };
     return { world, startPosition: startPick.startPosition };
   }
-
-  // src/core/mechanics/onEnter.ts
-  var onEnterDefaultTerrain = ({ cell, world, pos, stepCount }) => {
-    const r = RNG.createTileRandom({ world, stepCount, pos });
-    return { message: r.perMoveLine(terrainLoreLinesForKind(cell.kind)) };
-  };
 
   // src/core/types.ts
   var LEFT_PANEL_KIND_AUTO = "auto";
@@ -3203,7 +3507,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     const appliedFoodDelta = nextResources.food - baseResources.food;
     if (appliedFoodDelta) foodDeltas.push(appliedFoodDelta);
     const appliedGoldDelta = nextResources.gold - baseResources.gold;
-    if (appliedGoldDelta > 0) goldDeltas.push(appliedGoldDelta);
+    if (appliedGoldDelta) goldDeltas.push(appliedGoldDelta);
     const nextHasWon = prevState.run.hasWon || !!outcome.hasWon;
     const isGameOver = nextResources.armySize <= 0;
     const nextEncounter = outcome.encounter ?? null;
@@ -3242,26 +3546,30 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
       ui: baseUi
     };
     if (!ENABLE_ANIMATIONS) return baseState;
-    const startFrame = baseUi.clock.frame;
-    let uiWith = baseState.ui;
-    uiWith = enqueueDeltas(uiWith, { target: "food", deltas: foodDeltas, startFrame });
-    uiWith = enqueueDeltas(uiWith, { target: "gold", deltas: goldDeltas, startFrame });
-    uiWith = enqueueDeltas(uiWith, { target: "army", deltas: armyDeltas, startFrame });
+    const moveDeltas = [];
+    pushResourceDeltas(moveDeltas, "food", foodDeltas);
+    pushResourceDeltas(moveDeltas, "gold", goldDeltas);
+    pushResourceDeltas(moveDeltas, "army", armyDeltas);
+    let next = applyDeltas(baseState, { message, deltas: moveDeltas });
+    const slideStart = next.ui.clock.frame;
     if (outcome.enterAnims && outcome.enterAnims.length) {
-      uiWith = applyEnterAnims(uiWith, outcome.enterAnims, startFrame + MOVE_SLIDE_FRAMES);
+      next = { ...next, ui: applyEnterAnims(next.ui, outcome.enterAnims, slideStart + MOVE_SLIDE_FRAMES) };
     }
     if (teleported) {
-      uiWith = enqueueGridTransition(uiWith, { startFrame, from: "blank", to: "overworld" });
+      next = { ...next, ui: enqueueGridTransition(next.ui, { startFrame: slideStart, from: "blank", to: "overworld" }) };
     } else {
-      uiWith = enqueueAnim(uiWith, {
-        kind: "moveSlide",
-        startFrame,
-        durationFrames: MOVE_SLIDE_FRAMES,
-        blocksInput: true,
-        params: { fromPos: { x: prevPos.x, y: prevPos.y }, toPos: { x: nextPos.x, y: nextPos.y }, dx, dy }
-      });
+      next = {
+        ...next,
+        ui: enqueueAnim(next.ui, {
+          kind: "moveSlide",
+          startFrame: slideStart,
+          durationFrames: MOVE_SLIDE_FRAMES,
+          blocksInput: true,
+          params: { fromPos: { x: prevPos.x, y: prevPos.y }, toPos: { x: nextPos.x, y: nextPos.y }, dx, dy }
+        })
+      };
     }
-    return { ...baseState, ui: uiWith };
+    return next;
   }
   function reduceRestart(s) {
     const next = processAction(null, { type: ACTION_NEW_RUN, seed: s.world.seed + 1 });
@@ -3946,7 +4254,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
   function panelFrameTopLeftFor(s) {
     const inv = s.resources.inventory;
     if (inv.includes("bronzeKey")) return SPRITES.ui.panelBorderBronze;
-    if (inv.includes("blood")) return SPRITES.ui.panelBorderBlood;
+    if (inv.includes("bloodVial")) return SPRITES.ui.panelBorderBlood;
     return SPRITES.ui.panelBorder;
   }
   function drawLeftPanel(s) {
@@ -3993,7 +4301,7 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     const statusY = Math.max(illY, statusCenteredY - UI_LEFT_PANEL_STATS_OPTICAL_LIFT_PX);
     const armyX = statusX;
     const armyY = statusY;
-    spr(SPRITES.inventory.troop, armyX, armyY, -1, 1, 0, 0, 2, 2);
+    spr(SPRITES.inventory.army, armyX, armyY, -1, 1, 0, 0, 2, 2);
     const armyValueX = armyX + UI_ARMY_VALUE_OFFSET_X;
     const armyValueY = armyY + UI_ARMY_VALUE_OFFSET_Y;
     const armyColor = s.resources.armySize < 6 ? UI_COLOR_WARN : UI_COLOR_TEXT;
@@ -4096,16 +4404,18 @@ ${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`;
     rect(verticalX, illY, 1, verticalH, UI_COLOR_LEFT_PANEL_DIVIDER);
     rect(LEFT_PANEL_INNER_X, horizontalY, LEFT_PANEL_INNER_W, 1, UI_COLOR_LEFT_PANEL_DIVIDER);
   }
-  var STATUS_ICON_SLOTS = [
-    { collection: "inventory", id: "bronzeKey", spriteId: SPRITES.inventory.bronzeKey },
-    { collection: "inventory", id: "blood", spriteId: SPRITES.inventory.bloodVial },
-    { collection: "party", id: "scout", spriteId: SPRITES.inventory.scout },
-    { collection: "party", id: "mule", spriteId: SPRITES.inventory.beast }
-  ];
+  var INVENTORY_STATUS_ORDER = ["bronzeKey", "bloodVial"];
   function heldStatusIcons(s) {
     const out = [];
-    for (const slot of STATUS_ICON_SLOTS) {
-      if (s.resources[slot.collection].includes(slot.id)) out.push(slot.spriteId);
+    for (let i = 0; i < INVENTORY_STATUS_ORDER.length; i++) {
+      const id = INVENTORY_STATUS_ORDER[i];
+      if (!s.resources.inventory.includes(id)) continue;
+      const spriteId = inventorySpriteId(id);
+      if (spriteId != null) out.push(spriteId);
+    }
+    for (let i = 0; i < s.resources.party.length; i++) {
+      const spriteId = inventorySpriteId(s.resources.party[i]);
+      if (spriteId != null) out.push(spriteId);
     }
     return out;
   }

@@ -24,7 +24,7 @@ describe('signpost', () => {
         height: 10,
         cells: makeCells(10, 10, [
           { x: 3, y: 2, cell: { kind: 'gate' } },
-          { x: 6, y: 6, cell: { kind: 'farm', id: 66, name: 'The Oast', beastGoldCost: 10 } },
+          { x: 6, y: 6, cell: { kind: 'farm', id: 66, name: 'The Oast', offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'], companionHireGold: 10 } },
         ]),
       }
     )
@@ -53,8 +53,8 @@ describe('signpost', () => {
         height: 10,
         cells: makeCells(10, 10, [
           // Both are distance 5; id 23 wins over id 32.
-          { x: 3, y: 2, cell: { kind: 'farm', id: 23, name: 'Greyfield', beastGoldCost: 10 } },
-          { x: 2, y: 3, cell: { kind: 'farm', id: 32, name: 'The Oast', beastGoldCost: 10 } },
+          { x: 3, y: 2, cell: { kind: 'farm', id: 23, name: 'Greyfield', offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'], companionHireGold: 10 } },
+          { x: 2, y: 3, cell: { kind: 'farm', id: 32, name: 'The Oast', offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'], companionHireGold: 10 } },
         ]),
       }
     )
@@ -68,7 +68,7 @@ describe('signpost', () => {
         width: 10,
         height: 10,
         cells: makeCells(10, 10, [
-          { x: 3, y: 2, cell: { kind: 'camp', id: 23, name: 'Ember Watch', nextReadyStep: 0 } },
+          { x: 3, y: 2, cell: { kind: 'camp', id: 23, name: 'Ember Watch', nextReadyStep: 0, offers: ['CAMP_SEARCH'], companionHireGold: 15 } },
         ]),
       }
     )
@@ -83,8 +83,8 @@ describe('signpost', () => {
         height: 10,
         cells: makeCells(10, 10, [
           // Both are distance 5; farm wins over camp.
-          { x: 3, y: 2, cell: { kind: 'farm', id: 23, name: 'Greyfield', beastGoldCost: 10 } },
-          { x: 2, y: 3, cell: { kind: 'camp', id: 32, name: 'Ember Watch', nextReadyStep: 0 } },
+          { x: 3, y: 2, cell: { kind: 'farm', id: 23, name: 'Greyfield', offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'], companionHireGold: 10 } },
+          { x: 2, y: 3, cell: { kind: 'camp', id: 32, name: 'Ember Watch', nextReadyStep: 0, offers: ['CAMP_SEARCH'], companionHireGold: 15 } },
         ]),
       }
     )
@@ -99,7 +99,7 @@ describe('signpost', () => {
         height: 10,
         cells: makeCells(10, 10, [
           // Both are distance 5; camp wins over henge.
-          { x: 3, y: 2, cell: { kind: 'camp', id: 23, name: 'Ember Watch', nextReadyStep: 0 } },
+          { x: 3, y: 2, cell: { kind: 'camp', id: 23, name: 'Ember Watch', nextReadyStep: 0, offers: ['CAMP_SEARCH'], companionHireGold: 15 } },
           { x: 2, y: 3, cell: { kind: 'henge', id: 32, name: 'Old Insistence', nextReadyStep: 0, currentGroup: null } },
         ]),
       }
@@ -134,7 +134,7 @@ describe('signpost', () => {
         height: 10,
         cells: makeCells(10, 10, [
           { x: 3, y: 2, cell: { kind: 'lair', id: 23, isBled: false } },
-          { x: 2, y: 3, cell: { kind: 'farm', id: 32, name: 'Greyfield', beastGoldCost: 10 } },
+          { x: 2, y: 3, cell: { kind: 'farm', id: 32, name: 'Greyfield', offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'], companionHireGold: 10 } },
         ]),
       }
     )
@@ -149,7 +149,7 @@ describe('signpost', () => {
         height: 10,
         cells: makeCells(10, 10, [
           // Both are distance 5; farm wins over town.
-          { x: 3, y: 2, cell: { kind: 'farm', id: 23, name: 'Greyfield', beastGoldCost: 10 } },
+          { x: 3, y: 2, cell: { kind: 'farm', id: 23, name: 'Greyfield', offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'], companionHireGold: 10 } },
           {
             x: 2,
             y: 3,
@@ -158,7 +158,7 @@ describe('signpost', () => {
               id: 32,
               name: 'Stonebridge',
               offers: ['buyFood', 'buyTroops', 'hireScout'],
-              prices: { foodGold: 3, troopsGold: 5, scoutGold: 12, rumorGold: 3 },
+              prices: { foodGold: 3, troopsGold: 5, companionHireGold: 12, rumorGold: 3 },
               bundles: { food: 3, troops: 2 },
             },
           },
@@ -183,7 +183,7 @@ describe('signpost', () => {
               id: 23,
               name: 'Stonebridge',
               offers: ['buyFood', 'buyTroops', 'hireScout'],
-              prices: { foodGold: 3, troopsGold: 5, scoutGold: 12, rumorGold: 3 },
+              prices: { foodGold: 3, troopsGold: 5, companionHireGold: 12, rumorGold: 3 },
               bundles: { food: 3, troops: 2 },
             },
           },
@@ -203,8 +203,8 @@ describe('signpost', () => {
           // All are distance 5; gate wins over locksmith, farm and camp.
           { x: 3, y: 2, cell: { kind: 'gate' } },
           { x: 4, y: 1, cell: { kind: 'locksmith' } },
-          { x: 2, y: 3, cell: { kind: 'farm', id: 32, name: 'Greyfield', beastGoldCost: 10 } },
-          { x: 1, y: 4, cell: { kind: 'camp', id: 41, name: 'Ember Watch', nextReadyStep: 0 } },
+          { x: 2, y: 3, cell: { kind: 'farm', id: 32, name: 'Greyfield', offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'], companionHireGold: 10 } },
+          { x: 1, y: 4, cell: { kind: 'camp', id: 41, name: 'Ember Watch', nextReadyStep: 0, offers: ['CAMP_SEARCH'], companionHireGold: 15 } },
           { x: 5, y: 0, cell: { kind: 'henge', id: 5, name: 'The Mending', nextReadyStep: 0, currentGroup: null } },
         ]),
       }
@@ -241,7 +241,7 @@ describe('signpost', () => {
           // Too close (E, 1).
           { x: 1, y: 0, cell: { kind: 'gate' } },
           // Farther (SE, 5).
-          { x: 3, y: 2, cell: { kind: 'farm', id: 23, name: 'Greyfield', beastGoldCost: 10 } },
+          { x: 3, y: 2, cell: { kind: 'farm', id: 23, name: 'Greyfield', offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'], companionHireGold: 10 } },
         ]),
       }
     )

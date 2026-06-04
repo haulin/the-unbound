@@ -12,8 +12,8 @@ import {
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
 import type { CombatEncounter, LairCell, State } from '../../types'
-import { cellId, placeFeature } from '../../worldgen'
-import { fixedEnemySpawn, startCombatEncounter, type CombatVariantConfig } from './combat'
+import { cellId, placeFeatureFromSeed } from '../../worldgen'
+import { fixedEnemySpawn, startCombatEncounter, type CombatCloseOutcome, type CombatVariantConfig } from './combat'
 import type { MechanicDef, OnEnterTile, PlaceWorldProvider } from '../types'
 
 export const wyrmCombatVariant: CombatVariantConfig = {
@@ -22,7 +22,7 @@ export const wyrmCombatVariant: CombatVariantConfig = {
     const enc = s.encounter
     if (!enc || enc.kind !== 'combat') return []
     return [
-      { spriteId: SPRITES.enemies.heart, text: `${enc.enemyArmySize}` },
+      { spriteId: SPRITES.enemies.hp, text: `${enc.enemyArmySize}` },
       { spriteId: SPRITES.inventory.gold, text: `-${WYRM_PAY_GOLD_COST}` },
     ]
   },
@@ -37,20 +37,20 @@ export const wyrmCombatVariant: CombatVariantConfig = {
     successLines: WYRM_PAYOFF_LINES,
     failLines: { noFunds: WYRM_NO_GOLD_LINES },
     onSuccess: (resources) => {
-      if (resources.inventory.includes('blood')) return resources
-      return { ...resources, inventory: [...resources.inventory, 'blood'] }
+      if (resources.inventory.includes('bloodVial')) return resources
+      return { ...resources, inventory: [...resources.inventory, 'bloodVial'] }
     },
   },
   victoryReward: (resources, rngState) => {
-    if (resources.inventory.includes('blood')) return { resources, rngState }
+    if (resources.inventory.includes('bloodVial')) return { resources, rngState }
     return {
-      resources: { ...resources, inventory: [...resources.inventory, 'blood'] },
+      resources: { ...resources, inventory: [...resources.inventory, 'bloodVial'] },
       rngState,
     }
   },
 }
 
-const onEnterWyrm: OnEnterTile = ({ cell, world, pos, stepCount }) => {
+const onEnterWyrm: OnEnterTile = ({ cell, world, pos, stepCount, resources }) => {
   if (cell.kind !== 'lair') return {}
   const lair = getCellAt(world, pos)
   if (lair.kind !== 'lair') return {}
@@ -66,27 +66,24 @@ const onEnterWyrm: OnEnterTile = ({ cell, world, pos, stepCount }) => {
   return startCombatEncounter({
     world,
     pos,
+    playerArmySize: resources.armySize,
     spawnEnemy: fixedEnemySpawn(WYRM_INITIAL_HEALTH),
     encounterMessage: tileMessage,
     restoreMessage: tileMessage,
   })
 }
 
-const placeWyrm: PlaceWorldProvider = ({ cells, rngState }) => {
-  const res = placeFeature(cells, rngState, {
+const placeWyrm: PlaceWorldProvider = ({ cells, rngState, seed }) => {
+  placeFeatureFromSeed(cells, seed, 'place.wyrm', {
     count: 1,
     canPlaceAt: (_x, _y, here) => here.kind === 'mountain',
     buildCell: ({ x, y }) => ({ kind: 'lair', id: cellId(x, y), isBled: false }),
   })
-  return { rngState: res.rngState }
+  return { rngState }
 }
 
-function onWyrmCombatClosed(
-  state: State,
-  outcome: 'victory' | 'flee' | 'recruit',
-  encounter: CombatEncounter,
-): State {
-  if (outcome !== 'victory' && outcome !== 'recruit') return state
+function onWyrmCombatClosed(state: State, outcome: CombatCloseOutcome, encounter: CombatEncounter): State {
+  if (outcome === 'flee') return state
   const pos = posForCellId(state.world, encounter.sourceCellId)
   const cell = getCellAt(state.world, pos)
   if (cell.kind !== 'lair') return state

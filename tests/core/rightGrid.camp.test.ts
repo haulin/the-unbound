@@ -14,7 +14,11 @@ function makeWorld(): World {
     mapGenAlgorithm: 'TEST',
     cells: [
       [grass(), grass(), grass()],
-      [grass(), { kind: 'camp', id: 4, name: 'Ember Watch', nextReadyStep: 0 }, grass()],
+      [
+        grass(),
+        { kind: 'camp', id: 4, name: 'Ember Watch', nextReadyStep: 0, offers: ['CAMP_SEARCH'], companionHireGold: 15 },
+        grass(),
+      ],
       [grass(), grass(), grass()],
     ],
     rngState: 1,
@@ -35,8 +39,8 @@ function makeState(): State {
 describe('rightGrid camp layout', () => {
   it('maps camp cross actions (map corner enabled)', () => {
     const s = makeState()
+    expect(getRightGridCellDef(s, 1, 0).action).toEqual({ type: ACTION_CAMP_SEARCH }) // West (1st offer → left)
     expect(getRightGridCellDef(s, 0, 1).action).toBe(null) // North unused
-    expect(getRightGridCellDef(s, 1, 0).action).toEqual({ type: ACTION_CAMP_SEARCH }) // West (camp's only action slot)
     expect(getRightGridCellDef(s, 1, 2).action).toEqual({ type: ACTION_CAMP_LEAVE }) // East
     expect(getRightGridCellDef(s, 1, 1).action).toBe(null) // Center no-op
     expect(getRightGridCellDef(s, 2, 1).action).toBe(null) // South unused

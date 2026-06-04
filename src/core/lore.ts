@@ -9,19 +9,21 @@ Mechanics index (keep this list current):
 - Resources
   - Army: combat unit and HP; hits 0 = game over.
   - Food: depletes 1/move, 2 on mountains/swamps; hits 0 reduces army.
-  - Food carry cap: 2 per soldier (the Mule slot raises this by +50). Excess food gains clamp to the cap.
+    - Food carry cap: 2 per soldier (the Mule slot raises this by +50).
+    - Excess food gains clamp to the cap. Except for in-combat army losses
+  - Gold - currency for purchases, bribes, and hiring.
   - Bronze key - opens the Gate; forged only by the Locksmith.
   - The Blood - drawn from the Wyrm; consumed by the Locksmith as the quench.
 
 - Slots
   - Up to 3 held at once, from a roster of 7. Bought at PoIs, sold at The Crossing for half price.
-  - Mule (animal) — +50 food carry cap; -1 food per Camp Search. Cannot coexist with Boar.
-  - Boar (animal) — opening volley kills ~25% of enemy army at combat start. Cannot coexist with Mule.
-  - Scout (person) — halves woods/swamp lost chance; when oriented, reveals farms/camps/henges globally on the map (gate/locksmith/lair remain gated by mapping).
-  - Healer (person) — revives 1 wounded per combat; costs -1 gold per Town visit.
-  - Captain (person, banner-bearer) — +10% combat odds; +X% ambush in woods and mountains.
-  - Fisherman (person) — double lake yields; +1 troop loss per flee.
-  - Magpie (animal) — ~30% refund of 1 on any payment (Wyrm bribe included; Crossing sales excluded — those are refunds, not payments). Higher buy price.
+  - Mule (animal) - +50 food carry cap; -1 food per Camp Search. Cannot coexist with Boar.
+  - Boar (animal) - opening volley kills ~25% of enemy army at combat start. Cannot coexist with Mule.
+  - Scout (person) - halves woods/swamp lost chance; when oriented, reveals farms/camps/henges globally on the map (gate/locksmith/lair remain gated by mapping).
+  - Healer (person) - mends up to 2 round-losses after combat; -1 gold per town enter while held.
+  - Captain (person, banner-bearer) - +10% combat odds; +X% ambush in woods and mountains.
+  - Fisherman (person) - double lake yields; +1 troop loss per flee.
+  - Magpie (animal) - ~30% refund of 1 on any payment (Wyrm bribe included; Crossing sales excluded - those are refunds, not payments). Higher buy price.
 
 - Navigation
   - In-game map
@@ -34,21 +36,21 @@ Mechanics index (keep this list current):
   - Combat: fight/flee; Pay when the variant allows it.
   - Woods ambush: goblins, food-skewed loot, not recruitable.
   - Mountain ambush: brigands, gold-skewed loot; recruit small wounded bands for N² gold.
-  - Farms: modal encounter; buy food, hire one slot (varies by farm — Mule, Boar, or Magpie), leave.
-  - Camps: modal encounter; Search (deterministic reinforcements when ready); hire one slot (varies by camp — Scout or Captain); leave.
-  - Towns: modal encounter; buy food, hire one slot (varies by town — Scout, Healer, or Fisherman), leave. Tavern rumors land later (see backlog).
+  - Farms: modal encounter; buy food, hire one slot (varies by farm - Mule, Boar, or Magpie), leave.
+  - Camps: modal encounter; Search (deterministic reinforcements when ready); hire one slot (varies by camp - Scout or Captain); leave.
+  - Towns: modal encounter; buy food, hire one slot (varies by town - Scout, Healer, or Fisherman), leave. Tavern rumors land later (see backlog).
   - Henges: combat when a band is present; flee leaves wounded count on the henge; victory or recruit empties it and starts cooldown; quiet visit while cooling down.
   - Gate / Locksmith
     - Locksmith modal: requires the Blood + pay-gold-or-food; skipped if you have the key.
     - Without the Blood: no modal opens; tile shows inline flavor only.
     - Gate opens only with the key.
   - Wyrm Lair: mountain-tile PoI; modal combat (Fight / Pay / Flee) until bled, inline lore after.
-  - The Crossing: sell-only PoI. Buttons show each held slot; tapping sells that slot for half its purchase price. 1–2 per map.
+  - The Crossing: sell-only PoI. Buttons show each held slot; tapping sells that slot for half its purchase price. 1-2 per map.
   - Fishing lakes: placed PoIs; grant 1-3 food when ready; cooldown 3; do not appear on the map.
   - Rainbow's End: placed PoIs; grant +30 gold once per end (then spent).
   - Woods / Swamp / Mountain: move-event roll (lost / ambush / quiet).
   - Woods and mountains can ambush; swamps can lost (scout halves lost in woods and swamp).
-  - Swamp or mountain quiet enter: rare inline find (mixed loot), replaces terrain line, food/gold deltas — no modal.
+  - Swamp or mountain quiet enter: rare inline find (mixed loot), replaces terrain line, food/gold deltas - no modal.
 
 Note: Not every mechanic must be taught by ambient lore. Short teaching lines can also live in Town rumors (`BARKEEP_TIPS`).
 */
@@ -126,7 +128,7 @@ export const BARKEEP_TIPS = {
   ],
   combat: [
     "You can meet goblins in the woods and brigands in the mountains.",
-    "Only a small wounded band will march for coin — never a full war party.",
+    "Only a small wounded band will march for coin - never a full war party.",
   ],
   fisherman: [
     "A fisherman doubles what a lake gives you. He's heavy gear though. You'll feel it if you run.",
@@ -265,7 +267,7 @@ export const TERRAIN_LORE_BY_KIND: Record<TerrainKind, readonly string[]> = {
 };
 
 export const SWAMP_FIND_LINES = [
-  "A corpse in the reeds. Tangled roots hide a rotted sack — mushrooms and tarnished coin.",
+  "A corpse in the reeds. Tangled roots hide a rotted sack - mushrooms and tarnished coin.",
   "A sunken pack, half swallowed. Edible reeds and a bent penny.",
   "A journeyman's bones in the mud. Roots, berries, a few dull coins left behind.",
   "The mud coughs up a meal and pocket change. You do not ask who lost it.",
@@ -492,6 +494,24 @@ export const HEALER_SELL_LINES = [
   "A farmer's wife needs her more than you do. The trade is quiet.",
 ] as const;
 
+export const COMPANION_ALREADY_LINES = [
+  "You already have one like that at heel. The road doesn't need two.",
+  "That place in your company is taken. The offer stands open, but not for you.",
+  "Same face, same pack - you cannot hire what you already keep.",
+] as const;
+
+export const PARTY_FULL_LINES = [
+  "Your party is full. Someone must leave before another can join.",
+  "Three is all the road will carry. Make room first.",
+  "No more hands to hire - the company is crowded enough.",
+] as const;
+
+export const TOWN_RUMOR_EXHAUSTED_LINES = [
+  "The barkeep turns the cup in his hands. \"That's all I've got for you this visit.\"",
+  "He shakes his head once. \"Come back when you've walked off what I told you.\"",
+  "No more whispers today. The room has heard enough of your coin.",
+] as const;
+
 export const BOAR_BUY_LINES = [
   "The handler unties the rope. The boar follows, low and patient. Tusks the colour of old bone.",
   "\"She'll do once, hard, at the start of any fight. Then sleep the rest off.\" You pay.",
@@ -651,7 +671,7 @@ export const BRIGAND_RECRUIT_TOO_MANY_LINES: readonly string[] = [
 // left behind when they break. Reward lore is food-coded because goblins
 // hoard food and drop it when they run. The recruit-fail pool is the only
 // place we *teach* the rule that goblins aren't a faction you can bargain
-// with — see `docs/lore-and-tone.md` ("creatures of the road").
+// with - see `docs/lore-and-tone.md` ("creatures of the road").
 
 export const GOBLIN_ENCOUNTER_LINES: readonly string[] = [
   "Yellow eyes between the trees. Small, and many.",
@@ -688,7 +708,7 @@ export const GOBLIN_NOT_RECRUITABLE_LINES: readonly string[] = [
 // ----------------------------
 // Henge variant
 // ----------------------------
-// Henges are old places of oath and blood — banners hang from posts driven
+// Henges are old places of oath and blood - banners hang from posts driven
 // into the moss, sworn brothers gather behind the standing stones. Heavier
 // register than brigand alleyway feel: they stand for something, even if
 // what they stand for is forgotten. Encounter and flee aliases reuse the
@@ -723,7 +743,7 @@ export const HENGE_RECRUIT_SUCCESS_LINES: readonly string[] = [
   "Coin from the cairns, oaths from the living. The henge has done this before.",
 ] as const;
 
-// Aliases — the band-of-armed-men feel maps cleanly to brigand encounter,
+// Aliases - the band-of-armed-men feel maps cleanly to brigand encounter,
 // flee, and recruit-fail pools. Henge-specific authorship lives in the
 // lines above; reuse here keeps the lore surface lean.
 export const HENGE_ENCOUNTER_LINES = BRIGAND_ENCOUNTER_LINES;

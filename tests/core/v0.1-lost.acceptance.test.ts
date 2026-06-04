@@ -81,7 +81,17 @@ describe('v0.1 lost acceptance', () => {
 
   // S3
   it('stepping onto a farm orients the player', () => {
-    const s = makeState(blankWorld({ center: { kind: 'farm', id: 12, name: 'The Stemming', beastGoldCost: 10 } }))
+    const s = makeState(
+      blankWorld({
+        center: {
+          kind: 'farm',
+          id: 12,
+          name: 'The Stemming',
+          offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'],
+          companionHireGold: 10,
+        },
+      }),
+    )
     const next = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     expect(next.run.knowsPosition).toBe(true)
   })
@@ -96,7 +106,18 @@ describe('v0.1 lost acceptance', () => {
 
   // S5
   it('camps and henges do not orient', () => {
-    const sCamp = makeState(blankWorld({ center: { kind: 'camp', id: 12, name: 'Ember Watch', nextReadyStep: 0 } }))
+    const sCamp = makeState(
+      blankWorld({
+        center: {
+          kind: 'camp',
+          id: 12,
+          name: 'Ember Watch',
+          nextReadyStep: 0,
+          offers: ['CAMP_SEARCH'],
+          companionHireGold: 15,
+        },
+      }),
+    )
     expect(processAction(sCamp, { type: ACTION_MOVE, dx: 0, dy: 1 })!.run.knowsPosition).toBe(false)
     // Henge starts combat; we still expect knowsPosition to remain false.
     const sHenge = makeState(blankWorld({ center: { kind: 'henge', id: 12, name: 'The Mending', nextReadyStep: 0, currentGroup: null } }))
