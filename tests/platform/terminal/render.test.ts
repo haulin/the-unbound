@@ -138,8 +138,8 @@ describe('renderState — left panels', () => {
   })
 })
 
-describe('renderState — encounter plate', () => {
-  it('renders the encounter kind and the preview plate stats inline', () => {
+describe('renderState — encounter line', () => {
+  it('renders the encounter kind without plate stats', () => {
     const s = freshState()
     s.encounter = {
       kind: 'combat',
@@ -151,9 +151,22 @@ describe('renderState — encounter plate', () => {
     }
     const out = renderState(s)
     expect(out).toContain('encounter: combat')
-    // Plate provider emits enemy stat → renderer translates the sprite id into
-    // a short label. Brackets bound the plate stats.
-    expect(out).toMatch(/encounter: combat\s+\[enemy 8\]/)
+    expect(out).not.toMatch(/encounter: combat\s+\[/)
+  })
+
+  it('appends fight badge suffix on action labels', () => {
+    const s = freshState()
+    s.encounter = {
+      kind: 'combat',
+      enemyArmySize: 8,
+      initialSpawn: 8,
+      armyAtCombatStart: 10,
+      sourceCellId: 0,
+      restoreMessage: '',
+    }
+    s.world.cells[1]![1] = { kind: 'mountain' }
+    const out = renderState(s)
+    expect(out).toMatch(/fight \[8\]/)
   })
 
   it('omits the encounter line when there is no encounter', () => {

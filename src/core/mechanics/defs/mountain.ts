@@ -29,7 +29,6 @@ import {
 } from '../encounterHelpers'
 import type { MechanicDef, MoveEventPolicy, OnEnterTile } from '../types'
 import {
-  recruitablePreviewPlateLines,
   rolledEnemySpawn,
   startCombatEncounter,
   type CombatVariantConfig,
@@ -82,8 +81,7 @@ function brigandVictoryReward(
 }
 
 export const brigandCombatVariant: CombatVariantConfig = {
-  centerSpriteId: SPRITES.enemies.enemy,
-  previewPlateLines: recruitablePreviewPlateLines,
+  illustrationSpriteId: SPRITES.enemies.enemy,
   encounterLines: BRIGAND_ENCOUNTER_LINES,
   victoryLines: BRIGAND_VICTORY_LINES,
   fleeLines: BRIGAND_FLEE_LINES,

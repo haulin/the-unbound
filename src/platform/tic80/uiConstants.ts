@@ -14,6 +14,8 @@ export const UI_COLOR_BAD = 2 // red
 export const UI_COLOR_POI_NAME = 11
 export const UI_COLOR_POI_DESC = 13
 export const UI_COLOR_GRID_HOVER_TINT = 15
+// Right-panel seed/position/steps band — dimmer than hero stats (UI_COLOR_TEXT).
+export const UI_COLOR_RIGHT_STATS_TEXT = UI_COLOR_POI_DESC
 // Right-grid cell borders. Action/terrain share one color; shape (single vs
 // double) carries the distinction.
 export const UI_COLOR_GRID_CELL_BORDER = 14
@@ -41,16 +43,25 @@ export const UI_MAP_POI_TEXT_COLOR = 13
 export const UI_MAP_POI_UNCOMMITTED_TEXT_COLOR = UI_COLOR_BG
 export const UI_MAP_POI_TEXT_OFFSET_X_PX = 1
 
-// Encounter preview plate layout (overlay inside the illustration block).
-export const UI_PREVIEW_PLATE_PAD = 2
-export const UI_PREVIEW_PLATE_W = 42
-export const UI_PREVIEW_PLATE_INSET = 2
-
 // Right grid sprite draw policy.
 export const UI_RIGHT_GRID_SPRITE_SCALE = 1 // 16->16
 export const UI_RIGHT_GRID_SPRITE_W = 2
 export const UI_RIGHT_GRID_SPRITE_H = 2
 export const UI_RIGHT_GRID_COLORKEY = 0
+
+export const UI_BADGE_HEIGHT_PX = 7
+export const UI_BADGE_PAD_X = 2 // left inset inside pill
+export const UI_BADGE_PAD_RIGHT = 1 // right inset (trailing gap is part of pill art)
+export const UI_BADGE_PAD_Y = 1
+export const UI_BADGE_OFFSET_X = 1
+export const UI_BADGE_OFFSET_Y = 4
+export const UI_BADGE_PILL_CAP_PX = 4
+export const UI_BADGE_PILL_SHEET_W_PX = 8
+export const UI_BADGE_PILL_COLORKEY = 0
+// Glyph advance inside pill (TIC default font at 1×).
+export const UI_BADGE_MINUS_WIDTH_PX = 4
+export const UI_BADGE_DIGIT1_WIDTH_PX = 5
+export const UI_BADGE_DIGIT_WIDTH_PX = 6
 
 // Left panel layout
 export const UI_LEFT_PANEL_PADDING = 8

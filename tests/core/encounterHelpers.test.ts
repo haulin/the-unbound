@@ -2,8 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   applyDeltas,
   applyEnterAnims,
+  combatLoreMessage,
   leaveEncounter,
+  loreMessage,
+  loreTitleFromRestore,
   noGoldResponse,
+  openNamedPoiEncounter,
+  poiTitleFor,
+  setEncounterLoreBody,
   setEncounterMessage,
 } from '../../src/core/mechanics/encounterHelpers'
 import { TOWN_NO_GOLD_LINES } from '../../src/core/constants'
@@ -40,6 +46,78 @@ function makeMinimalState(overrides: Partial<State> = {}): State {
 }
 
 describe('encounterHelpers', () => {
+  describe('loreMessage', () => {
+    it('joins title and body with newline when title is set', () => {
+      expect(loreMessage('Stonebridge Town', 'Smoke on the wind.')).toBe('Stonebridge Town\nSmoke on the wind.')
+    })
+
+    it('returns body only when title is omitted', () => {
+      expect(loreMessage(undefined, 'Something stirs.')).toBe('Something stirs.')
+    })
+  })
+
+  describe('poiTitleFor', () => {
+    it('uses worldgen name + suffix', () => {
+      expect(poiTitleFor('Stonebridge', 'Town')).toBe('Stonebridge Town')
+    })
+
+    it('falls back when name is missing', () => {
+      expect(poiTitleFor(undefined, 'Camp')).toBe('A Camp')
+    })
+  })
+
+  describe('loreTitleFromRestore', () => {
+    it('extracts first line when restoreMessage has a newline', () => {
+      expect(loreTitleFromRestore('Wyrm Henge\nThe stones hum.')).toBe('Wyrm Henge')
+    })
+
+    it('returns undefined for body-only restoreMessage', () => {
+      expect(loreTitleFromRestore('Something stirs in the brush.')).toBeUndefined()
+    })
+  })
+
+  describe('setEncounterLoreBody', () => {
+    it('preserves title from encounter.restoreMessage', () => {
+      const s = makeMinimalState({
+        encounter: { kind: 'combat', sourceCellId: 1, restoreMessage: 'Old Henge\nArrival line', enemyArmySize: 3, armyAtCombatStart: 5, initialSpawn: 3 },
+        ui: { ...baseUi, message: 'Old Henge\nArrival line' },
+      })
+      const next = setEncounterLoreBody(s, 'You paid them off.')
+      expect(next.ui.message).toBe('Old Henge\nYou paid them off.')
+    })
+  })
+
+  describe('combatLoreMessage', () => {
+    it('preserves titled restoreMessage for combat outcomes', () => {
+      const s = makeMinimalState({
+        encounter: { kind: 'combat', sourceCellId: 1, restoreMessage: 'Old Henge\nArrival line', enemyArmySize: 3, armyAtCombatStart: 5, initialSpawn: 3 },
+      })
+      expect(combatLoreMessage(s, 'Victory.')).toBe('Old Henge\nVictory.')
+    })
+
+    it('returns body only when restoreMessage has no title', () => {
+      const s = makeMinimalState({
+        encounter: { kind: 'combat', sourceCellId: 1, restoreMessage: 'Something stirs.', enemyArmySize: 3, armyAtCombatStart: 5, initialSpawn: 3 },
+      })
+      expect(combatLoreMessage(s, 'Victory.')).toBe('Victory.')
+    })
+  })
+
+  describe('openNamedPoiEncounter', () => {
+    it('opens a titled modal PoI with matching message and restoreMessage', () => {
+      const opened = openNamedPoiEncounter({
+        kind: 'camp',
+        sourceCellId: 42,
+        title: 'Ash Camp',
+        enterBody: 'Smoke on the horizon.',
+      })
+      expect(opened.message).toBe('Ash Camp\nSmoke on the horizon.')
+      expect(opened.encounter.restoreMessage).toBe(opened.message)
+      expect(opened.encounter.kind).toBe('camp')
+      expect(opened.enterAnims).toEqual([{ kind: 'gridTransition', from: 'overworld', to: 'camp' }])
+    })
+  })
+
   describe('setEncounterMessage', () => {
     it('replaces message with "<prefix>\\n<line>"', () => {
       const s = makeMinimalState()

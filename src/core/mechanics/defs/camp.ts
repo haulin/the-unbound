@@ -2,6 +2,7 @@ import {
   CAMP_COOLDOWN_MOVES,
   CAMP_COUNT,
   CAMP_EMPTY_LINES,
+  CAMP_ENTER_LINES,
   CAMP_FOOD_GAIN,
   CAMP_NAME_POOL,
   CAMP_RECRUIT_LINES,
@@ -15,19 +16,20 @@ import { cellIdForPos, getCellAt, setCellAt } from '../../cells'
 import { applyFoodCapOnGain } from '../../foodCarry'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
-import type { CampCell, CampEncounter, Resources, State } from '../../types'
+import type { CampCell, Resources, State } from '../../types'
 import {
   applyDeltas,
-  gridButton,
   hireCompanion,
   leaveEncounter,
+  loreMessage,
   makeRightGrid,
-  offersToGridLayout,
+  offerGridCell,
+  openNamedPoiEncounter,
+  poiTitleFor,
   previewEncounterProvider,
-  offersInGridOrder,
-  previewPlateForOffers,
+  offersToGridLayout,
   setEncounterMessage,
-  type RightGridActionCell,
+  type CellBadge,
 } from '../encounterHelpers'
 import { buildOfferSets, cellId, isTerrainCell, placeNamedFeatureFromSeed } from '../../worldgen'
 import type { OfferCategory } from '../../worldgen'
@@ -35,9 +37,7 @@ import type {
   MechanicDef,
   OnEnterTile,
   PlaceWorldProvider,
-  PreviewPlateProvider,
   ReduceEncounterAction,
-  TileEnterResult,
 } from '../types'
 
 export const ACTION_CAMP_SEARCH = 'CAMP_SEARCH' as const
@@ -48,25 +48,7 @@ type CampActionSpec = {
   category: OfferCategory
   spriteId: number
   reduce: (s: State) => State
-  previewPlate?: (s: State) => readonly { spriteId: number; text: string }[] | null
-}
-
-function campSearchPreviewPlate(s: State): readonly { spriteId: number; text: string }[] | null {
-  const camp = getCellAt(s.world, s.player.position) as CampCell
-  if (!camp.offers.includes(ACTION_CAMP_SEARCH)) return null
-  const stepCount = s.run.stepCount
-  if (stepCount < (camp.nextReadyStep ?? 0)) return null
-  const armyGain = computeCampArmyGain({ seed: s.world.seed, campId: camp.id, stepCount })
-  return [
-    { spriteId: SPRITES.inventory.food, text: `+${CAMP_FOOD_GAIN}` },
-    { spriteId: SPRITES.inventory.army, text: `+${armyGain}` },
-  ]
-}
-
-function campHireScoutPreviewPlate(s: State): readonly { spriteId: number; text: string }[] | null {
-  const camp = getCellAt(s.world, s.player.position) as CampCell
-  if (!camp.offers.includes(ACTION_CAMP_HIRE_SCOUT)) return null
-  return [{ spriteId: SPRITES.inventory.scout, text: `-${camp.companionHireGold}` }]
+  badge?: (s: State) => CellBadge | null
 }
 
 const CAMP_OFFERS = {
@@ -74,13 +56,15 @@ const CAMP_OFFERS = {
     category: 'economy',
     spriteId: SPRITES.actions.search,
     reduce: reduceCampSearch,
-    previewPlate: campSearchPreviewPlate,
   },
   [ACTION_CAMP_HIRE_SCOUT]: {
     category: 'companion_hire',
     spriteId: SPRITES.inventory.scout,
     reduce: reduceCampHireScout,
-    previewPlate: campHireScoutPreviewPlate,
+    badge: (s: State): CellBadge => {
+      const camp = getCellAt(s.world, s.player.position) as CampCell
+      return { variant: 'price', text: `-${camp.companionHireGold}` }
+    },
   },
 } as const satisfies Record<string, CampActionSpec>
 
@@ -119,38 +103,25 @@ const placeNamedCamps: PlaceWorldProvider = ({ cells, rngState, seed }) => {
   return { rngState }
 }
 
-function campOfferSlot(s: State, slot: keyof ReturnType<typeof offersToGridLayout<CampOfferKind>>): RightGridActionCell | null {
+function campOfferSlot(s: State, slot: keyof ReturnType<typeof offersToGridLayout<CampOfferKind>>) {
   const camp = getCellAt(s.world, s.player.position) as CampCell
   const offer = offersToGridLayout(camp.offers)[slot]
-  return offer ? gridButton(CAMP_OFFERS, offer) : null
+  return offer ? offerGridCell(CAMP_OFFERS, offer)(s) : null
 }
 
-const campPreviewPlate: PreviewPlateProvider = (s) => {
-  const camp = getCellAt(s.world, s.player.position) as CampCell
-  const layout = offersToGridLayout(camp.offers)
-  const order = offersInGridOrder(camp.offers, layout)
-  return previewPlateForOffers(s, order, CAMP_OFFERS)
-}
-
-const onEnterCamp: OnEnterTile = ({ cell, world, pos }) => {
+const onEnterCamp: OnEnterTile = ({ cell, world, pos, stepCount }) => {
   if (cell.kind !== 'camp') return {}
   const camp = getCellAt(world, pos)
   if (!camp || camp.kind !== 'camp') return {}
 
-  const name = camp.name || 'A Camp'
-  const message = `${name} Camp`
-  const cellId = cellIdForPos(world, pos)
-  const encounter: CampEncounter = {
+  const r = RNG.createTileRandom({ world, stepCount, pos })
+  const line = r.stableLine(CAMP_ENTER_LINES, { placeId: camp.id })
+  return openNamedPoiEncounter({
     kind: 'camp',
-    sourceCellId: cellId,
-    restoreMessage: message,
-  }
-  const result: TileEnterResult = {
-    message,
-    encounter,
-    enterAnims: [{ kind: 'gridTransition', from: 'overworld', to: 'camp' }],
-  }
-  return result
+    sourceCellId: cellIdForPos(world, pos),
+    title: poiTitleFor(camp.name, 'Camp'),
+    enterBody: line,
+  })
 }
 
 const reduceCampAction: ReduceEncounterAction = (prevState, action) => {
@@ -161,7 +132,7 @@ const reduceCampAction: ReduceEncounterAction = (prevState, action) => {
 
 function reduceCampSearch(prevState: State): State {
   const campCell = getCellAt(prevState.world, prevState.player.position) as CampCell
-  const campName = campCell.name || 'A Camp'
+  const title = poiTitleFor(campCell.name, 'Camp')
   const stepCount = prevState.run.stepCount
   const prevRes = prevState.resources
   const rnd = RNG.createRunCopyRandom(prevState)
@@ -169,7 +140,7 @@ function reduceCampSearch(prevState: State): State {
   const readyAt = campCell.nextReadyStep ?? 0
   if (stepCount < readyAt) {
     const line = rnd.perMoveLine(CAMP_EMPTY_LINES, { cellId: campCell.id })
-    return setEncounterMessage(prevState, `${campName} Camp`, line)
+    return setEncounterMessage(prevState, title, line)
   }
 
   const armyGain = computeCampArmyGain({ seed: prevState.world.seed, campId: campCell.id, stepCount })
@@ -185,7 +156,7 @@ function reduceCampSearch(prevState: State): State {
     { ...prevState, world: nextWorld },
     {
       resources: nextResources,
-      message: `${campName} Camp\n${line}`,
+      message: loreMessage(title, line),
       deltas: [
         { target: 'food', delta: foodGain },
         { target: 'army', delta: armyGain },
@@ -196,15 +167,23 @@ function reduceCampSearch(prevState: State): State {
 
 function reduceCampHireScout(prevState: State): State {
   const camp = getCellAt(prevState.world, prevState.player.position) as CampCell
-  const prefix = `${camp.name || 'A Camp'} Camp`
+  const title = poiTitleFor(camp.name, 'Camp')
   const rnd = RNG.createRunCopyRandom(prevState)
   return hireCompanion(prevState, {
-    prefix,
+    prefix: title,
     slotId: 'scout',
     goldCost: camp.companionHireGold,
     successLine: rnd.perMoveLine(CAMP_SCOUT_HIRE_LINES, { cellId: camp.id, salt: 'camp.scout.hire' }),
   })
 }
+
+const { provider: campRightGrid, illustrationFor: campIllustration } = makeRightGrid({
+  leaveAction: { type: ACTION_CAMP_LEAVE },
+  illustrationSpriteId: SPRITES.centers.campfire,
+  top: (s) => campOfferSlot(s, 'top'),
+  left: (s) => campOfferSlot(s, 'left'),
+  bottom: (s) => campOfferSlot(s, 'bottom'),
+})
 
 export const campMechanic: MechanicDef = {
   id: 'camp',
@@ -219,14 +198,8 @@ export const campMechanic: MechanicDef = {
   encounter: {
     kind: 'camp',
     reduceAction: reduceCampAction,
-    previewPlate: campPreviewPlate,
     previewEncounter: previewEncounterProvider('camp'),
-    rightGrid: makeRightGrid({
-      leaveAction: { type: ACTION_CAMP_LEAVE },
-      centerSpriteId: SPRITES.centers.campfire,
-      top: (s) => campOfferSlot(s, 'top'),
-      left: (s) => campOfferSlot(s, 'left'),
-      bottom: (s) => campOfferSlot(s, 'bottom'),
-    }),
+    rightGrid: campRightGrid,
+    illustrationSpriteId: campIllustration,
   },
 }

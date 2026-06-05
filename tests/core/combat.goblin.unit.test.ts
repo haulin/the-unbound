@@ -82,6 +82,6 @@ describe('goblinCombatVariant identity', () => {
   it('softer +6/+3 round math + goblin sprite', () => {
     expect(goblinCombatVariant.playerRollBonus).toBe(6)
     expect(goblinCombatVariant.enemyRollBonus).toBe(3)
-    expect(goblinCombatVariant.centerSpriteId).toBe(130)
+    expect(goblinCombatVariant.illustrationSpriteId).toBe(130)
   })
 })

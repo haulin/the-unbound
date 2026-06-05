@@ -19,20 +19,21 @@ import type { LocksmithEncounter, State } from '../../types'
 import {
   applyDeltasAndClose,
   buy,
-  gridButton,
   leaveEncounter,
+  loreMessage,
   makeRightGrid,
+  offerGridCell,
+  openNamedPoiEncounter,
   previewEncounterProvider,
   setEncounterMessage,
+  type CellBadge,
 } from '../encounterHelpers'
 import { isTerrainCell, placeFeatureFromSeed } from '../../worldgen'
 import type {
   MechanicDef,
   OnEnterTile,
   PlaceWorldProvider,
-  PreviewPlateProvider,
   ReduceEncounterAction,
-  TileEnterResult,
 } from '../types'
 
 export const ACTION_LOCKSMITH_PAY_GOLD = 'LOCKSMITH_PAY_GOLD' as const
@@ -42,11 +43,20 @@ export const ACTION_LOCKSMITH_LEAVE = 'LOCKSMITH_LEAVE' as const
 type LocksmithActionSpec = {
   spriteId: number
   reduce: (s: State, enc: LocksmithEncounter) => State
+  badge: CellBadge
 }
 
 const LOCKSMITH_ACTIONS = {
-  [ACTION_LOCKSMITH_PAY_GOLD]: { spriteId: SPRITES.inventory.gold, reduce: reduceLocksmithPayGold },
-  [ACTION_LOCKSMITH_PAY_FOOD]: { spriteId: SPRITES.inventory.food, reduce: reduceLocksmithPayFood },
+  [ACTION_LOCKSMITH_PAY_GOLD]: {
+    spriteId: SPRITES.inventory.gold,
+    reduce: reduceLocksmithPayGold,
+    badge: { variant: 'price', text: `-${LOCKSMITH_KEY_GOLD_COST}` },
+  },
+  [ACTION_LOCKSMITH_PAY_FOOD]: {
+    spriteId: SPRITES.inventory.food,
+    reduce: reduceLocksmithPayFood,
+    badge: { variant: 'price', text: `-${LOCKSMITH_KEY_FOOD_COST}` },
+  },
 } as const satisfies Record<string, LocksmithActionSpec>
 
 export type LocksmithAction =
@@ -60,31 +70,22 @@ const onEnterLocksmith: OnEnterTile = ({ cell, world, pos, stepCount, resources 
 
   if (resources.inventory.includes('bronzeKey')) {
     const line = r.perMoveLine(LOCKSMITH_VISITED_LINES)
-    return { message: `${LOCKSMITH_NAME}\n${line}` }
+    return { message: loreMessage(LOCKSMITH_NAME, line) }
   }
 
   if (!resources.inventory.includes('bloodVial')) {
     const line = r.perMoveLine(LOCKSMITH_NO_BLOOD_LINES)
-    return { message: `${LOCKSMITH_NAME}\n${line}` }
+    return { message: loreMessage(LOCKSMITH_NAME, line) }
   }
 
   const line = r.stableLine(LOCKSMITH_ENTER_LINES)
-  const message = `${LOCKSMITH_NAME}\n${line}`
-  const cellId = cellIdForPos(world, pos)
-  const encounter: LocksmithEncounter = {
+  return openNamedPoiEncounter({
     kind: 'locksmith',
-    sourceCellId: cellId,
-    restoreMessage: message,
-  }
-  const result: TileEnterResult = {
-    message,
-    encounter,
-    enterAnims: [{ kind: 'gridTransition', from: 'overworld', to: 'locksmith' }],
-  }
-  return result
+    sourceCellId: cellIdForPos(world, pos),
+    title: LOCKSMITH_NAME,
+    enterBody: line,
+  })
 }
-
-// ---- Encounter actions ----
 
 const reduceLocksmithAction: ReduceEncounterAction = (prevState, action) => {
   if (action.type !== ACTION_LOCKSMITH_LEAVE && !(action.type in LOCKSMITH_ACTIONS)) return null
@@ -102,12 +103,10 @@ function reduceLocksmithPayGold(prevState: State, enc: LocksmithEncounter): Stat
   }
   return applyDeltasAndClose(prevState, {
     resources: consumeBlood(result.resources),
-    message: `${LOCKSMITH_NAME}\n${rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)}`,
+    message: loreMessage(LOCKSMITH_NAME, rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)),
     deltas: result.deltas,
   }, 'locksmith')
 }
-
-// ---- Worldgen placement ----
 
 const placeLocksmith: PlaceWorldProvider = ({ cells, rngState, seed }) => {
   const lairPos = findCellByKind(cells, 'lair')
@@ -121,13 +120,6 @@ const placeLocksmith: PlaceWorldProvider = ({ cells, rngState, seed }) => {
   return { rngState }
 }
 
-// ---- Preview plate ----
-
-const locksmithPreviewPlate: PreviewPlateProvider = () => [
-  { spriteId: LOCKSMITH_ACTIONS[ACTION_LOCKSMITH_PAY_GOLD].spriteId, text: `-${LOCKSMITH_KEY_GOLD_COST}` },
-  { spriteId: LOCKSMITH_ACTIONS[ACTION_LOCKSMITH_PAY_FOOD].spriteId, text: `-${LOCKSMITH_KEY_FOOD_COST}` },
-]
-
 function reduceLocksmithPayFood(prevState: State, _enc: LocksmithEncounter): State {
   const rnd = RNG.createRunCopyRandom(prevState)
   const result = buy(prevState.resources, { food: LOCKSMITH_KEY_FOOD_COST, gain: { inventory: ['bronzeKey'] } })
@@ -136,7 +128,7 @@ function reduceLocksmithPayFood(prevState: State, _enc: LocksmithEncounter): Sta
   }
   return applyDeltasAndClose(prevState, {
     resources: consumeBlood(result.resources),
-    message: `${LOCKSMITH_NAME}\n${rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)}`,
+    message: loreMessage(LOCKSMITH_NAME, rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)),
     deltas: result.deltas,
   }, 'locksmith')
 }
@@ -146,7 +138,12 @@ function consumeBlood(resources: State['resources']): State['resources'] {
   return { ...resources, inventory: resources.inventory.filter((slot) => slot !== 'bloodVial') }
 }
 
-// ---- Mechanic registration ----
+const { provider: locksmithRightGrid, illustrationFor: locksmithIllustration } = makeRightGrid({
+  leaveAction: { type: ACTION_LOCKSMITH_LEAVE },
+  illustrationSpriteId: SPRITES.centers.locksmithKiln,
+  top: offerGridCell(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_GOLD),
+  left: offerGridCell(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_FOOD),
+})
 
 export const locksmithMechanic: MechanicDef = {
   id: 'locksmith',
@@ -161,13 +158,8 @@ export const locksmithMechanic: MechanicDef = {
   encounter: {
     kind: 'locksmith',
     reduceAction: reduceLocksmithAction,
-    previewPlate: locksmithPreviewPlate,
     previewEncounter: previewEncounterProvider('locksmith'),
-    rightGrid: makeRightGrid({
-      leaveAction: { type: ACTION_LOCKSMITH_LEAVE },
-      centerSpriteId: SPRITES.centers.locksmithKiln,
-      top: gridButton(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_GOLD),
-      left: gridButton(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_FOOD),
-    }),
+    rightGrid: locksmithRightGrid,
+    illustrationSpriteId: locksmithIllustration,
   },
 }

@@ -90,21 +90,10 @@ export type ReduceEncounterAction = (state: State, action: Action) => State | nu
 // mechanics' RNG streams.
 export type PlaceWorldProvider = (args: { cells: CellGrid; rngState: number; seed: number }) => { rngState: number }
 
-// One line in an encounter preview plate: a 16x16 icon + a short value string.
-// Color is the renderer's job; mechanics return semantically-neutral lines.
-export type PreviewPlateLine = { spriteId: number; text: string }
-export type PreviewPlateProvider = (state: State) => readonly PreviewPlateLine[] | null
-
-// Anchor specs for animated +/- delta popups that should land on the preview
-// plate (rather than on the top-status icons). The renderer turns each spec
-// into pixel coordinates via its own plate geometry.
-//
-// `lineIndex` is the index into the plate lines (0 = first line). `goodSign`
-// is the sign of `delta` that counts as "good" for the player (default +1).
-// Combat passes -1 because the enemy losing troops is good for the player.
-export type PreviewPlateDeltaAnchor = {
-  target: DeltaAnimTarget
-  lineIndex: number
+// Grid-cell anchor for animated +/- delta popups (e.g. enemyArmy on Fight badge).
+export type DeltaAnchorSpec = {
+  row: number
+  col: number
   goodSign?: 1 | -1
 }
 
@@ -121,8 +110,8 @@ export type MechanicEncounter = {
   kind: EncounterKind
   reduceAction?: ReduceEncounterAction
   rightGrid?: RightGridProvider
-  previewPlate?: PreviewPlateProvider
-  previewPlateDeltaAnchors?: readonly PreviewPlateDeltaAnchor[]
+  illustrationSpriteId?: (state: State) => number
+  deltaAnchorsByTarget?: Partial<Record<DeltaAnimTarget, DeltaAnchorSpec>>
   previewEncounter?: PreviewEncounterProvider
 }
 

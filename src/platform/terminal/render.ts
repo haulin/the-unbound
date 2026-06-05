@@ -2,9 +2,8 @@ import { ACTION_TOGGLE_MINIMAP, LOST_COORD_LABEL } from '../../core/constants'
 import { foodCarryCap } from '../../core/foodCarry'
 import { computeGameMapView } from '../../core/gameMap'
 import { torusDelta, wrapIndex } from '../../core/math'
-import { MECHANIC_INDEX } from '../../core/mechanics'
 import { getRightGridCellDef, type RightGridCellDef } from '../../core/rightGrid'
-import { terminalPlateLabel } from '../../core/spriteIds'
+import type { CellBadge } from '../../core/mechanics/encounterHelpers'
 import {
   LEFT_PANEL_KIND_MAP,
   LEFT_PANEL_KIND_MINIMAP,
@@ -15,9 +14,6 @@ import { labelForAction } from './labels'
 export type RenderOptions = { blind: boolean }
 const DEFAULT_OPTIONS: RenderOptions = { blind: false }
 
-// Numpad layout: top-row keys are 7/8/9, mid 4/5/6, bottom 1/2/3. The 3x3
-// position matches the right-grid the TIC build clicks on, so the agent's
-// keyboard map is identical to the on-screen button layout.
 const KEY_GRID = [
   ['7', '8', '9'],
   ['4', '5', '6'],
@@ -41,16 +37,21 @@ function tileKindAt(s: State, x: number, y: number): string {
   return s.world.cells[ty]![tx]!.kind
 }
 
+function formatBadgeSuffix(badge: CellBadge): string {
+  return badge.variant === 'left' ? ` [${badge.text}]` : ` (${badge.text})`
+}
+
 function gridLabel(s: State, def: RightGridCellDef): string {
   if (def.action) {
     const label = labelForAction(def.action)
+    const suffix = def.badge ? formatBadgeSuffix(def.badge) : ''
     if (def.tilePreview) {
       const dx = def.tilePreview.dx
       const dy = def.tilePreview.dy
       const tile = tileKindAt(s, s.player.position.x + dx, s.player.position.y + dy)
-      return `${label} (${tile})`
+      return `${label} (${tile})${suffix}`
     }
-    return label
+    return `${label}${suffix}`
   }
   return '-'
 }
@@ -75,8 +76,6 @@ function renderActions(s: State, opts: RenderOptions): string[] {
   return lines
 }
 
-// Full-world ASCII map. Used when the player toggles minimap (full reveal,
-// matches the TIC minimap which shows every cell).
 function renderFullMap(s: State): string[] {
   const lines: string[] = ['minimap:']
   const w = s.world.width
@@ -95,11 +94,6 @@ function renderFullMap(s: State): string[] {
   return lines
 }
 
-// Player-knowledge map (matches the TIC in-game map): a 9x9 viewport centered
-// on the player, torus-wrapped, showing only mapped POIs. Empty cells are dots.
-// Player is always rendered at center as `@` — even when lost — mirroring the
-// TIC build's "marker is always visible" rule (the coordinate readout is the
-// part gated by knowsPosition, not the dot).
 const KNOWN_MAP_VIEWPORT = 9
 
 function renderKnownMap(s: State): string[] {
@@ -131,7 +125,6 @@ function renderKnownMap(s: State): string[] {
 }
 
 function kindGlyph(kind: string): string {
-  // Single-letter glyphs that read at a glance. Lowercase = terrain, uppercase = POI.
   switch (kind) {
     case 'grass':
       return '.'
@@ -181,26 +174,12 @@ function renderResources(s: State): string {
   const r = s.resources
   const inv = r.inventory.length ? ` | inventory: ${r.inventory.join(', ')}` : ''
   const party = r.party.length ? ` | party: ${r.party.join(', ')}` : ''
-  // Food cap is invisible in the TIC build (no spare pixels). Terminal has
-  // no such constraint, so we surface it as `food N/M`. Same source of truth
-  // as the reducer (`foodCarryCap`) — picks up army growth + beast's +50 for
-  // free.
   return `army ${r.armySize} | food ${r.food}/${foodCarryCap(r)} | gold ${r.gold}${inv}${party}`
 }
 
 function renderEncounter(s: State): string[] {
   if (!s.encounter) return []
-  const head = `encounter: ${s.encounter.kind}`
-  const provider = MECHANIC_INDEX.previewPlateByEncounterKind[s.encounter.kind]
-  const plate = provider?.(s) ?? null
-  if (!plate || plate.length === 0) return [head]
-
-  const stats: string[] = []
-  for (const line of plate) {
-    const label = terminalPlateLabel(line.spriteId)
-    stats.push(`${label} ${line.text}`)
-  }
-  return [`${head}  [${stats.join(', ')}]`]
+  return [`encounter: ${s.encounter.kind}`]
 }
 
 function renderMessage(message: string): string[] {

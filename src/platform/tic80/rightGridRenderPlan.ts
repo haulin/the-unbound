@@ -4,6 +4,7 @@ import {
 } from '../../core/constants'
 import { MECHANIC_INDEX } from '../../core/mechanics'
 import { getRightGridCellDef, type RightGridCellDef } from '../../core/rightGrid'
+import type { CellBadge } from '../../core/mechanics/encounterHelpers'
 import { getSpriteIdAt } from '../../core/cells'
 import type { GridFromKind, GridTransitionAnim, MoveSlideAnim, State } from '../../core/types'
 import { SPRITES } from '../../core/spriteIds'
@@ -17,6 +18,18 @@ type Rect = { x: number; y: number; w: number; h: number }
 export type RightGridRenderOp =
   | { kind: 'rect'; x: number; y: number; w: number; h: number; color: number }
   | { kind: 'rectb'; x: number; y: number; w: number; h: number; color: number }
+  | { kind: 'print'; x: number; y: number; text: string; color: number }
+  | {
+      kind: 'badgePill'
+      spriteId: number
+      x: number
+      y: number
+      w: number
+      h: number
+      capPx: number
+      sheetWidthPx: number
+      colorkey: number
+    }
   | {
       kind: 'spr'
       spriteId: number
@@ -34,14 +47,24 @@ export type RightGridRenderPlan = {
   ops: RightGridRenderOp[]
 }
 
-function crossRevealIndex(row: number, col: number): number {
-  // Reveal order: N, W, S, E, C
-  if (row === 0 && col === 1) return 0
-  if (row === 1 && col === 0) return 1
-  if (row === 2 && col === 1) return 2
-  if (row === 1 && col === 2) return 3
-  if (row === 1 && col === 1) return 4
+/** Cross arms reveal top → left → bottom → right; center (1,1) stays live. */
+export const GRID_CROSS_REVEAL_ORDER = [
+  { row: 0, col: 1 },
+  { row: 1, col: 0 },
+  { row: 2, col: 1 },
+  { row: 1, col: 2 },
+] as const
+
+export function gridCrossRevealPhaseIndex(row: number, col: number): number {
+  for (let i = 0; i < GRID_CROSS_REVEAL_ORDER.length; i++) {
+    const cell = GRID_CROSS_REVEAL_ORDER[i]!
+    if (cell.row === row && cell.col === col) return i
+  }
   return -1
+}
+
+export function gridTransitionDurationFrames(): number {
+  return Math.max(1, GRID_TRANSITION_STEP_FRAMES | 0) * GRID_CROSS_REVEAL_ORDER.length
 }
 
 function findGridTransitionAnim(s: State): GridTransitionAnim | null {
@@ -59,7 +82,7 @@ function findGridTransitionAnim(s: State): GridTransitionAnim | null {
 function transitionModeForCell(s: State, row: number, col: number): GridFromKind | null {
   const transition = findGridTransitionAnim(s)
   if (!transition) return null
-  const idx = crossRevealIndex(row, col)
+  const idx = gridCrossRevealPhaseIndex(row, col)
   if (idx < 0) return null
   const frame = s.ui.clock.frame | 0
   const start = transition.startFrame | 0
@@ -85,6 +108,7 @@ type CellCategory = 'meta' | 'action' | 'terrain' | 'empty'
 type CellView = {
   spriteId: number | null
   category: CellCategory
+  badge?: CellBadge
 }
 
 // Resolves the def-derived view (sprite + category) for one cell against a state.
@@ -101,6 +125,28 @@ function viewFromDef(def: RightGridCellDef, s: State): CellView {
   return { spriteId: null, category: 'empty' }
 }
 
+function badgeGlyphWidthPx(ch: string): number {
+  if (ch === '-') return UI.UI_BADGE_MINUS_WIDTH_PX
+  if (ch === '1') return UI.UI_BADGE_DIGIT1_WIDTH_PX
+  return UI.UI_BADGE_DIGIT_WIDTH_PX
+}
+
+function badgeTextWidthPx(text: string): number {
+  let w = 0
+  for (let i = 0; i < text.length; i++) {
+    w += badgeGlyphWidthPx(text[i]!)
+  }
+  return w
+}
+
+function badgeTopLeftPx(row: number, col: number): { x: number; y: number } {
+  const o = cellOriginPx(row, col)
+  return {
+    x: o.x + UI.UI_BADGE_OFFSET_X,
+    y: o.y - UI.UI_BADGE_HEIGHT_PX + UI.UI_BADGE_OFFSET_Y,
+  }
+}
+
 // The full per-cell view for this frame: handles meta corners, the center
 // no-border rule, and the cross-reveal animation in one place. Border ops and
 // sprite ops downstream both read from this single source so they animate in
@@ -111,21 +157,35 @@ function viewForCell(s: State, row: number, col: number): CellView {
     return { spriteId: def.spriteId ?? null, category: 'meta' }
   }
 
+  // Center is always the live player tile — same sprite in overworld and encounter.
+  if (row === 1 && col === 1) {
+    const def = getRightGridCellDef(s, row, col)
+    const view = viewFromDef(def, s)
+    return { spriteId: view.spriteId, category: 'empty' }
+  }
+
   const mode = transitionModeForCell(s, row, col)
   if (mode === 'blank') return { spriteId: null, category: 'empty' }
 
   const stateAt = mode != null ? synthesizeStateForMode(s, mode) : s
   const def = getRightGridCellDef(stateAt, row, col)
   const view = viewFromDef(def, stateAt)
+  const badge = def.badge
 
-  // Center is never a button: it shows content but draws no border.
-  if (row === 1 && col === 1) return { spriteId: view.spriteId, category: 'empty' }
-  return view
+  return badge ? { ...view, badge } : view
 }
 
 function cellOriginPx(row: number, col: number) {
   const pitch = Layout.CELL_SIZE_PX + Layout.CELL_GAP_PX
   return { x: Layout.GRID_ORIGIN_X + col * pitch, y: Layout.GRID_ORIGIN_Y + row * pitch }
+}
+
+export function badgeTextAnchorPx(row: number, col: number): { x: number; y: number } {
+  const topLeft = badgeTopLeftPx(row, col)
+  return {
+    x: topLeft.x + UI.UI_BADGE_PAD_X,
+    y: topLeft.y + UI.UI_BADGE_PAD_Y,
+  }
 }
 
 function spriteOriginInCellPx(row: number, col: number) {
@@ -163,11 +223,45 @@ function borderOpsForCell(row: number, col: number, category: CellCategory): Rig
   ]
 }
 
+function badgeOpsForCell(row: number, col: number, badge: CellBadge): RightGridRenderOp[] {
+  const padLeft = UI.UI_BADGE_PAD_X
+  const padRight = UI.UI_BADGE_PAD_RIGHT
+  const padY = UI.UI_BADGE_PAD_Y
+  const h = UI.UI_BADGE_HEIGHT_PX
+  const textW = badgeTextWidthPx(badge.text)
+  const w = textW + padLeft + padRight
+  const topLeft = badgeTopLeftPx(row, col)
+  const spriteId = badge.variant === 'price' ? SPRITES.ui.badgePrice : SPRITES.ui.badgeLeft
+  const fg = UI.UI_COLOR_TEXT
+
+  return [
+    {
+      kind: 'badgePill',
+      spriteId,
+      x: topLeft.x,
+      y: topLeft.y,
+      w,
+      h,
+      capPx: UI.UI_BADGE_PILL_CAP_PX,
+      sheetWidthPx: UI.UI_BADGE_PILL_SHEET_W_PX,
+      colorkey: UI.UI_BADGE_PILL_COLORKEY,
+    },
+    { kind: 'print', x: topLeft.x + padLeft, y: topLeft.y + padY, text: badge.text, color: fg },
+  ]
+}
+
+function actionCellOps(row: number, col: number, category: CellCategory, badge?: CellBadge): RightGridRenderOp[] {
+  const ops = borderOpsForCell(row, col, category)
+  if (badge && category === 'action') ops.push(...badgeOpsForCell(row, col, badge))
+  return ops
+}
+
 function cellBorderOps(s: State): RightGridRenderOp[] {
   const ops: RightGridRenderOp[] = []
   for (let row = 0; row < Layout.GRID_ROWS; row++) {
     for (let col = 0; col < Layout.GRID_COLS; col++) {
-      ops.push(...borderOpsForCell(row, col, viewForCell(s, row, col).category))
+      const view = viewForCell(s, row, col)
+      ops.push(...actionCellOps(row, col, view.category, view.badge))
     }
   }
   return ops
@@ -191,10 +285,6 @@ function sprOp(spriteId: number, x: number, y: number): RightGridRenderOp {
 function drawHoverTintOps(cell: Cell): RightGridRenderOp[] {
   const o = cellOriginPx(cell.row, cell.col)
   return [rectOp(o.x, o.y, Layout.CELL_SIZE_PX, Layout.CELL_SIZE_PX, UI.UI_COLOR_GRID_HOVER_TINT)]
-}
-
-function hoverCellFromHints(hints: RenderHints): Cell | null {
-  return hints.rightGridHoverCell
 }
 
 function findMoveSlideAnim(s: State): MoveSlideAnim | null {
@@ -378,7 +468,7 @@ function buildMoveSlidePlan(s: State, anim: MoveSlideAnim, hover: Cell | null): 
 }
 
 export function buildRightGridRenderPlan(s: State, hints: RenderHints): RightGridRenderPlan {
-  const hover = hoverCellFromHints(hints)
+  const hover = hints.rightGridHoverCell
   const moveSlide = findMoveSlideAnim(s)
   if (!moveSlide) return buildStaticPlan(s, hover)
   return buildMoveSlidePlan(s, moveSlide, hover)

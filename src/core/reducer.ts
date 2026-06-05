@@ -15,7 +15,7 @@ import {
   MOVE_SLIDE_FRAMES,
   FOOD_COST_DEFAULT,
 } from './constants'
-import { gameOverMessage } from './gameOver'
+import { gameOverMessage, applyArmyZeroGameOver } from './gameOver'
 import { SPRITES } from './spriteIds'
 import { generateWorld } from './world'
 import { applyEnterAnims, onEnterDefaultTerrain } from './mechanics/encounterHelpers'
@@ -246,8 +246,7 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
   const nextHasWon = prevState.run.hasWon || !!outcome.hasWon
 
   // wouldGameOver implies isGameOver (handler skipped, so resources unchanged from baseResources).
-  // A handler MAY upgrade isGameOver (e.g. combat actions reducing armySize), but that runs in
-  // reduceEncounterAction, not here.
+  // Encounter actions that drop army to 0 are finalized in applyArmyZeroGameOver after the handler returns.
   const isGameOver = nextResources.armySize <= 0
 
   const nextEncounter = outcome.encounter ?? null
@@ -395,7 +394,7 @@ export function processAction(prevState: State | null, action: Action): State | 
     const handler = reduceEncounterActionByEncounterKind[prevState.encounter.kind]
     if (handler) {
       const next = handler(prevState, action)
-      if (next != null) return next
+      if (next != null) return applyArmyZeroGameOver(next)
     }
   }
 

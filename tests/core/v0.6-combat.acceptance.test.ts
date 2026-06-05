@@ -60,7 +60,7 @@ describe('v0.6 combat balance acceptance', () => {
     expect(variant).not.toBe(brigandCombatVariant)
     expect(variant.playerRollBonus).toBe(6)
     expect(variant.enemyRollBonus).toBe(3)
-    expect(variant.centerSpriteId).toBe(130)
+    expect(variant.illustrationSpriteId).toBe(130)
     expect(GOBLIN_ENCOUNTER_LINES).toContain(opened.ui.message)
   })
 
@@ -362,17 +362,12 @@ describe('v0.6 combat balance acceptance', () => {
     expect(BRIGAND_RECRUIT_NO_FUNDS_LINES).toContain(after.ui.message)
   })
 
-  // Combat preview plate is minimal: enemy count + variant sprite, plus
-  // a conditional recruit-cost row when payment is eligible. The plate
-  // fits the TIC-80 column budget (3 chars × ~3 rows) and signals variant
-  // identity through `variant.centerSpriteId` (brigand enemy vs goblin
-  // sprite vs wyrm heart).
-  it('Combat preview plate shows enemy count only when not recruit-eligible', () => {
-    const previewPlate = MECHANIC_INDEX.previewPlateByEncounterKind.combat
-    if (!previewPlate) throw new Error('no combat preview-plate registered')
+  // Combat badges: fight shows enemy count; pay shows recruit cost when eligible.
+  it('Combat fight badge shows enemy count; pay badge when recruit-eligible', () => {
+    const grid = MECHANIC_INDEX.rightGridByEncounterKind.combat
+    if (!grid) throw new Error('no combat right-grid registered')
 
-    // Brigand at initialSpawn=10, enemy=6 → too many to recruit; plate
-    // shows only the enemy-count row.
+    // Brigand at initialSpawn=10, enemy=6 → too many to recruit; pay has no badge.
     {
       const initialSpawn = 10
       const enemyArmySize = 6
@@ -390,13 +385,11 @@ describe('v0.6 combat balance acceptance', () => {
           restoreMessage: '',
         },
       }
-      expect(previewPlate(probe)).toEqual([
-        { spriteId: SPRITES.enemies.enemy, text: `${enemyArmySize}` },
-      ])
+      expect(grid(probe, 1, 0)).toMatchObject({ badge: { variant: 'left', text: `${enemyArmySize}` } })
+      expect(grid(probe, 0, 1).badge).toBeUndefined()
     }
 
-    // Goblin: never recruitable; plate is single-row with the goblin
-    // sprite (sprite-per-variant correctness).
+    // Goblin: never recruitable; fight badge only.
     {
       const initialSpawn = 10
       const enemyArmySize = 6
@@ -413,13 +406,11 @@ describe('v0.6 combat balance acceptance', () => {
           restoreMessage: '',
         },
       }
-      expect(previewPlate(probe)).toEqual([
-        { spriteId: SPRITES.enemies.goblin, text: `${enemyArmySize}` },
-      ])
+      expect(grid(probe, 1, 0)).toMatchObject({ badge: { variant: 'left', text: `${enemyArmySize}` } })
+      expect(grid(probe, 0, 1).badge).toBeUndefined()
     }
 
-    // Henge at initialSpawn=20, enemy=20 → fresh band, not wounded;
-    // plate is single-row.
+    // Henge at initialSpawn=20, enemy=20 → fresh band, not wounded; pay unbadged.
     {
       const initialSpawn = 20
       const opened = stepSouth(stateOnHenge({ playerArmy: 5 }))
@@ -435,23 +426,22 @@ describe('v0.6 combat balance acceptance', () => {
           restoreMessage: '',
         },
       }
-      expect(previewPlate(probe)).toEqual([
-        { spriteId: SPRITES.enemies.enemy, text: `${initialSpawn}` },
-      ])
+      expect(grid(probe, 1, 0)).toMatchObject({ badge: { variant: 'left', text: `${initialSpawn}` } })
+      expect(grid(probe, 0, 1).badge).toBeUndefined()
     }
   })
 
-  it('Plate shows recruit cost row when wounded, small, and paid', () => {
-    const previewPlate = MECHANIC_INDEX.previewPlateByEncounterKind.combat
-    if (!previewPlate) throw new Error('no combat preview-plate registered')
+  it('Pay badge shows recruit cost when wounded, small, and paid', () => {
+    const grid = MECHANIC_INDEX.rightGridByEncounterKind.combat
+    if (!grid) throw new Error('no combat right-grid registered')
 
     const initialSpawn = 12
-    const enemyArmySize = 3 // wounded + small (≤5)
+    const enemyArmySize = 3
     const opened = stepSouth(stateOnMountainAmbush({ playerArmy: 5 }))
     const sourceCellId = (opened.encounter as CombatEncounter).sourceCellId
     const probe: State = {
       ...opened,
-      resources: { ...opened.resources, gold: 100 }, // affordable
+      resources: { ...opened.resources, gold: 100 },
       encounter: {
         kind: 'combat',
         enemyArmySize,
@@ -461,23 +451,22 @@ describe('v0.6 combat balance acceptance', () => {
         restoreMessage: '',
       },
     }
-    expect(previewPlate(probe)).toEqual([
-      { spriteId: SPRITES.enemies.enemy, text: `${enemyArmySize}` },
-      { spriteId: SPRITES.inventory.gold, text: `-${enemyArmySize * enemyArmySize}` }, // "-9"
-    ])
+    expect(grid(probe, 0, 1)).toMatchObject({
+      badge: { variant: 'price', text: `-${enemyArmySize * enemyArmySize}` },
+    })
   })
 
-  it('Plate hides recruit cost row when player cannot afford it', () => {
-    const previewPlate = MECHANIC_INDEX.previewPlateByEncounterKind.combat
-    if (!previewPlate) throw new Error('no combat preview-plate registered')
+  it('Pay badge hidden when player cannot afford recruit', () => {
+    const grid = MECHANIC_INDEX.rightGridByEncounterKind.combat
+    if (!grid) throw new Error('no combat right-grid registered')
 
     const initialSpawn = 12
-    const enemyArmySize = 5 // wounded + small but cost = 25
+    const enemyArmySize = 5
     const opened = stepSouth(stateOnMountainAmbush({ playerArmy: 5 }))
     const sourceCellId = (opened.encounter as CombatEncounter).sourceCellId
     const probe: State = {
       ...opened,
-      resources: { ...opened.resources, gold: 10 }, // < 25, cannot afford
+      resources: { ...opened.resources, gold: 10 },
       encounter: {
         kind: 'combat',
         enemyArmySize,
@@ -487,9 +476,8 @@ describe('v0.6 combat balance acceptance', () => {
         restoreMessage: '',
       },
     }
-    expect(previewPlate(probe)).toEqual([
-      { spriteId: SPRITES.enemies.enemy, text: `${enemyArmySize}` },
-    ])
+    expect(grid(probe, 0, 1).badge).toBeUndefined()
+    expect(grid(probe, 1, 0)).toMatchObject({ badge: { variant: 'left', text: `${enemyArmySize}` } })
   })
 
   // ----------------------------------------------------------------

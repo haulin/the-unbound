@@ -7,16 +7,30 @@ Tentative milestones plus ideas in other sections below. Each milestone should c
 - **Registry kind-coverage validation.** A mechanic declaring `moveEventPolicyByKind: { foo: { ambushPercent: 100 } }` without a matching `combatVariantByKind[foo]` falls through to the preview placeholder silently. Add a registry-time check (`docs/backlog.md` already tracks this in the broader registry hardening task).
 - **Recruit helper coupling (henge → mountain).** `henge.ts` imports `brigandRecruitCost` / `brigandRecruitEligibility` / `brigandRecruitLootScale` from `mountain.ts` because both use the same recruitable-bandit math. That ties a PoI encounter to a terrain file and makes brigand tuning silently affect henge. Extract neutral shared helpers (e.g. `recruitableBandit.ts` or combat-layer recruit utilities) when a third recruitable source appears—or sooner if recruit rules diverge per variant.
 
+## Issues
+- Arriving in a farm with 1 food gives food, but game over as well.
+- Food delta UX: consider collapsing `-1` + `+N` into a single animated net delta when both occur on the same move.
+- Two signposts should not point to the same PoI?
+
+## Polish for demo:
+- Balance pass: town prices, scout cost, combat gold drops...
+- Wyrm balance: combat tuning, Blood/payment economy.
+- Hide debug stuff, pick seed for new game randomly
+- title screen, about screen, back to menu, resume
+- animations for left panel — illustration transitions (modal enter/leave, overworld move), lore line stagger. **Spec:** `docs/plans/2026-06-05-button-badges-design.md` § Phase 2 pointer + addendum 2026-06-05.
+- lore audit and polish
+- more exciting win / lose
+
 ## Ideas
-- loot drops in lore title +Ng/+Mf/+Os
-- controller support
-- buy tiles show prices on them instead of in plates
-- make rainbows modals - if player chooses to not take gold, next visit it increases
+- loot drops in lore title +Ng/+Mf/+Ls
+- buy tiles show prices on them instead of in plates, enemy hp shown in middle, search in camp not advertised - middle and preview sprites can swap
+- make rainbows modals - if player chooses to not take gold, next visit it increases, maybe sell rumors as well
 - Fight hit/miss is shown in lore lines.
 - Consider making roads cost food only ~50% of the time (mechanics/balance change; would require tests + tuning).
 - skip modal if nothing to do (not enough money or cooldown - camp/farm/town)
 - every 28 days a plague comes that kills half your army
 - buying scout shows animation - switch to show map, reveal tiles, hide map (if it was hidden)
+- show round number during fights
 - battle log - every fight attempt marks ✓/✗ in the lore lines
 - morale modifying battle odds, +2, +5, +10% either way (curse could lower it, praying at altar could clear a curse)
 - active item that allows you to auto-win a fight or land a hit at least
@@ -29,23 +43,11 @@ Tentative milestones plus ideas in other sections below. Each milestone should c
 - companion that allows you to recruit goblins (goblin chief?)
 - Camp local map — see *Camp local map* in Deferred backlog.
 - maybe adjust worldgen as it feels like swamps & mountains are too common
+- When I accidentally leave a town I cannot return, have to step out and back. Consider 5 action buttons with middle leave/reenter.
+- PoI leave lines (camp/farm farewell)
 
-**v0.9 — Random Encounters & World Texture**
 
-- Random encounter pool on specific tiles (probably road/grass): loot find / lone soldier joins / cursed tile / traps / fellow traveller with rumor / something negative TBD
-- Scout becomes a Camp specialty (in addition to Towns) via the pool pattern. `CAMP_SCOUT_*` lines already in `lore.ts`.
-- Lore pass.
-
-Polish for demo:
-- Balance pass: town prices, scout cost, combat gold drops...
-- Wyrm balance: combat tuning, Blood/payment economy.
-- Hide debug stuff, pick seed for new game randomly
-- title screen, about screen, back to menu, resume
-- animations for left panel
-- lore audit and polish
-- more exciting win / lose
-
-**v0.10 — Slot System: Trading & Farm Animals**
+**v0.9 — Slot System: Trading & Farm Animals**
 
 See `docs/2026-05-27-slot-system-design.md` for the full design.
 
@@ -53,6 +55,13 @@ See `docs/2026-05-27-slot-system-design.md` for the full design.
 - Sprite-flash animation primitive: pulse slot icon when event-triggered effect fires. Shared by all slots with event-driven P or N.
 - Boar specialty added to Farm pool. P3' opening volley (~25% of enemy army at combat start) + N15 bidirectional Mule exclusion. New 16×16 sprite (low body, bristled back, tusks). Lore lines for `BOAR_*` and `*_REFUSED_LINES` already in `lore.ts`.
 - Mule update (paired with Boar): wire Mule end of the bidirectional exclusion. Mule N1 (-1 food per Camp Search) gets the sprite-flash treatment in passing. Also implement mule negative. Mule upside is not communicated well enough. Only one lore line spells it out.
+- Lore pass.
+
+**v0.10 — Random Encounters & World Texture**
+
+- Random encounter pool on specific tiles (probably road/grass): loot find / lone soldier joins / cursed tile / traps / fellow traveller with rumor / something negative TBD
+- controller support
+- Lore pass.
 
 **v0.11 — Slot System: People & Economy**
 
@@ -87,14 +96,6 @@ See `docs/2026-05-27-slot-system-design.md` for the full design.
 - Full balance pass
 - Paid content gate (one gate free, two gates paid — Hoplite model)
 - Itch.io + web release, Android via Capacitor if viable
-
-## Issues
-- camps don't have entry lore lines
-- Leaving a camp shows no message.
-- Arriving in a farm with 1 food gives food, but game over as well.
-- When I accidentally leave a town I cannot return, have to step out and back.
-- Food delta UX: consider collapsing `-1` + `+N` into a single animated net delta when both occur on the same move.
-- Two signposts should not point to the same PoI?
 
 # Deferred backlog
 
@@ -138,7 +139,25 @@ Items considered during the v0.5 UI intermezzo and intentionally left for later.
 - **Map-toggle highlighted state.** When the map is open, the (0,2) map button should look pressed (white border or similar) rather than identical to its closed state. Same idea for the minimap toggle at (2,0).
 - **Disabled-button overlay.** Buttons that are non-actionable in the current state (e.g. movement during end-of-game) look the same as active ones. A checkerboard or stipple overlay would communicate "this exists but you can't use it" without removing the affordance.
 - **Goals-button replacement.** The (0,0) corner is `show_goal`, which is useful early and decorative once the player knows the layout. Candidate replacement: a held-inventory hero slot, freeing the bottom band for something else.
-- **Textured preview-plate background.** Tried during the intermezzo with a checkerboard sprite at `SPRITES.ui.previewPlateBackground` (#309) and 8 retouched plate-eligible icons (food/gold/troop/scout/beast/rumor/enemy/heart) keyed off color #8. Plates looked good, but those same icons reused as right-grid buttons made the hover tint inconsistent — outlined sprites highlighted "everything except the outline", non-outlined sprites highlighted only the 8 px cell padding. The correct fix is to keep base sprites unmodified and draw separate outline-frame sprites on top *inside the plate only* (so buttons stay flat). Cost is one extra outline sprite per plate-eligible concept (8 today, growing as healer/boar/brigand/etc. arrive). Revisit once the encounter roster settles and the sprite-sheet cost is known.
+
+## Button badges — post-ship UX (deferred)
+
+Phase 1 shipped per `docs/plans/2026-06-05-button-badges-design.md` addendum 2026-06-05. Playtest: net positive layout; slightly less accessible than preview plates (stats vs badge eye travel, combat delta readability). Do **not** rollback badges; optional polish only:
+
+- Longer delta hold when deltas anchor to Fight / Pay badges.
+- Pulse left-panel army (or enemy) stat on change during combat.
+- Badge tint when player cannot afford listed price.
+- Combat-only minimalist text strip on illustration (constant-gated escape hatch).
+
+Full Phase 2 (illustration transitions + lore stagger) is a separate milestone — see design doc § Phase 2 pointer.
+
+## Larger encounter illustrations — deferred
+
+Button badges freed the left panel; art is still 16×16 scaled 4×. Upgrade path when sheet budget allows:
+
+- **32×32 @ scale 2** in bank 0: ~8 pieces in a reserved #384–#511 band (16 slots each). No runtime bank work; best first step.
+- **64×64 @ scale 1** or **warehouse banks 1–7**: store art off-sheet, stage into a fixed slot in bank 0 via `sync(2, bank, false)` + `memcpy` + `sync(2, 0, false)` over two frames. `sync` only swaps RAM sections (use sprites mask `2`); it does not repaint the screen — draw fully first, sync after paint on frame 1, restore bank 0 before any draw on frame 2. One frame of stale illustration is acceptable at ~5 fps UI cadence.
+- Not on current roadmap; revisit with v0.14 sprite audit / bank reshuffle.
 
 ## After demo wishlist
 - Map size presets (example): quick 7×7, normal 10×10, epic 15×15.
@@ -237,10 +256,6 @@ Effects available to current or future slots. Includes both already-wired-to-dem
 ## Tech
 - Animation scheduling: consider extracting reducer-side animation enqueueing into a dedicated pure helper once iteration stabilizes.
 
-
-## shop clarity (deferred)
-
-- Town offer UI: decide whether to show quantity, price, or both (e.g. `3/5`), and whether bundle sizes should vary per offer/town.
 
 ## Prototype follow-ups
 

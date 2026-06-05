@@ -119,8 +119,8 @@ describe('v0.5 the wyrm acceptance', () => {
   })
 
   // C. First arrival at a Lair opens combat with the wyrm variant UI
-  it('C. first arrival at an un-bled lair opens combat with the wyrm-variant right-grid + heart preview', () => {
-    const s0 = makeState(makeWorld(lair()))
+  it('C. first arrival at an un-bled lair opens combat with the wyrm-variant right-grid + badges', () => {
+    const s0 = makeState(makeWorld(lair()), { gold: WYRM_PAY_GOLD_COST })
     const after = processAction(s0, moveSouth)!
     expect(after.encounter?.kind).toBe('combat')
     const enc = after.encounter
@@ -133,18 +133,23 @@ describe('v0.5 the wyrm acceptance', () => {
     // Variant lookup wires center sprite + Pay button via the source-cell kind.
     const rightGrid = MECHANIC_INDEX.rightGridByEncounterKind.combat
     if (!rightGrid) throw new Error('no combat right-grid registered')
-    expect(rightGrid(after, 0, 1)).toEqual({ spriteId: SPRITES.inventory.gold, action: { type: ACTION_COMBAT_PAY } })
-    expect(rightGrid(after, 1, 0)).toEqual({ spriteId: SPRITES.actions.fight, action: { type: ACTION_FIGHT } })
-    expect(rightGrid(after, 1, 1)).toEqual({ spriteId: SPRITES.centers.wyrm, action: null })
-    expect(rightGrid(after, 1, 2)).toEqual({ spriteId: SPRITES.actions.return, action: { type: ACTION_RETURN } })
-
-    // Preview plate: 2 lines — heart + remaining wyrm health, gold + pay cost.
-    const previewPlate = MECHANIC_INDEX.previewPlateByEncounterKind.combat
-    if (!previewPlate) throw new Error('no combat preview-plate registered')
-    expect(previewPlate(after)).toEqual([
-      { spriteId: SPRITES.enemies.hp, text: `${WYRM_INITIAL_HEALTH}` },
-      { spriteId: SPRITES.inventory.gold, text: `-${WYRM_PAY_GOLD_COST}` },
-    ])
+    expect(rightGrid(after, 0, 1)).toMatchObject({
+      spriteId: SPRITES.inventory.gold,
+      action: { type: ACTION_COMBAT_PAY },
+      badge: { variant: 'price', text: `-${WYRM_PAY_GOLD_COST}` },
+    })
+    expect(rightGrid(after, 1, 0)).toMatchObject({
+      spriteId: SPRITES.actions.fight,
+      action: { type: ACTION_FIGHT },
+      badge: { variant: 'left', text: `${WYRM_INITIAL_HEALTH}` },
+    })
+    expect(rightGrid(after, 1, 1)).toEqual({ tilePreview: { kind: 'relativeToPlayer', dx: 0, dy: 0 }, action: null })
+    expect(rightGrid(after, 1, 2)).toMatchObject({
+      spriteId: SPRITES.actions.return,
+      action: { type: ACTION_RETURN },
+      badge: { variant: 'price', text: '-1' },
+    })
+    expect(MECHANIC_INDEX.illustrationByEncounterKind.combat?.(after)).toBe(SPRITES.enemies.wyrm)
   })
 
   // D. Bleeding the wyrm via Fight

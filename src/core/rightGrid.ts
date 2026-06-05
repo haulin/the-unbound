@@ -6,6 +6,7 @@ import {
   ACTION_TOGGLE_MINIMAP,
 } from './constants'
 import { SPRITES } from './spriteIds'
+import type { CellBadge } from './mechanics/encounterHelpers'
 import type { Action, State } from './types'
 import { MECHANIC_INDEX } from './mechanics'
 
@@ -17,6 +18,13 @@ export type RightGridCellDef = {
   spriteId?: number
   tilePreview?: RightGridTilePreview
   action?: Action | null
+  badge?: CellBadge
+}
+
+export function encounterIllustrationSpriteId(s: State): number | null {
+  const enc = s.encounter
+  if (!enc) return null
+  return MECHANIC_INDEX.illustrationByEncounterKind[enc.kind]?.(s) ?? null
 }
 
 export function getRightGridCellDef(s: State, row: number, col: number): RightGridCellDef {

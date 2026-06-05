@@ -13,22 +13,23 @@ import { applyFoodCapOnGain, foodCarryCap, FOOD_CARRY_FULL_MESSAGE } from '../..
 import { FARM_BUY_FOOD_LINES, FARM_ENTER_LINES, MULE_BUY_LINES } from '../../lore'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
-import type { FarmCell, FarmEncounter, State } from '../../types'
+import type { FarmCell, State } from '../../types'
 import {
   applyDeltas,
   buy,
   encounterStableLine,
-  gridButton,
   leaveEncounter,
+  loreMessage,
   makeRightGrid,
   noGoldResponse,
+  offerGridCell,
+  openNamedPoiEncounter,
+  poiTitleFor,
   previewEncounterProvider,
-  offersInGridOrder,
   hireCompanion,
   offersToGridLayout,
-  previewPlateForOffers,
   setEncounterMessage,
-  type RightGridActionCell,
+  type CellBadge,
 } from '../encounterHelpers'
 import { buildOfferSets, cellId, isTerrainCell, placeNamedFeatureFromSeed } from '../../worldgen'
 import type { OfferCategory } from '../../worldgen'
@@ -36,29 +37,18 @@ import type {
   MechanicDef,
   OnEnterTile,
   PlaceWorldProvider,
-  PreviewPlateProvider,
   ReduceEncounterAction,
-  TileEnterResult,
 } from '../types'
 
 export const ACTION_FARM_BUY_FOOD = 'FARM_BUY_FOOD' as const
 export const ACTION_FARM_BUY_BEAST = 'FARM_BUY_BEAST' as const
 export const ACTION_FARM_LEAVE = 'FARM_LEAVE' as const
 
-function farmBuyFoodPreview(_s: State): readonly { spriteId: number; text: string }[] {
-  return [{ spriteId: SPRITES.inventory.food, text: `-${FARM_BUY_FOOD_GOLD_COST}` }]
-}
-
-function farmHireMulePreview(s: State): readonly { spriteId: number; text: string }[] {
-  const farm = getCellAt(s.world, s.player.position) as FarmCell
-  return [{ spriteId: SPRITES.inventory.beast, text: `-${farm.companionHireGold}` }]
-}
-
 type FarmActionSpec = {
   category: OfferCategory
   spriteId: number
   reduce: (s: State, farm: FarmCell) => State
-  previewPlate: (s: State) => readonly { spriteId: number; text: string }[]
+  badge: (s: State) => CellBadge
 }
 
 const FARM_OFFERS = {
@@ -66,13 +56,16 @@ const FARM_OFFERS = {
     category: 'economy',
     spriteId: SPRITES.inventory.food,
     reduce: reduceFarmBuyFood,
-    previewPlate: farmBuyFoodPreview,
+    badge: () => ({ variant: 'price', text: `-${FARM_BUY_FOOD_GOLD_COST}` }),
   },
   [ACTION_FARM_BUY_BEAST]: {
     category: 'companion_hire',
     spriteId: SPRITES.inventory.beast,
     reduce: reduceFarmBuyBeast,
-    previewPlate: farmHireMulePreview,
+    badge: (s) => {
+      const farm = getCellAt(s.world, s.player.position) as FarmCell
+      return { variant: 'price', text: `-${farm.companionHireGold}` }
+    },
   },
 } as const satisfies Record<string, FarmActionSpec>
 
@@ -81,33 +74,22 @@ export type FarmAction = { type: FarmOfferKind } | { type: typeof ACTION_FARM_LE
 
 const FARM_OFFER_POOL = Object.keys(FARM_OFFERS) as FarmOfferKind[]
 
-function farmPrefix(farm: FarmCell): string {
-  const name = farm.name || 'A Farm'
-  return `${name} Farm`
-}
-
 const onEnterFarm: OnEnterTile = ({ cell, world, pos, stepCount }) => {
   if (cell.kind !== 'farm') return {}
   const farmCell = getCellAt(world, pos)
   if (!farmCell || farmCell.kind !== 'farm') return {}
 
-  const name = farmCell.name || 'A Farm'
   const r = RNG.createTileRandom({ world, stepCount, pos })
   const line = r.stableLine(FARM_ENTER_LINES, { placeId: farmCell.id })
-  const message = `${name} Farm\n${line}`
-  const cellId = cellIdForPos(world, pos)
-  const encounter: FarmEncounter = {
-    kind: 'farm',
-    sourceCellId: cellId,
-    restoreMessage: message,
-  }
-  const result: TileEnterResult = {
-    message,
+  return {
+    ...openNamedPoiEncounter({
+      kind: 'farm',
+      sourceCellId: cellIdForPos(world, pos),
+      title: poiTitleFor(farmCell.name, 'Farm'),
+      enterBody: line,
+    }),
     knowsPosition: true,
-    encounter,
-    enterAnims: [{ kind: 'gridTransition', from: 'overworld', to: 'farm' }],
   }
-  return result
 }
 
 const reduceFarmAction: ReduceEncounterAction = (prevState, action) => {
@@ -119,13 +101,13 @@ const reduceFarmAction: ReduceEncounterAction = (prevState, action) => {
 }
 
 function reduceFarmBuyFood(prevState: State, farm: FarmCell): State {
-  const prefix = farmPrefix(farm)
+  const title = poiTitleFor(farm.name, 'Farm')
   if (prevState.resources.food >= foodCarryCap(prevState.resources)) {
-    return setEncounterMessage(prevState, prefix, FOOD_CARRY_FULL_MESSAGE)
+    return setEncounterMessage(prevState, title, FOOD_CARRY_FULL_MESSAGE)
   }
 
   const result = buy(prevState.resources, { gold: FARM_BUY_FOOD_GOLD_COST, gain: { food: FARM_BUY_FOOD_AMOUNT } })
-  if (result.outcome === 'noFunds') return noGoldResponse(prevState, prefix)
+  if (result.outcome === 'noFunds') return noGoldResponse(prevState, title)
 
   const clamped = applyFoodCapOnGain(prevState.resources, result.resources)
   const appliedFoodDelta = clamped.food - prevState.resources.food
@@ -134,7 +116,7 @@ function reduceFarmBuyFood(prevState: State, farm: FarmCell): State {
   const line = encounterStableLine(prevState, 'farm.buyFood', FARM_BUY_FOOD_LINES)
   return applyDeltas(prevState, {
     resources: clamped,
-    message: `${prefix}\n${line}`,
+    message: loreMessage(title, line),
     deltas,
   })
 }
@@ -166,30 +148,29 @@ const placeNamedFarms: PlaceWorldProvider = ({ cells, rngState, seed }) => {
   return { rngState }
 }
 
-function farmOfferSlot(s: State, slot: keyof ReturnType<typeof offersToGridLayout<FarmOfferKind>>): RightGridActionCell | null {
+function farmOfferSlot(s: State, slot: keyof ReturnType<typeof offersToGridLayout<FarmOfferKind>>) {
   const farm = getCellAt(s.world, s.player.position) as FarmCell
   const offer = offersToGridLayout(farm.offers)[slot]
-  return offer ? gridButton(FARM_OFFERS, offer) : null
-}
-
-const farmPreviewPlate: PreviewPlateProvider = (s) => {
-  const here = getCellAt(s.world, s.player.position)
-  if (!here || here.kind !== 'farm') return null
-  const layout = offersToGridLayout(here.offers)
-  const order = offersInGridOrder(here.offers, layout)
-  return previewPlateForOffers(s, order, FARM_OFFERS)
+  return offer ? offerGridCell(FARM_OFFERS, offer)(s) : null
 }
 
 function reduceFarmBuyBeast(prevState: State, farm: FarmCell): State {
-  const prefix = farmPrefix(farm)
+  const title = poiTitleFor(farm.name, 'Farm')
   const rnd = RNG.createRunCopyRandom(prevState)
   return hireCompanion(prevState, {
-    prefix,
+    prefix: title,
     slotId: 'beast',
     goldCost: farm.companionHireGold,
     successLine: rnd.perMoveLine(MULE_BUY_LINES, { cellId: farm.id }),
   })
 }
+
+const { provider: farmRightGrid, illustrationFor: farmIllustration } = makeRightGrid({
+  leaveAction: { type: ACTION_FARM_LEAVE },
+  illustrationSpriteId: SPRITES.centers.farmBarn,
+  top: (s) => farmOfferSlot(s, 'top'),
+  left: (s) => farmOfferSlot(s, 'left'),
+})
 
 export const farmMechanic: MechanicDef = {
   id: 'farm',
@@ -204,13 +185,8 @@ export const farmMechanic: MechanicDef = {
   encounter: {
     kind: 'farm',
     reduceAction: reduceFarmAction,
-    previewPlate: farmPreviewPlate,
     previewEncounter: previewEncounterProvider('farm'),
-    rightGrid: makeRightGrid({
-      leaveAction: { type: ACTION_FARM_LEAVE },
-      centerSpriteId: SPRITES.centers.farmBarn,
-      top: (s) => farmOfferSlot(s, 'top'),
-      left: (s) => farmOfferSlot(s, 'left'),
-    }),
+    rightGrid: farmRightGrid,
+    illustrationSpriteId: farmIllustration,
   },
 }

@@ -1,26 +1,22 @@
 import { ENABLE_ANIMATIONS } from '../../constants'
 import { cellIdForPos, getCellAt, posForCellId } from '../../cells'
 import { applyFoodCapOnGain } from '../../foodCarry'
-import { gameOverMessage } from '../../gameOver'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
 import type { Action, CombatEncounter, Encounter, Resources, State, Ui, Vec2, World } from '../../types'
 import { enqueueGridTransition } from '../../uiAnim'
 import {
   applyDeltas,
+  badgedGridButton,
+  combatLoreMessage,
   encounterStableLine,
-  gridButton,
   makeRightGrid,
   pushResourceDeltas,
   resourceDeltasFromDiff,
+  type CellBadge,
 } from '../encounterHelpers'
 import type { ResourceDelta } from '../encounterHelpers'
-import type {
-  MechanicDef,
-  PreviewPlateProvider,
-  ReduceEncounterAction,
-  TileEnterResult,
-} from '../types'
+import type { MechanicDef, ReduceEncounterAction, TileEnterResult } from '../types'
 // Lazy circular: `mechanics/index.ts` builds MECHANIC_INDEX from this file's
 // `combatMechanic`, so the import binding here is only safe to dereference
 // inside function bodies (post-module-graph load), never at module scope.
@@ -42,8 +38,7 @@ export type CombatAction = { type: keyof typeof COMBAT_ACTIONS }
 
 // ---- Pure combat math -------------------------------------------------------------
 
-// Ambush spawn formula: U[max(2, p-2) .. 2*p]. The `max(min, …)` ceiling
-// guards `playerArmy ∈ {0, 1}` where `2 * playerArmy < min`.
+// U[max(2, p-2) .. 2*p]; max(min,…) guards playerArmy ∈ {0,1} where 2*p < min.
 export function spawnEnemyArmy(opts: { rngState: number; playerArmy: number }): { rngState: number; enemyArmy: number } {
   const playerArmy = Math.max(0, Math.trunc(opts.playerArmy))
   const min = Math.max(2, playerArmy - 2)
@@ -52,8 +47,7 @@ export function spawnEnemyArmy(opts: { rngState: number; playerArmy: number }): 
   return { rngState: r.rngState, enemyArmy: r.intInRange(min, max) }
 }
 
-// One round: each side rolls U[0..size+bonus); ties go to the player. On
-// player hit, enemy halves (floor); on enemy hit, caller loses 1 troop.
+// One round: U[0..size+bonus); ties go to the player. Player hit → enemy halves (floor).
 type FightRound = {
   rngState: number
   outcome: 'playerHit' | 'enemyHit'
@@ -83,9 +77,7 @@ function resolveFightRound(opts: {
 
 // ---- Right-grid + action dispatch -------------------------------------------------
 
-// `previewEncounter()` carries `sourceCellId: -1` so the right-grid can
-// pre-paint a combat cross during grid-slide transitions; the variant
-// lookup short-circuits to the placeholder for that path.
+// Preview sentinel uses sourceCellId < 0 so grid-slide can paint combat before a real cell.
 function isPreviewSentinel(sourceCellId: number): boolean {
   return sourceCellId < 0
 }
@@ -100,7 +92,6 @@ function combatVariantForEncounter(state: State): CombatVariantConfig {
 
 export type CombatCloseOutcome = 'victory' | 'flee' | 'recruit' | 'paid'
 
-// Mend round losses from this encounter (victory or pay). Not used on flee.
 export function applyHealerMend(resources: Resources, enc: CombatEncounter): Resources {
   if (!resources.party.includes('healer')) return resources
   const roundLosses = Math.max(0, enc.armyAtCombatStart - resources.armySize)
@@ -135,21 +126,29 @@ function finishCombatClose(
   })
 }
 
-// Top slot is the pay/recruit button — always rendered. Variants that
-// don't recruit return `unrecruitable` from `isEligible`.
-const combatRightGrid = makeRightGrid({
-  leaveAction: { type: ACTION_RETURN },
-  centerSpriteId: (s) => combatVariantForEncounter(s).centerSpriteId,
-  left: gridButton(COMBAT_ACTIONS, ACTION_FIGHT),
-  top: gridButton(COMBAT_ACTIONS, ACTION_COMBAT_PAY),
-})
-
-const combatPreviewPlate: PreviewPlateProvider = (s) => {
-  const enc = s.encounter
+function combatFightBadge(state: State): CellBadge | null {
+  const enc = state.encounter
   if (!enc || enc.kind !== 'combat') return null
-  const variant = combatVariantForEncounter(s)
-  return variant.previewPlateLines(s)
+  if (enc.enemyArmySize <= 0) return null
+  return { variant: 'left', text: `${enc.enemyArmySize}` }
 }
+
+function combatPayBadge(state: State): CellBadge | null {
+  const enc = state.encounter
+  if (!enc || enc.kind !== 'combat') return null
+  const variant = combatVariantForEncounter(state)
+  if (variant.payment.isEligible(enc, state.resources) !== 'ok') return null
+  const cost = variant.payment.computeCost(enc)
+  return { variant: 'price', text: `-${cost}` }
+}
+
+const { provider: combatRightGrid, illustrationFor: combatIllustration } = makeRightGrid({
+  leaveAction: { type: ACTION_RETURN },
+  leaveBadge: { variant: 'price', text: '-1' },
+  illustrationSpriteId: (s) => combatVariantForEncounter(s).illustrationSpriteId,
+  left: badgedGridButton(COMBAT_ACTIONS, ACTION_FIGHT, combatFightBadge),
+  top: badgedGridButton(COMBAT_ACTIONS, ACTION_COMBAT_PAY, combatPayBadge),
+})
 
 const reduceCombatAction: ReduceEncounterAction = (prevState: State, action: Action): State | null => {
   if (!(action.type in COMBAT_ACTIONS)) return null
@@ -172,13 +171,10 @@ function reduceCombatPay(prevState: State): State {
     return {
       ...prevState,
       encounter: enc,
-      ui: { ...prevState.ui, message: line || prevState.ui.message },
+      ui: { ...prevState.ui, message: combatLoreMessage(prevState, line) || prevState.ui.message },
     }
   }
 
-  // Variants with a `recruitLootScale` draw the full `victoryReward`
-  // (advancing world rngState exactly once, same as a fight victory) and
-  // multiply gold/food gains by the returned scale.
   const cost = payment.computeCost(enc)
   const prevRes = prevState.resources
   const prevWorld = prevState.world
@@ -202,12 +198,11 @@ function reduceCombatPay(prevState: State): State {
       food: afterTroops.food + lootFoodGain,
     }
     nextResources = applyFoodCapOnGain(prevRes, withLoot)
-    // Recompute applied food gain after cap-on-gain clamp.
     lootFoodGain = nextResources.food - afterTroops.food
     nextWorld = { ...prevWorld, rngState: reward.rngState }
   }
   const successPick = RNG.createRunCopyRandom(prevState).advanceCursor('combat.pay.success', payment.successLines)
-  const baseUi: Ui = { ...prevUi, message: successPick.line || prevUi.message }
+  const baseUi: Ui = { ...prevUi, message: combatLoreMessage(prevState, successPick.line || '') || prevUi.message }
   const intermediate: State = {
     world: nextWorld,
     player: prevState.player,
@@ -233,14 +228,16 @@ function reduceCombatReturn(prevState: State): State {
 
   const prevRes = prevState.resources
   const nextArmy = prevRes.armySize - 1
-  const isGameOver = nextArmy <= 0
+  const armyDepleted = nextArmy <= 0
   const nextResources: Resources = { ...prevRes, armySize: Math.max(0, nextArmy) }
   const fleeVariant = combatVariantForEncounter(prevState)
-  const fleePick = isGameOver
+  const fleePick = armyDepleted
     ? null
     : RNG.createRunCopyRandom(prevState).advanceCursor('combat.exit.flee', fleeVariant.fleeLines)
-  const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : fleePick!.nextState.run
-  const nextMessage = isGameOver ? gameOverMessage(prevState.world.seed, prevState.run.stepCount) : fleePick!.line || prevUi.message
+  const nextRun = armyDepleted ? prevState.run : fleePick!.nextState.run
+  const nextMessage = armyDepleted
+    ? prevUi.message
+    : combatLoreMessage(prevState, fleePick!.line || '') || prevUi.message
   const baseUi: Ui = { ...prevUi, message: nextMessage }
   const intermediate: State = {
     world: prevState.world,
@@ -250,7 +247,7 @@ function reduceCombatReturn(prevState: State): State {
     encounter: null,
     ui: baseUi,
   }
-  const closed = isGameOver ? intermediate : applyCombatClosed(intermediate, 'flee', enc)
+  const closed = armyDepleted ? intermediate : applyCombatClosed(intermediate, 'flee', enc)
   let next = applyDeltas(closed, {
     message: closed.ui.message,
     resources: nextResources,
@@ -260,7 +257,7 @@ function reduceCombatReturn(prevState: State): State {
   if (!ENABLE_ANIMATIONS) return next
   return {
     ...next,
-    ui: isGameOver ? next.ui : enqueueGridTransition(next.ui, { from: 'combat', to: 'overworld' }),
+    ui: armyDepleted ? next.ui : enqueueGridTransition(next.ui, { from: 'combat', to: 'overworld' }),
   }
 }
 
@@ -316,16 +313,19 @@ function reduceCombatFight(prevState: State): State {
   nextResources = applyFoodCapOnGain(prevRes, nextResources)
   const appliedFoodDelta = nextResources.food - prevRes.food
   if (appliedFoodDelta) foodDeltas.push(appliedFoodDelta)
-  const isGameOver = nextResources.armySize <= 0
+  const armyDepleted = nextResources.armySize <= 0
   const victoryPick =
-    !isGameOver && nextEncounter == null
+    !armyDepleted && nextEncounter == null
       ? RNG.createRunCopyRandom(prevState).advanceCursor('combat.exit.victory', variant.victoryLines)
       : null
-  const nextRun = isGameOver ? { ...prevState.run, isGameOver: true } : nextEncounter == null ? victoryPick!.nextState.run : prevState.run
-  const nextMessage = isGameOver
-    ? gameOverMessage(nextWorld.seed, prevState.run.stepCount)
+  const nextRun = armyDepleted
+    ? prevState.run
     : nextEncounter == null
-      ? victoryPick!.line || prevUi.message
+      ? victoryPick!.nextState.run
+      : prevState.run
+  const nextMessage =
+    nextEncounter == null && !armyDepleted
+      ? combatLoreMessage(prevState, victoryPick!.line || '') || prevUi.message
       : prevUi.message
 
   const baseUi: Ui = { message: nextMessage, leftPanel: prevUi.leftPanel, clock: prevUi.clock, anim: prevUi.anim }
@@ -334,7 +334,7 @@ function reduceCombatFight(prevState: State): State {
     player: prevState.player,
     run: nextRun,
     resources: nextResources,
-    encounter: isGameOver ? null : nextEncounter,
+    encounter: armyDepleted ? null : nextEncounter,
     ui: baseUi,
   }
   const fightDeltas: ResourceDelta[] = []
@@ -344,7 +344,7 @@ function reduceCombatFight(prevState: State): State {
   pushResourceDeltas(fightDeltas, 'enemyArmy', enemyDeltas)
 
   let next: State
-  if (!isGameOver && nextEncounter == null) {
+  if (!armyDepleted && nextEncounter == null) {
     next = finishCombatClose(intermediate, enc, 'victory', fightDeltas)
   } else {
     next = applyDeltas(intermediate, {
@@ -354,24 +354,21 @@ function reduceCombatFight(prevState: State): State {
       deltas: fightDeltas,
     })
   }
-  next = { ...next, encounter: isGameOver ? null : nextEncounter }
+  next = { ...next, encounter: armyDepleted ? null : nextEncounter }
   if (!ENABLE_ANIMATIONS) return next
 
-  if (!isGameOver && nextEncounter == null) {
+  if (!armyDepleted && nextEncounter == null) {
     next = { ...next, ui: enqueueGridTransition(next.ui, { from: 'combat', to: 'overworld' }) }
   }
   return next
 }
 
-// Source mechanics pick their `spawnEnemy` (rolled vs fixed) and own the
-// messaging — encounterMessage during combat, restoreMessage after.
 export type EnemySpawn = (rngState: number) => { rngState: number; enemyArmy: number }
 
 export function rolledEnemySpawn(playerArmy: number): EnemySpawn {
   return (rngState) => spawnEnemyArmy({ rngState, playerArmy })
 }
 
-// Fixed spawn that leaves the stream RNG untouched.
 export function fixedEnemySpawn(enemyArmy: number): EnemySpawn {
   const clamped = Math.max(0, Math.trunc(enemyArmy))
   return (rngState) => ({ rngState, enemyArmy: clamped })
@@ -405,46 +402,10 @@ export function startCombatEncounter(args: {
 
 // ---- Combat variant ---------------------------------------------------------
 
-export type CombatVariantPlateLine = { spriteId: number; text: string }
-
 export type EligibilityKind = 'ok' | 'noFunds' | 'notWounded' | 'tooMany' | 'unrecruitable'
 
-// Shared enemy-count line, anchored at `lineIndex: 0` so
-// `previewPlateDeltaAnchors` can target enemy-army deltas reliably.
-export function enemyCountPlateLine(state: State): CombatVariantPlateLine | null {
-  const enc = state.encounter
-  if (!enc || enc.kind !== 'combat') return null
-  const variant = combatVariantForEncounter(state)
-  return { spriteId: variant.centerSpriteId, text: `${enc.enemyArmySize}` }
-}
-
-// Plate for variants that show only the enemy-count row (no recruit cost).
-export function enemyCountOnlyPlateLines(state: State): readonly CombatVariantPlateLine[] {
-  const line = enemyCountPlateLine(state)
-  return line ? [line] : []
-}
-
-// Plate for recruitable variants: enemy count always, plus a recruit-cost
-// row when payment is eligible.
-export function recruitablePreviewPlateLines(state: State): readonly CombatVariantPlateLine[] {
-  const enc = state.encounter
-  if (!enc || enc.kind !== 'combat') return []
-  const enemyLine = enemyCountPlateLine(state)
-  if (!enemyLine) return []
-  const variant = combatVariantForEncounter(state)
-  if (variant.payment.isEligible(enc, state.resources) === 'ok') {
-    const cost = variant.payment.computeCost(enc)
-    return [
-      enemyLine,
-      { spriteId: SPRITES.inventory.gold, text: `-${cost}` },
-    ]
-  }
-  return [enemyLine]
-}
-
 export type CombatVariantConfig = {
-  centerSpriteId: number
-  previewPlateLines: (state: State) => readonly CombatVariantPlateLine[]
+  illustrationSpriteId: number
   encounterLines: readonly string[]
   victoryLines: readonly string[]
   fleeLines: readonly string[]
@@ -462,17 +423,11 @@ export type CombatVariantConfig = {
     rngState: number,
     encounter: CombatEncounter,
   ) => { resources: Resources; rngState: number }
-  // Optional partial-loot scale (0..1) applied to gold/food gains when a
-  // recruit succeeds. Without this field, recruit grants troops only.
   recruitLootScale?: (encounter: CombatEncounter) => number
 }
 
-// Placeholder for the preview-sentinel and registry-hole paths. Only
-// `centerSpriteId` and `previewPlateLines` are ever read; reducer fields
-// satisfy the type but never dispatch.
 const previewPlaceholderVariant: CombatVariantConfig = {
-  centerSpriteId: SPRITES.enemies.enemy,
-  previewPlateLines: enemyCountOnlyPlateLines,
+  illustrationSpriteId: SPRITES.enemies.enemy,
   encounterLines: [],
   victoryLines: [],
   fleeLines: [],
@@ -494,11 +449,9 @@ export const combatMechanic: MechanicDef = {
   encounter: {
     kind: 'combat',
     rightGrid: combatRightGrid,
+    illustrationSpriteId: combatIllustration,
     reduceAction: reduceCombatAction,
-    previewPlate: combatPreviewPlate,
-    // Enemy-army delta popups land on the plate's enemy line. Negative deltas
-    // (enemy losing troops) are "good" for the player → green.
-    previewPlateDeltaAnchors: [{ target: 'enemyArmy', lineIndex: 0, goodSign: -1 }],
+    deltaAnchorsByTarget: { enemyArmy: { row: 1, col: 0, goodSign: -1 } },
     previewEncounter: (): CombatEncounter => ({
       kind: 'combat',
       enemyArmySize: 0,

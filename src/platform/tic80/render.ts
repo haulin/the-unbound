@@ -6,9 +6,10 @@ import {
 } from '../../core/constants'
 import { inventorySpriteId, SPRITES } from '../../core/spriteIds'
 import { MECHANIC_INDEX } from '../../core/mechanics'
-import type { PreviewPlateLine, PreviewPlateDeltaAnchor } from '../../core/mechanics/types'
+import type { DeltaAnchorSpec } from '../../core/mechanics/types'
 import { computeGameMapView } from '../../core/gameMap'
 import { getSpriteIdAt } from '../../core/cells'
+import { encounterIllustrationSpriteId } from '../../core/rightGrid'
 import { torusDelta } from '../../core/math'
 import {
   LEFT_PANEL_KIND_MAP,
@@ -22,7 +23,7 @@ import * as Layout from './layout'
 import * as UI from './uiConstants'
 import type { RenderHints } from './input'
 import { drawNineSliceFrame } from './nineSlice'
-import { buildRightGridRenderPlan, type RightGridRenderOp } from './rightGridRenderPlan'
+import { buildRightGridRenderPlan, badgeTextAnchorPx, type RightGridRenderOp } from './rightGridRenderPlan'
 
 export function renderFrame(s: State, hints: RenderHints) {
   cls(UI.UI_COLOR_BG)
@@ -108,41 +109,6 @@ function drawIllustrationWithTextureOverlay(spriteId: number, x: number, y: numb
   }
 }
 
-// Generic preview-plate chrome shared by all encounter previews. Returns the
-// first-line icon origin so animated overlays (combat enemy delta) can anchor
-// to the plate without re-deriving its geometry.
-type PlateGeometry = { firstIconX: number; firstIconY: number }
-
-function drawPreviewPlateChrome(
-  lines: readonly PreviewPlateLine[],
-  illX: number,
-  illY: number,
-  illSize: number,
-): PlateGeometry {
-  const platePad = UI.UI_PREVIEW_PLATE_PAD
-  const plateW = UI.UI_PREVIEW_PLATE_W
-  const plateH = 16 * lines.length + platePad * 2
-  const plateX = illX + illSize - plateW - UI.UI_PREVIEW_PLATE_INSET
-  const plateY = illY + UI.UI_PREVIEW_PLATE_INSET
-  rect(plateX, plateY, plateW, plateH, UI.UI_COLOR_BG)
-  rectb(plateX, plateY, plateW, plateH, UI.UI_COLOR_DIM)
-
-  const firstIconX = plateX + platePad
-  const firstIconY = plateY + platePad
-  for (let i = 0; i < lines.length; i++) {
-    const ln = lines[i]!
-    const iconX = firstIconX
-    const iconY = firstIconY + i * 16
-    spr(ln.spriteId, iconX, iconY, 0, 1, 0, 0, 2, 2)
-
-    const valueX = iconX + UI.UI_ICON_VALUE_OFFSET_X
-    const valueY = iconY + UI.UI_ICON_VALUE_OFFSET_Y
-    print(ln.text, valueX, valueY, UI.UI_COLOR_TEXT)
-  }
-
-  return { firstIconX, firstIconY }
-}
-
 type DeltaAnchor = {
   x: number
   y: number
@@ -152,22 +118,17 @@ type DeltaAnchor = {
   goodSign?: 1 | -1
 }
 
-// Resolve mechanic-supplied plate anchor specs (lineIndex + goodSign) to
-// pixel-space anchors using the plate geometry returned by
-// `drawPreviewPlateChrome`. Mechanics never deal in pixels.
-function plateAnchorsFromSpecs(
-  specs: readonly PreviewPlateDeltaAnchor[],
-  geom: PlateGeometry,
+function deltaAnchorsFromGridSpecs(
+  specs: Partial<Record<DeltaAnimTarget, DeltaAnchorSpec>>,
 ): Partial<Record<DeltaAnimTarget, DeltaAnchor>> {
   const anchors: Partial<Record<DeltaAnimTarget, DeltaAnchor>> = {}
-  for (let i = 0; i < specs.length; i++) {
-    const spec = specs[i]!
-    const anchor: DeltaAnchor = {
-      x: geom.firstIconX,
-      y: geom.firstIconY + spec.lineIndex * 16,
-    }
+  for (const targetKey of Object.keys(specs) as DeltaAnimTarget[]) {
+    const spec = specs[targetKey]
+    if (!spec) continue
+    const pt = badgeTextAnchorPx(spec.row, spec.col)
+    const anchor: DeltaAnchor = { x: pt.x, y: pt.y }
     if (spec.goodSign != null) anchor.goodSign = spec.goodSign
-    anchors[spec.target] = anchor
+    anchors[targetKey] = anchor
   }
   return anchors
 }
@@ -255,7 +216,6 @@ function drawLeftPanel(s: State) {
     fallbackBorderColor: UI.UI_COLOR_DIM,
   })
 
-  const encounterKind = s.encounter?.kind ?? null
   const pos = s.player.position
   const spriteIdAtPos = getSpriteIdAt(s.world, pos.x, pos.y)
   const leftPanel = s.ui.leftPanel
@@ -264,7 +224,7 @@ function drawLeftPanel(s: State) {
   const illX = UI.UI_LEFT_PANEL_PADDING
   const illY = UI.UI_LEFT_PANEL_PADDING
   // User-driven panel toggles (minimap, goal-sprite focus) win over the AUTO-mode
-  // defaults (tombstone on game over, combat plate during combat, tile preview otherwise).
+  // defaults (tombstone on game over, encounter illustration otherwise, tile preview fallback).
   if (leftPanel.kind === LEFT_PANEL_KIND_MINIMAP) {
     drawMinimap(s)
   } else if (leftPanel.kind === LEFT_PANEL_KIND_MAP) {
@@ -274,19 +234,8 @@ function drawLeftPanel(s: State) {
   } else if (s.run.isGameOver) {
     drawIllustrationWithTextureOverlay(SPRITES.centers.tombstone, illX, illY)
   } else {
-    drawIllustrationWithTextureOverlay(spriteIdAtPos, illX, illY)
-
-    if (encounterKind) {
-      const provider = MECHANIC_INDEX.previewPlateByEncounterKind[encounterKind]
-      const lines = provider?.(s) ?? null
-      if (lines && lines.length) {
-        const geom = drawPreviewPlateChrome(lines, illX, illY, illSize)
-        const anchorSpecs = MECHANIC_INDEX.previewPlateDeltaAnchorsByEncounterKind[encounterKind]
-        if (anchorSpecs && anchorSpecs.length) {
-          drawDeltaOverlays(s, plateAnchorsFromSpecs(anchorSpecs, geom))
-        }
-      }
-    }
+    const illSpriteId = encounterIllustrationSpriteId(s) ?? spriteIdAtPos
+    drawIllustrationWithTextureOverlay(illSpriteId, illX, illY)
   }
 
   const statusX = illX + illSize + UI.UI_LEFT_PANEL_INNER_GAP
@@ -363,6 +312,12 @@ function drawRightPanel(s: State, hints: RenderHints) {
   drawRightHeldBand(s)
   drawRightPanelDividers()
   drawRightPanelFrame(s)
+
+  const encounterKind = s.encounter?.kind ?? null
+  if (encounterKind) {
+    const anchorSpecs = MECHANIC_INDEX.deltaAnchorsByTargetByEncounterKind[encounterKind]
+    if (anchorSpecs) drawDeltaOverlays(s, deltaAnchorsFromGridSpecs(anchorSpecs))
+  }
 }
 
 function drawRightPanelFrame(s: State) {
@@ -399,7 +354,7 @@ function drawRightStatsBand(s: State) {
     const item = items[i]!
     spr(item.iconSpriteId, x, iconY, -1)
     x += iconSize + iconValueGap
-    print(item.value, x, textY, UI.UI_COLOR_TEXT)
+    print(item.value, x, textY, UI.UI_COLOR_RIGHT_STATS_TEXT)
     x += item.value.length * FONT_CHAR_PX + itemGap
   }
 }
@@ -453,11 +408,60 @@ function heldStatusIcons(s: State): readonly number[] {
   return out
 }
 
+function drawHorizontalBadgePill(
+  spriteId: number,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  capPx: number,
+  sheetWidthPx: number,
+  colorkey: number,
+) {
+  const wPx = Math.max(0, Math.floor(w))
+  const hPx = Math.max(0, Math.floor(h))
+  if (wPx === 0 || hPx === 0) return
+
+  const cap = Math.max(1, Math.floor(capPx))
+  const sheetW = Math.max(cap * 2, Math.floor(sheetWidthPx))
+  const x0 = Math.floor(x)
+  const y0 = Math.floor(y)
+
+  if (wPx <= cap * 2) {
+    clip(x0, y0, wPx, hPx)
+    spr(spriteId, x0, y0, colorkey, 1)
+    clip()
+    return
+  }
+
+  clip(x0, y0, cap, hPx)
+  spr(spriteId, x0, y0, colorkey, 1)
+  clip()
+
+  const rightX = x0 + wPx - cap
+  clip(rightX, y0, cap, hPx)
+  spr(spriteId, rightX + cap - sheetW, y0, colorkey, 1)
+  clip()
+
+  const midX = x0 + cap
+  const midW = wPx - cap * 2
+  const seamCol = cap - 1
+  clip(midX, y0, midW, hPx)
+  for (let dx = 0; dx < midW; dx++) {
+    spr(spriteId, midX + dx - seamCol, y0, colorkey, 1)
+  }
+  clip()
+}
+
 function drawRightGridOps(ops: RightGridRenderOp[]) {
   for (let i = 0; i < ops.length; i++) {
     const op = ops[i]!
     if (op.kind === 'rect') rect(op.x, op.y, op.w, op.h, op.color)
     else if (op.kind === 'rectb') rectb(op.x, op.y, op.w, op.h, op.color)
+    else if (op.kind === 'print') print(op.text, op.x, op.y, op.color)
+    else if (op.kind === 'badgePill') {
+      drawHorizontalBadgePill(op.spriteId, op.x, op.y, op.w, op.h, op.capPx, op.sheetWidthPx, op.colorkey)
+    }
     else spr(op.spriteId, op.x, op.y, op.colorkey, op.scale, op.flip, op.rotate, op.w, op.h)
   }
 }

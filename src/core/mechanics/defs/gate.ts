@@ -2,6 +2,7 @@ import { GATE_LOCKED_LINES, GATE_LOCKSMITH_MIN_DISTANCE, GATE_NAME, GATE_OPEN_LI
 import { findCellByKind, setCellAt } from '../../cells'
 import { RNG } from '../../rng'
 import { isTerrainCell, placeFeatureFromSeed } from '../../worldgen'
+import { loreMessage } from '../encounterHelpers'
 import type { MechanicDef, OnEnterTile, PlaceWorldProvider } from '../types'
 
 const onEnterGate: OnEnterTile = ({ cell, world, pos, stepCount, resources }) => {
@@ -11,12 +12,12 @@ const onEnterGate: OnEnterTile = ({ cell, world, pos, stepCount, resources }) =>
 
   if (!resources.inventory.includes('bronzeKey')) {
     const line = r.perMoveLine(GATE_LOCKED_LINES)
-    return { message: `${GATE_NAME}\n${line}` }
+    return { message: loreMessage(GATE_NAME, line) }
   }
 
   const nextWorld = cell.kind === 'gateOpen' ? world : setCellAt(world, pos, { kind: 'gateOpen' })
   const line = r.perMoveLine(GATE_OPEN_LINES)
-  return { world: nextWorld, hasWon: true, message: `${GATE_NAME}\n${line}` }
+  return { world: nextWorld, hasWon: true, message: loreMessage(GATE_NAME, line) }
 }
 
 const placeGate: PlaceWorldProvider = ({ cells, rngState, seed }) => {

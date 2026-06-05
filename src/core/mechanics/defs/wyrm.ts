@@ -13,19 +13,12 @@ import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
 import type { CombatEncounter, LairCell, State } from '../../types'
 import { cellId, placeFeatureFromSeed } from '../../worldgen'
+import { loreMessage } from '../encounterHelpers'
 import { fixedEnemySpawn, startCombatEncounter, type CombatCloseOutcome, type CombatVariantConfig } from './combat'
 import type { MechanicDef, OnEnterTile, PlaceWorldProvider } from '../types'
 
 export const wyrmCombatVariant: CombatVariantConfig = {
-  centerSpriteId: SPRITES.centers.wyrm,
-  previewPlateLines: (s) => {
-    const enc = s.encounter
-    if (!enc || enc.kind !== 'combat') return []
-    return [
-      { spriteId: SPRITES.enemies.hp, text: `${enc.enemyArmySize}` },
-      { spriteId: SPRITES.inventory.gold, text: `-${WYRM_PAY_GOLD_COST}` },
-    ]
-  },
+  illustrationSpriteId: SPRITES.enemies.wyrm,
   encounterLines: WYRM_ENCOUNTER_LINES,
   victoryLines: WYRM_VICTORY_LINES,
   fleeLines: WYRM_FLEE_LINES,
@@ -59,10 +52,10 @@ const onEnterWyrm: OnEnterTile = ({ cell, world, pos, stepCount, resources }) =>
 
   if (lair.isBled) {
     const line = r.perMoveLine(WYRM_BLED_LINES, { cellId: lair.id })
-    return { message: `${LAIR_NAME}\n${line}` }
+    return { message: loreMessage(LAIR_NAME, line) }
   }
 
-  const tileMessage = `${LAIR_NAME}\n${r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id })}`
+  const tileMessage = loreMessage(LAIR_NAME, r.perMoveLine(WYRM_ENCOUNTER_LINES, { cellId: lair.id }))
   return startCombatEncounter({
     world,
     pos,

@@ -36,10 +36,11 @@ Mechanics index (keep this list current):
   - Combat: fight/flee; Pay when the variant allows it.
   - Woods ambush: goblins, food-skewed loot, not recruitable.
   - Mountain ambush: brigands, gold-skewed loot; recruit small wounded bands for N² gold.
-  - Farms: modal encounter; buy food, hire one slot (varies by farm - Mule, Boar, or Magpie), leave.
-  - Camps: modal encounter; Search (deterministic reinforcements when ready); hire one slot (varies by camp - Scout or Captain); leave.
-  - Towns: modal encounter; buy food, hire one slot (varies by town - Scout, Healer, or Fisherman), leave. Tavern rumors land later (see backlog).
-  - Henges: combat when a band is present; flee leaves wounded count on the henge; victory or recruit empties it and starts cooldown; quiet visit while cooling down.
+  - Farms: modal encounter; can always buy food; pool: hire Mule, Boar, or Magpie, leave.
+  - Camps: modal encounter; can always Search (deterministic reinforcements when ready); pool: Scout or Captain; leave.
+  - Towns: modal encounter; pool: buy food, hire Scout, Healer, or Fisherman, buy rumor, leave.
+  - Henges: special combat when a band is present - drops more loot; flee leaves wounded count on the henge;
+    - victory or recruit empties it and starts cooldown; quiet visit while cooling down; cooldown 3 rounds.
   - Gate / Locksmith
     - Locksmith modal: requires the Blood + pay-gold-or-food; skipped if you have the key.
     - Without the Blood: no modal opens; tile shows inline flavor only.
@@ -53,6 +54,12 @@ Mechanics index (keep this list current):
   - Swamp or mountain quiet enter: rare inline find (mixed loot), replaces terrain line, food/gold deltas - no modal.
 
 Note: Not every mechanic must be taught by ambient lore. Short teaching lines can also live in Town rumors (`BARKEEP_TIPS`).
+
+TIC lore panel:
+- Word-wrap at LORE_MAX_CHARS_PER_LINE (20).
+- Clip at the panel floor (~8 lines, shared by title + body).
+- Lines under a PoI title: <=90 characters (~4-5 wrapped lines)
+  so a two-line title still fits (includes BARKEEP_TIPS rumors).
 */
 
 import type { TerrainKind } from "./types";
@@ -84,19 +91,19 @@ export const BARKEEP_TIPS = {
   lostAndOrientation: [
     "Woods and swamps can pull you off course.",
     "When lost, find a signpost, farm, or town to get your bearings again.",
-    "What's nice about the Unbound is that everything is at most 10 leagues away.",
+    "In the Unbound, nothing is more than ten leagues away.",
   ],
   terrain: [
-    "Swamps and mountains cost double rations. Quiet steps through them sometimes turn up a mixed haul.",
+    "Swamps and mountains cost double rations. Quiet steps there sometimes pay off.",
   ],
   map: [
     "The map shows landmarks, not terrain.",
-    "While lost, map only shows what you've found since you went off course.",
+    "While lost, the map only shows what you've found since you strayed.",
   ],
   scout: [
     "A Scout halves your odds of getting lost in woods and swamps.",
-    "When you're oriented, a Scout points out farms, camps, and henges.",
-    "A scout can be hired in a Town - or, if you're lucky, around a Camp's fire.",
+    "When oriented, a Scout marks farms, camps, and henges on the map.",
+    "Hire a Scout in a Town - or, with luck, at a Camp fire.",
   ],
   goal: [
     "Someone saw the Locksmith three nights ago.",
@@ -111,19 +118,19 @@ export const BARKEEP_TIPS = {
     "The cave with the long wind - that's where it sleeps.",
   ],
   mule: [
-    "A mule carries fifty more rations, but it'll take some of yours at every camp.",
+    "A mule carries fifty more rations, but takes some at every camp.",
     "Sell a tired mule at a Crossing if you can. Half what you paid is fair.",
   ],
   healer: [
-    "A hedge-healer can pull a soldier back from a bad day. She'll empty your purse, slowly.",
-    "Some towns have one. She'll cost you a coin every time you stop in - bandages, herbs, the salve that smells of iron.",
+    "A hedge-healer mends after a bad fight. She'll drain your purse, slowly.",
+    "Some towns have one. A coin each visit - herbs, bandages, iron-smelling salve.",
   ],
   boar: [
-    "A trained boar does one thing well, and at the start of a fight. Don't expect it twice in a day.",
+    "A trained boar hits hard once, at the start of a fight. Not twice in a day.",
     "If you've a mule, a boar won't sit beside it. Pick one.",
   ],
   captain: [
-    "A banner makes the men fight straighter. It also makes them seen. Mind your woods and mountains.",
+    "A banner steadies the line. It also makes you seen in woods and mountains.",
     "If you carry the colours, expect company on bad roads.",
   ],
   combat: [
@@ -131,15 +138,15 @@ export const BARKEEP_TIPS = {
     "Only a small wounded band will march for coin - never a full war party.",
   ],
   fisherman: [
-    "A fisherman doubles what a lake gives you. He's heavy gear though. You'll feel it if you run.",
+    "A fisherman doubles lake yield. Heavy kit - you'll feel it when you flee.",
   ],
   magpie: [
-    "A magpie palms a coin out of any honest trade. Roughly one in three. Pays for itself if you trade enough.",
+    "A magpie steals a coin from honest trades. One in three. Worth it if you trade enough.",
     "Don't ask the farmer where she got it. She doesn't know either.",
   ],
   crossing: [
-    "Carrying too many companions? A Crossing will take one off your hands. Half what you paid is the going rate.",
-    "Drovers at a Crossing buy from anyone. Beasts, banners, even people with somewhere else to be.",
+    "Too many companions? A Crossing buys one back. Half what you paid is fair.",
+    "Drovers buy beasts, banners, even folk with somewhere else to be.",
   ],
 } as const;
 
@@ -344,7 +351,7 @@ export const FARM_HARVEST_LINES = [
 ] as const;
 
 export const FARM_ENTER_LINES = [
-  "The barn still trades - food for coin, and whatever the farmer has at hand for those with the purse for it.",
+  "The barn still trades: rations for coin, and whatever else the farmer will sell.",
   "Stalls line the yard: rations, and a price scratched beside something else.",
   "Someone left this place open. Stock and prices are scratched on the door.",
 ] as const;
@@ -403,6 +410,12 @@ export const CAMP_RECRUIT_LINES = [
   "They were waiting for someone. You'll do.",
   "No questions asked. No names given. Your ranks grow.",
   "They look like they've found something. So have you.",
+] as const;
+
+export const CAMP_ENTER_LINES = [
+  "Smoke on the horizon. Someone always stops here.",
+  "A ring of stones and a fire that never quite goes out.",
+  "Word travels slower than hunger. This is where both catch up.",
 ] as const;
 
 export const CAMP_EMPTY_LINES = [
@@ -538,8 +551,8 @@ export const MULE_BOAR_REFUSED_LINES = [
 ] as const;
 
 export const CAPTAIN_BUY_LINES = [
-  "A banner-bearer. The flag is patched in three colours, all of them wrong. The men straighten anyway.",
-  "He takes your coin and shoulders the pole. \"Carry it high and the company carries itself. Carry it through woods and the woods know.\"",
+  "A banner-bearer. The flag is patched in three wrong colours. The men straighten anyway.",
+  "He takes your coin and shoulders the pole. \"Carry it high. The company will follow.\"",
 ] as const;
 
 export const CAPTAIN_ALREADY_LINES = [
@@ -554,7 +567,7 @@ export const CAPTAIN_SELL_LINES = [
 
 export const FISHERMAN_BUY_LINES = [
   "Rod over one shoulder. A wide hat that has seen more weather than most men.",
-  "He squints at you, then at the road. \"Where there's water, there's two suppers if I'm with you.\"",
+  "He squints at the road. \"Where there's water, you eat twice if I'm with you.\"",
 ] as const;
 
 export const FISHERMAN_ALREADY_LINES = [
@@ -568,7 +581,7 @@ export const FISHERMAN_SELL_LINES = [
 ] as const;
 
 export const MAGPIE_BUY_LINES = [
-  "The farmer wraps her in cloth. She is heavier than she looks. One coin disappears as you reach for the door.",
+  "The farmer wraps her in cloth. Heavy for her size. A coin vanishes as you reach the door.",
   "\"She'll find what falls off other men's tables.\" The price is steep; you pay it anyway.",
 ] as const;
 
@@ -586,8 +599,8 @@ export const MAGPIE_SELL_LINES = [
 // The Crossing
 // ----------------------------
 export const CROSSING_ENTER_LINES = [
-  "Three roads meet under an oak that has seen more travellers than it can count. Drovers, factors, smiths - someone is always buying.",
-  "The Crossing trades in what walks. A company arrives heavy; it leaves lighter. Coin moves the other way.",
+  "Three roads meet under an old oak. Drovers, factors, smiths - someone is always buying.",
+  "Trades in what walks. Companies arrive heavy and leave lighter. Coin runs the other way.",
 ] as const;
 
 export const CROSSING_EMPTY_LINES = [
@@ -738,7 +751,7 @@ export const HENGE_RECRUIT_SUCCESS_LINES: readonly string[] = [
   "The standard-bearer salutes you and falls in. The henge is empty behind him.",
   // Partial-loot framing for henge: the survivors hand over the spoils
   // gathered from their fallen sisters and brothers as part of the bargain.
-  "They gather the spoils of their fallen and pour them at your feet, then take their place at your side.",
+  "They gather their fallen's spoils, pour them at your feet, and fall in beside you.",
   "The survivors strip their dead between the stones. \"What was theirs is yours, captain.\"",
   "Coin from the cairns, oaths from the living. The henge has done this before.",
 ] as const;

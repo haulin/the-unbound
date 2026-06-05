@@ -38,9 +38,9 @@ export const SPRITES = {
     gold: 204,
   },
 
-  // 16x16 opponent-side stats.
+  // 16x16 opponent-side stats and boss illustrations.
   enemies: {
-    hp: 134,
+    wyrm: 134,
     enemy: 132,
     goblin: 130,
   },
@@ -61,7 +61,6 @@ export const SPRITES = {
   centers: {
     farmBarn: 162,
     locksmithKiln: 164,
-    wyrm: 166,
     marketStall: 168,
     campfire: 170,
     tombstone: 174,
@@ -84,6 +83,8 @@ export const SPRITES = {
     mapHereMarker: 306,
     mapBackground: 307,
     previewGrain: 308,
+    badgePrice: 310,
+    badgeLeft: 311,
   },
 } as const
 
@@ -93,13 +94,4 @@ type InventorySpriteKey = keyof typeof SPRITES.inventory
 export function inventorySpriteId(slotId: string): number | undefined {
   const key = slotId as InventorySpriteKey
   return SPRITES.inventory[key]
-}
-
-export function terminalPlateLabel(spriteId: number): string {
-  for (const group of Object.values(SPRITES)) {
-    for (const [name, id] of Object.entries(group)) {
-      if (id === spriteId) return name
-    }
-  }
-  return `sprite_${spriteId}`
 }

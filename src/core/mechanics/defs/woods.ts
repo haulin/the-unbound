@@ -19,7 +19,6 @@ import {
 } from '../encounterHelpers'
 import type { MechanicDef, MoveEventPolicy, OnEnterTile } from '../types'
 import {
-  enemyCountOnlyPlateLines,
   rolledEnemySpawn,
   startCombatEncounter,
   type CombatVariantConfig,
@@ -51,8 +50,7 @@ function goblinVictoryReward(
 }
 
 export const goblinCombatVariant: CombatVariantConfig = {
-  centerSpriteId: SPRITES.enemies.goblin,
-  previewPlateLines: enemyCountOnlyPlateLines,
+  illustrationSpriteId: SPRITES.enemies.goblin,
   encounterLines: GOBLIN_ENCOUNTER_LINES,
   victoryLines: GOBLIN_VICTORY_LINES,
   fleeLines: GOBLIN_FLEE_LINES,

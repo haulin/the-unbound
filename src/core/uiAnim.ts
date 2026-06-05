@@ -21,9 +21,9 @@ export function enqueueGridTransition(
     startFrame?: number
   },
 ): Ui {
-  const phaseCount = 5 // N, W, S, E, C reveal
   const stepFrames = Math.max(1, GRID_TRANSITION_STEP_FRAMES | 0)
-  const durationFrames = stepFrames * phaseCount
+  // Arm count must match GRID_CROSS_REVEAL_ORDER.length in platform/tic80/rightGridRenderPlan.ts
+  const durationFrames = stepFrames * 4
   const startFrame = args.startFrame ?? ui.clock.frame
   return enqueueAnim(ui, {
     kind: 'gridTransition',

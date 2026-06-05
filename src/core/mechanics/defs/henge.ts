@@ -23,6 +23,7 @@ import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
 import type { CombatEncounter, HengeCell, Resources, State } from '../../types'
 import type { MechanicDef, OnEnterTile, PlaceWorldProvider } from '../types'
+import { loreMessage, poiTitleFor } from '../encounterHelpers'
 import {
   brigandRecruitCost,
   brigandRecruitEligibility,
@@ -30,7 +31,6 @@ import {
 } from './mountain'
 import {
   fixedEnemySpawn,
-  recruitablePreviewPlateLines,
   startCombatEncounter,
   type CombatCloseOutcome,
   type CombatVariantConfig,
@@ -57,8 +57,7 @@ function hengeVictoryReward(
 }
 
 export const hengeCombatVariant: CombatVariantConfig = {
-  centerSpriteId: SPRITES.enemies.enemy,
-  previewPlateLines: recruitablePreviewPlateLines,
+  illustrationSpriteId: SPRITES.enemies.enemy,
   encounterLines: HENGE_ENCOUNTER_LINES,
   victoryLines: HENGE_VICTORY_LINES,
   fleeLines: HENGE_FLEE_LINES,
@@ -111,16 +110,16 @@ const onEnterHenge: OnEnterTile = ({ cell, world, pos, stepCount, resources }) =
   if (!hengeCell || hengeCell.kind !== 'henge') return {}
 
   const r = RNG.createTileRandom({ world, stepCount, pos })
-  const name = hengeCell.name || 'A Henge'
+  const title = poiTitleFor(hengeCell.name, 'Henge')
   const readyAt = hengeCell.nextReadyStep ?? 0
 
   if (hengeCell.currentGroup == null && stepCount < readyAt) {
     const line = r.perMoveLine(HENGE_EMPTY_LINES, { cellId: hengeCell.id })
-    return { message: `${name} Henge\n${line}` }
+    return { message: loreMessage(title, line) }
   }
 
   if (hengeCell.currentGroup != null) {
-    const tileMessage = `${name} Henge\n${r.perMoveLine(HENGE_ARRIVAL_LINES, { cellId: hengeCell.id })}`
+    const tileMessage = loreMessage(title, r.perMoveLine(HENGE_ARRIVAL_LINES, { cellId: hengeCell.id }))
     return startCombatEncounter({
       world,
       pos,
@@ -131,7 +130,7 @@ const onEnterHenge: OnEnterTile = ({ cell, world, pos, stepCount, resources }) =
     })
   }
 
-  const tileMessage = `${name} Henge\n${r.perMoveLine(HENGE_ARRIVAL_LINES, { cellId: hengeCell.id })}`
+  const tileMessage = loreMessage(title, r.perMoveLine(HENGE_ARRIVAL_LINES, { cellId: hengeCell.id }))
   const result = startCombatEncounter({
     world,
     pos,

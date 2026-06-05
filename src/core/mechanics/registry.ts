@@ -1,13 +1,13 @@
 import type { CellKind, CombatEncounter, EncounterKind, State } from '../types'
 import type { CombatCloseOutcome, CombatVariantConfig } from './defs/combat'
+import type { DeltaAnimTarget } from '../types'
 import type {
+  DeltaAnchorSpec,
   MechanicDef,
   MoveEventPolicy,
   OnEnterTile,
   PoiSignpostContribution,
   PreviewEncounterProvider,
-  PreviewPlateDeltaAnchor,
-  PreviewPlateProvider,
   ReduceEncounterAction,
   RightGridProvider,
 } from './types'
@@ -19,8 +19,8 @@ export type MechanicIndex = {
   onEnterTileByKind: Partial<Record<CellKind, OnEnterTile>>
   rightGridByEncounterKind: Partial<Record<EncounterKind, RightGridProvider>>
   reduceEncounterActionByEncounterKind: Partial<Record<EncounterKind, ReduceEncounterAction>>
-  previewPlateByEncounterKind: Partial<Record<EncounterKind, PreviewPlateProvider>>
-  previewPlateDeltaAnchorsByEncounterKind: Partial<Record<EncounterKind, readonly PreviewPlateDeltaAnchor[]>>
+  illustrationByEncounterKind: Partial<Record<EncounterKind, (s: State) => number>>
+  deltaAnchorsByTargetByEncounterKind: Partial<Record<EncounterKind, Partial<Record<DeltaAnimTarget, DeltaAnchorSpec>>>>
   previewEncounterByEncounterKind: Partial<Record<EncounterKind, PreviewEncounterProvider>>
   poiSignpostByKind: Partial<Record<CellKind, PoiSignpostContribution>>
   mapLabelByKind: Partial<Record<CellKind, string>>
@@ -36,8 +36,10 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
   const onEnterTileByKind: Partial<Record<CellKind, OnEnterTile>> = {}
   const rightGridByEncounterKind: Partial<Record<EncounterKind, RightGridProvider>> = {}
   const reduceEncounterActionByEncounterKind: Partial<Record<EncounterKind, ReduceEncounterAction>> = {}
-  const previewPlateByEncounterKind: Partial<Record<EncounterKind, PreviewPlateProvider>> = {}
-  const previewPlateDeltaAnchorsByEncounterKind: Partial<Record<EncounterKind, readonly PreviewPlateDeltaAnchor[]>> = {}
+  const illustrationByEncounterKind: Partial<Record<EncounterKind, (s: State) => number>> = {}
+  const deltaAnchorsByTargetByEncounterKind: Partial<
+    Record<EncounterKind, Partial<Record<DeltaAnimTarget, DeltaAnchorSpec>>>
+  > = {}
   const previewEncounterByEncounterKind: Partial<Record<EncounterKind, PreviewEncounterProvider>> = {}
   const poiSignpostByKind: Partial<Record<CellKind, PoiSignpostContribution>> = {}
   const mapLabelByKind: Partial<Record<CellKind, string>> = {}
@@ -64,9 +66,9 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
       seenEncounterKinds.add(ek)
       if (m.encounter.rightGrid) rightGridByEncounterKind[ek] = m.encounter.rightGrid
       if (m.encounter.reduceAction) reduceEncounterActionByEncounterKind[ek] = m.encounter.reduceAction
-      if (m.encounter.previewPlate) previewPlateByEncounterKind[ek] = m.encounter.previewPlate
-      if (m.encounter.previewPlateDeltaAnchors) {
-        previewPlateDeltaAnchorsByEncounterKind[ek] = m.encounter.previewPlateDeltaAnchors
+      if (m.encounter.illustrationSpriteId) illustrationByEncounterKind[ek] = m.encounter.illustrationSpriteId
+      if (m.encounter.deltaAnchorsByTarget) {
+        deltaAnchorsByTargetByEncounterKind[ek] = m.encounter.deltaAnchorsByTarget
       }
       if (m.encounter.previewEncounter) previewEncounterByEncounterKind[ek] = m.encounter.previewEncounter
     }
@@ -132,8 +134,8 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
     onEnterTileByKind,
     rightGridByEncounterKind,
     reduceEncounterActionByEncounterKind,
-    previewPlateByEncounterKind,
-    previewPlateDeltaAnchorsByEncounterKind,
+    illustrationByEncounterKind,
+    deltaAnchorsByTargetByEncounterKind,
     previewEncounterByEncounterKind,
     poiSignpostByKind,
     mapLabelByKind,
