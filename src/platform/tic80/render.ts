@@ -3,7 +3,9 @@ import {
   FOOD_WARNING_THRESHOLD,
   LORE_MAX_CHARS_PER_LINE,
   LOST_COORD_LABEL,
+  SHOW_COMBAT_HIT_ODDS,
 } from '../../core/constants'
+import { combatFightHitOddsPercent } from '../../core/mechanics/defs/combat'
 import { inventorySpriteId, SPRITES } from '../../core/spriteIds'
 import { MECHANIC_INDEX } from '../../core/mechanics'
 import type { DeltaAnchorSpec } from '../../core/mechanics/types'
@@ -38,6 +40,11 @@ export function renderFrame(s: State, hints: RenderHints) {
 // Most tunables live in `uiConstants.ts`; these two are font geometry that
 // every text-positioning helper in this file needs.
 const FONT_CHAR_PX = 6
+
+// Left-panel hero stats (army / food / gold) — locked layout.
+const HERO_STATS_X = 84
+const HERO_STATS_Y = 12
+const HERO_STAT_ROW_PX = 19 // 16px icon + 3px row gap
 
 // ----------------------------
 // Pure rendering helpers
@@ -135,6 +142,11 @@ function deltaAnchorsFromGridSpecs(
 
 // Animated +/- delta overlays. One shared pass for every delta animation —
 // callers wire up which targets to draw and where each one anchors.
+function drawHeroStat(x: number, y: number, spriteId: number, text: string, color: number) {
+  spr(spriteId, x, y, -1, 1, 0, 0, 2, 2)
+  print(text, x + 19, y + 5, color) // 16px icon + 3px label gap; 5px text baseline
+}
+
 function drawDeltaOverlays(s: State, anchors: Partial<Record<DeltaAnimTarget, DeltaAnchor>>) {
   if (!ENABLE_ANIMATIONS) return
   const anims = s.ui.anim.active
@@ -238,49 +250,29 @@ function drawLeftPanel(s: State) {
     drawIllustrationWithTextureOverlay(illSpriteId, illX, illY)
   }
 
-  const statusX = illX + illSize + UI.UI_LEFT_PANEL_INNER_GAP
   const fontH = 6
   const messageLineH = fontH + 1
 
-  // Header band runs from illustration top to horizontal divider; stats column
-  // is shorter than the illustration so we center it inside the band.
   const headerBandBottomY = illY + illSize
   const horizontalDividerY =
     headerBandBottomY + Math.floor((UI.UI_LEFT_PANEL_LORE_TOP_GAP - 1) / 2)
-  const statusBlockH = 3 * UI.UI_ARMY_ICON_H_PX + 2 * UI.UI_HERO_RESOURCE_GAP_PX
-  const statusCenteredY = illY + Math.ceil(((horizontalDividerY - illY) - statusBlockH) / 2)
-  const statusY = Math.max(illY, statusCenteredY - UI.UI_LEFT_PANEL_STATS_OPTICAL_LIFT_PX)
 
-  const armyX = statusX
-  const armyY = statusY
-  spr(SPRITES.inventory.army, armyX, armyY, -1, 1, 0, 0, 2, 2)
-  const armyValueX = armyX + UI.UI_ARMY_VALUE_OFFSET_X
-  const armyValueY = armyY + UI.UI_ARMY_VALUE_OFFSET_Y
-  const armyColor = s.resources.armySize < 6 ? UI.UI_COLOR_WARN : UI.UI_COLOR_TEXT
-  print(`${s.resources.armySize}`, armyValueX, armyValueY, armyColor)
+  let statY = HERO_STATS_Y
+  const army = { x: HERO_STATS_X, y: statY }
+  drawHeroStat(army.x, army.y, SPRITES.inventory.army, `${s.resources.armySize}`,
+    s.resources.armySize < 6 ? UI.UI_COLOR_WARN : UI.UI_COLOR_TEXT)
+  statY += HERO_STAT_ROW_PX
 
-  const foodX = statusX
-  const foodY = armyY + UI.UI_ARMY_ICON_H_PX + UI.UI_HERO_RESOURCE_GAP_PX
-  spr(SPRITES.inventory.food, foodX, foodY, -1, 1, 0, 0, 2, 2)
-  const foodValueX = foodX + UI.UI_ICON_VALUE_OFFSET_X
-  const foodValueY = foodY + UI.UI_ICON_VALUE_OFFSET_Y
-  const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? UI.UI_COLOR_WARN : UI.UI_COLOR_TEXT
-  print(`${s.resources.food}`, foodValueX, foodValueY, foodColor)
+  const food = { x: HERO_STATS_X, y: statY }
+  drawHeroStat(food.x, food.y, SPRITES.inventory.food, `${s.resources.food}`,
+    s.resources.food < FOOD_WARNING_THRESHOLD ? UI.UI_COLOR_WARN : UI.UI_COLOR_TEXT)
+  statY += HERO_STAT_ROW_PX
 
-  const goldX = statusX
-  const goldY = foodY + UI.UI_FOOD_ICON_H_PX + UI.UI_HERO_RESOURCE_GAP_PX
-  spr(SPRITES.inventory.gold, goldX, goldY, -1, 1, 0, 0, 2, 2)
-  const goldValueX = goldX + UI.UI_GOLD_VALUE_OFFSET_X
-  const goldValueY = goldY + UI.UI_GOLD_VALUE_OFFSET_Y
-  print(`${s.resources.gold}`, goldValueX, goldValueY, UI.UI_COLOR_TEXT)
+  const gold = { x: HERO_STATS_X, y: statY }
+  drawHeroStat(gold.x, gold.y, SPRITES.inventory.gold, `${s.resources.gold}`, UI.UI_COLOR_TEXT)
+  drawDeltaOverlays(s, { army, food, gold })
 
-  drawDeltaOverlays(s, {
-    army: { x: armyX, y: armyY },
-    food: { x: foodX, y: foodY },
-    gold: { x: goldX, y: goldY },
-  })
-
-  const statusBottomY = goldY + UI.UI_GOLD_ICON_H_PX + UI.UI_AFTER_RESOURCES_GAP_PX
+  const statusBottomY = gold.y + 16 + 2
   const headerBottomY = Math.max(headerBandBottomY, statusBottomY)
   drawLeftPanelDividers(illX, illY, illSize, horizontalDividerY)
   const msgY = headerBottomY + UI.UI_LEFT_PANEL_LORE_TOP_GAP
@@ -308,6 +300,7 @@ function drawLeftPanel(s: State) {
 function drawRightPanel(s: State, hints: RenderHints) {
   const plan = buildRightGridRenderPlan(s, hints)
   drawRightGridOps(plan.ops)
+  drawCombatHitOddsDebug(s)
   drawRightStatsBand(s)
   drawRightHeldBand(s)
   drawRightPanelDividers()
@@ -318,6 +311,13 @@ function drawRightPanel(s: State, hints: RenderHints) {
     const anchorSpecs = MECHANIC_INDEX.deltaAnchorsByTargetByEncounterKind[encounterKind]
     if (anchorSpecs) drawDeltaOverlays(s, deltaAnchorsFromGridSpecs(anchorSpecs))
   }
+}
+
+function drawCombatHitOddsDebug(s: State) {
+  if (!SHOW_COMBAT_HIT_ODDS) return
+  const pct = combatFightHitOddsPercent(s)
+  if (pct == null) return
+  print(`${pct}%`, 146, 70, UI.UI_COLOR_TEXT)
 }
 
 function drawRightPanelFrame(s: State) {
@@ -346,7 +346,7 @@ function drawRightStatsBand(s: State) {
   contentW += (items.length - 1) * itemGap
 
   const bandY = Layout.RIGHT_PANEL_TOP_BAND_Y
-  const iconY = bandY + Math.floor((Layout.RIGHT_PANEL_TOP_BAND_H - iconSize) / 2)
+  const iconY = bandY + Math.floor((Layout.RIGHT_PANEL_TOP_BAND_H - iconSize) / 2) - 1
   const textY = bandY + Math.floor((Layout.RIGHT_PANEL_TOP_BAND_H - FONT_CHAR_PX) / 2)
   let x = Layout.RIGHT_PANEL_INNER_X + Math.floor((Layout.RIGHT_PANEL_INNER_W - contentW) / 2)
 
@@ -377,18 +377,49 @@ function drawRightHeldBand(s: State) {
   }
 }
 
-function drawRightPanelDividers() {
-  rect(Layout.RIGHT_PANEL_INNER_X, Layout.RIGHT_PANEL_TOP_DIVIDER_Y, Layout.RIGHT_PANEL_INNER_W, 1, UI.UI_COLOR_RIGHT_PANEL_DIVIDER)
-  rect(Layout.RIGHT_PANEL_INNER_X, Layout.RIGHT_PANEL_BOTTOM_DIVIDER_Y, Layout.RIGHT_PANEL_INNER_W, 1, UI.UI_COLOR_RIGHT_PANEL_DIVIDER)
+// 7x7 art centered on the line (8x8 sprite, colorkey 8). Vertical: 90° CW + 1 px left.
+function stampDividerGem(x: number, y: number, vertical: boolean) {
+  spr(SPRITES.ui.dividerGem, x - 3 + (vertical ? -1 : 0), y - 3, 8, 1, 0, vertical ? 1 : 0)
 }
 
-// Left-panel chrome dividers. Vertical stops short of the horizontal so the
-// negative space matches the inset the horizontal keeps from the frame.
+// Inclusive endpoints; two gems at center ± gemOffset, empty middle.
+function drawDivider(x0: number, y0: number, x1: number, y1: number, gemOffset: number, color: number) {
+  const horiz = y0 === y1
+  if (horiz === (x0 === x1)) return
+
+  const lo = horiz ? Math.min(x0, x1) : Math.min(y0, y1)
+  const hi = horiz ? Math.max(x0, x1) : Math.max(y0, y1)
+  const span = hi - lo + 1
+  if (span <= 0) return
+
+  const cross = horiz ? y0 : x0
+  const center = lo + ((span - 1) >> 1)
+  if (horiz) rect(lo, cross, span, 1, color)
+  else rect(cross, lo, 1, span, color)
+
+  for (const along of [center - gemOffset, center + gemOffset]) {
+    stampDividerGem(horiz ? along : cross, horiz ? cross : along, !horiz)
+  }
+}
+
+function drawRightPanelDividers() {
+  const x = Layout.RIGHT_PANEL_INNER_X
+  const x1 = x + Layout.RIGHT_PANEL_INNER_W - 1
+  const c = UI.UI_COLOR_RIGHT_PANEL_DIVIDER
+  drawDivider(x, Layout.RIGHT_PANEL_TOP_DIVIDER_Y, x1, Layout.RIGHT_PANEL_TOP_DIVIDER_Y, 14, c)
+  drawDivider(x, Layout.RIGHT_PANEL_BOTTOM_DIVIDER_Y, x1, Layout.RIGHT_PANEL_BOTTOM_DIVIDER_Y, 14, c)
+}
+
+// Vertical stops short of the horizontal T-junction (see UI_LEFT_PANEL_DIVIDER_GAP_PX).
 function drawLeftPanelDividers(illX: number, illY: number, illSize: number, horizontalY: number) {
   const verticalX = illX + illSize + Math.floor(UI.UI_LEFT_PANEL_INNER_GAP / 2)
   const verticalH = Math.max(0, horizontalY - illY - UI.UI_LEFT_PANEL_DIVIDER_GAP_PX)
-  rect(verticalX, illY, 1, verticalH, UI.UI_COLOR_LEFT_PANEL_DIVIDER)
-  rect(Layout.LEFT_PANEL_INNER_X, horizontalY, Layout.LEFT_PANEL_INNER_W, 1, UI.UI_COLOR_LEFT_PANEL_DIVIDER)
+  const c = UI.UI_COLOR_LEFT_PANEL_DIVIDER
+  if (verticalH > 0) {
+    drawDivider(verticalX, illY, verticalX, illY + verticalH - 1, Math.floor(verticalH / 6.4), c)
+  }
+  const x = Layout.LEFT_PANEL_INNER_X
+  drawDivider(x, horizontalY, x + Layout.LEFT_PANEL_INNER_W - 1, horizontalY, 15, c)
 }
 
 const INVENTORY_STATUS_ORDER = ['bronzeKey', 'bloodVial'] as const

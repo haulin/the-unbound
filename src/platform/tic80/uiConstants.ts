@@ -79,42 +79,11 @@ export const UI_COLOR_LEFT_PANEL_DIVIDER = 15
 // negative space matches the inset the horizontal keeps from the frame.
 export const UI_LEFT_PANEL_DIVIDER_GAP_PX = 5
 
-// Pixel lift to optically center the stats column inside the header band.
-export const UI_LEFT_PANEL_STATS_OPTICAL_LIFT_PX = 3
-
 export const UI_STATUS_ICON_SIZE = 8
 
-// Resource + stats stack spacing (tweak to tighten the column).
-export const UI_HERO_RESOURCE_GAP_PX = 2
-export const UI_AFTER_RESOURCES_GAP_PX = 2
-
-// Army line (hero)
-export const UI_ARMY_ICON_W_PX = 16
-export const UI_ARMY_ICON_H_PX = 16
-export const UI_ARMY_VALUE_OFFSET_X = UI_ARMY_ICON_W_PX + 3
-export const UI_ARMY_VALUE_OFFSET_Y = 5
-
-// Army delta overlay (relative to army icon origin)
+// Delta overlay (relative to hero stat icon origin; see HERO_STATS_* in render.ts).
 export const UI_DELTA_OFFSET_X = 2
 export const UI_DELTA_OFFSET_Y = 2
 export const UI_DELTA_RISE_PX = 6
 export const UI_DELTA_GAP_PX = -4
-
-// Food line (hero)
-export const UI_FOOD_ICON_W_PX = 16
-export const UI_FOOD_ICON_H_PX = 16
-
-// Value text offset next to any 16x16 stat/preview icon.
-export const UI_ICON_VALUE_OFFSET_X = UI_FOOD_ICON_W_PX + 3
-export const UI_ICON_VALUE_OFFSET_Y = 5
-
-// Gold line (hero)
-export const UI_GOLD_ICON_W_PX = 16
-export const UI_GOLD_ICON_H_PX = 16
-export const UI_GOLD_VALUE_OFFSET_X = UI_GOLD_ICON_W_PX + 3
-export const UI_GOLD_VALUE_OFFSET_Y = 5
-
-// Small stats (seed/pos/steps) are placed relative to the hero block (army+food).
-export const UI_SMALL_STATS_START_OFFSET_Y =
-  UI_ARMY_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX + UI_FOOD_ICON_H_PX + UI_AFTER_RESOURCES_GAP_PX
 

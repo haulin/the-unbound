@@ -16,16 +16,17 @@ Tentative milestones plus ideas in other sections below. Each milestone should c
 - Balance pass: town prices, scout cost, combat gold drops...
 - Wyrm balance: combat tuning, Blood/payment economy.
 - Hide debug stuff, pick seed for new game randomly
-- title screen, about screen, back to menu, resume
+- title screen, about screen, back to menu, resume, controls
 - animations for left panel — illustration transitions (modal enter/leave, overworld move), lore line stagger. **Spec:** `docs/plans/2026-06-05-button-badges-design.md` § Phase 2 pointer + addendum 2026-06-05.
 - lore audit and polish
 - more exciting win / lose
 
 ## Ideas
 - loot drops in lore title +Ng/+Mf/+Ls
-- buy tiles show prices on them instead of in plates, enemy hp shown in middle, search in camp not advertised - middle and preview sprites can swap
-- make rainbows modals - if player chooses to not take gold, next visit it increases, maybe sell rumors as well
+- make rainbows modals - if player chooses to not take gold, next visit it increases, maybe sell rumors as well - camps can do the same
 - Fight hit/miss is shown in lore lines.
+- first hit in fights does a max N damage (10?)
+- sound fx
 - Consider making roads cost food only ~50% of the time (mechanics/balance change; would require tests + tuning).
 - skip modal if nothing to do (not enough money or cooldown - camp/farm/town)
 - every 28 days a plague comes that kills half your army

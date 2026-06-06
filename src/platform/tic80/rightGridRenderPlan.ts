@@ -250,9 +250,9 @@ function badgeOpsForCell(row: number, col: number, badge: CellBadge): RightGridR
   ]
 }
 
-function actionCellOps(row: number, col: number, category: CellCategory, badge?: CellBadge): RightGridRenderOp[] {
-  const ops = borderOpsForCell(row, col, category)
-  if (badge && category === 'action') ops.push(...badgeOpsForCell(row, col, badge))
+function actionCellOps(row: number, col: number, view: CellView): RightGridRenderOp[] {
+  const ops = borderOpsForCell(row, col, view.category)
+  if (view.badge && view.category === 'action') ops.push(...badgeOpsForCell(row, col, view.badge))
   return ops
 }
 
@@ -261,7 +261,7 @@ function cellBorderOps(s: State): RightGridRenderOp[] {
   for (let row = 0; row < Layout.GRID_ROWS; row++) {
     for (let col = 0; col < Layout.GRID_COLS; col++) {
       const view = viewForCell(s, row, col)
-      ops.push(...actionCellOps(row, col, view.category, view.badge))
+      ops.push(...actionCellOps(row, col, view))
     }
   }
   return ops

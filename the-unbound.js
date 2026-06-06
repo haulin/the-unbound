@@ -520,7 +520,8 @@
       mapBackground: 307,
       previewGrain: 308,
       badgePrice: 310,
-      badgeLeft: 311
+      badgeLeft: 311,
+      dividerGem: 312
     }
   };
   function inventorySpriteId(slotId) {
@@ -534,6 +535,7 @@
   var WORLD_HEIGHT = 10;
   var INITIAL_SEED = 47;
   var ENABLE_ANIMATIONS = true;
+  var SHOW_COMBAT_HIT_ODDS = true;
   var SIGNPOST_COUNT = 6;
   var GATE_LOCKSMITH_MIN_DISTANCE = 7;
   var LOCKSMITH_LAIR_MIN_DISTANCE = 4;
@@ -2093,6 +2095,24 @@ ${dir}, ${chosen.d} leagues away.`;
       return { rngState: r.rngState, outcome: "playerHit", nextEnemyArmy, enemyDelta: nextEnemyArmy - enemyArmy, killed };
     }
     return { rngState: r.rngState, outcome: "enemyHit", nextEnemyArmy: enemyArmy, enemyDelta: 0, killed: 0 };
+  }
+  function fightHitChancePercent(opts) {
+    const wMax = Math.max(1, Math.trunc(opts.playerArmy) + opts.playerRollBonus);
+    const bMax = Math.max(1, Math.trunc(opts.enemyArmy) + opts.enemyRollBonus);
+    let wins = 0;
+    for (let b = 0; b < wMax && b < bMax; b++) wins += wMax - b;
+    return Math.round(wins / (wMax * bMax) * 100);
+  }
+  function combatFightHitOddsPercent(state2) {
+    const enc = state2.encounter;
+    if (!enc || enc.kind !== "combat" || enc.enemyArmySize <= 0 || state2.resources.armySize <= 0) return null;
+    const variant = combatVariantForEncounter(state2);
+    return fightHitChancePercent({
+      playerArmy: state2.resources.armySize,
+      enemyArmy: enc.enemyArmySize,
+      playerRollBonus: variant.playerRollBonus,
+      enemyRollBonus: variant.enemyRollBonus
+    });
   }
   function isPreviewSentinel(sourceCellId) {
     return sourceCellId < 0;
@@ -3717,27 +3737,11 @@ ${dir}, ${chosen.d} leagues away.`;
   var UI_LEFT_PANEL_LORE_TOP_GAP = 7;
   var UI_COLOR_LEFT_PANEL_DIVIDER = 15;
   var UI_LEFT_PANEL_DIVIDER_GAP_PX = 5;
-  var UI_LEFT_PANEL_STATS_OPTICAL_LIFT_PX = 3;
   var UI_STATUS_ICON_SIZE = 8;
-  var UI_HERO_RESOURCE_GAP_PX = 2;
-  var UI_AFTER_RESOURCES_GAP_PX = 2;
-  var UI_ARMY_ICON_W_PX = 16;
-  var UI_ARMY_ICON_H_PX = 16;
-  var UI_ARMY_VALUE_OFFSET_X = UI_ARMY_ICON_W_PX + 3;
-  var UI_ARMY_VALUE_OFFSET_Y = 5;
   var UI_DELTA_OFFSET_X = 2;
   var UI_DELTA_OFFSET_Y = 2;
   var UI_DELTA_RISE_PX = 6;
   var UI_DELTA_GAP_PX = -4;
-  var UI_FOOD_ICON_W_PX = 16;
-  var UI_FOOD_ICON_H_PX = 16;
-  var UI_ICON_VALUE_OFFSET_X = UI_FOOD_ICON_W_PX + 3;
-  var UI_ICON_VALUE_OFFSET_Y = 5;
-  var UI_GOLD_ICON_W_PX = 16;
-  var UI_GOLD_ICON_H_PX = 16;
-  var UI_GOLD_VALUE_OFFSET_X = UI_GOLD_ICON_W_PX + 3;
-  var UI_GOLD_VALUE_OFFSET_Y = 5;
-  var UI_SMALL_STATS_START_OFFSET_Y = UI_ARMY_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX + UI_FOOD_ICON_H_PX + UI_AFTER_RESOURCES_GAP_PX;
 
   // src/platform/tic80/nineSlice.ts
   function int(n) {
@@ -3952,9 +3956,9 @@ ${dir}, ${chosen.d} leagues away.`;
       { kind: "print", x: topLeft.x + padLeft, y: topLeft.y + padY, text: badge.text, color: fg }
     ];
   }
-  function actionCellOps(row, col, category, badge) {
-    const ops = borderOpsForCell(row, col, category);
-    if (badge && category === "action") ops.push(...badgeOpsForCell(row, col, badge));
+  function actionCellOps(row, col, view) {
+    const ops = borderOpsForCell(row, col, view.category);
+    if (view.badge && view.category === "action") ops.push(...badgeOpsForCell(row, col, view.badge));
     return ops;
   }
   function cellBorderOps(s) {
@@ -3962,7 +3966,7 @@ ${dir}, ${chosen.d} leagues away.`;
     for (let row = 0; row < GRID_ROWS; row++) {
       for (let col = 0; col < GRID_COLS; col++) {
         const view = viewForCell(s, row, col);
-        ops.push(...actionCellOps(row, col, view.category, view.badge));
+        ops.push(...actionCellOps(row, col, view));
       }
     }
     return ops;
@@ -4136,6 +4140,9 @@ ${dir}, ${chosen.d} leagues away.`;
     drawLeftPanel(s);
   }
   var FONT_CHAR_PX = 6;
+  var HERO_STATS_X = 84;
+  var HERO_STATS_Y = 12;
+  var HERO_STAT_ROW_PX = 19;
   function formatA1(position) {
     const col = String.fromCharCode("A".charCodeAt(0) + position.x);
     const row = String(position.y + 1);
@@ -4195,6 +4202,10 @@ ${dir}, ${chosen.d} leagues away.`;
       anchors[targetKey] = anchor;
     }
     return anchors;
+  }
+  function drawHeroStat(x, y, spriteId, text, color) {
+    spr(spriteId, x, y, -1, 1, 0, 0, 2, 2);
+    print(text, x + 19, y + 5, color);
   }
   function drawDeltaOverlays(s, anchors) {
     if (!ENABLE_ANIMATIONS) return;
@@ -4277,40 +4288,33 @@ ${dir}, ${chosen.d} leagues away.`;
       const illSpriteId = encounterIllustrationSpriteId(s) ?? spriteIdAtPos;
       drawIllustrationWithTextureOverlay(illSpriteId, illX, illY);
     }
-    const statusX = illX + illSize + UI_LEFT_PANEL_INNER_GAP;
     const fontH = 6;
     const messageLineH = fontH + 1;
     const headerBandBottomY = illY + illSize;
     const horizontalDividerY = headerBandBottomY + Math.floor((UI_LEFT_PANEL_LORE_TOP_GAP - 1) / 2);
-    const statusBlockH = 3 * UI_ARMY_ICON_H_PX + 2 * UI_HERO_RESOURCE_GAP_PX;
-    const statusCenteredY = illY + Math.ceil((horizontalDividerY - illY - statusBlockH) / 2);
-    const statusY = Math.max(illY, statusCenteredY - UI_LEFT_PANEL_STATS_OPTICAL_LIFT_PX);
-    const armyX = statusX;
-    const armyY = statusY;
-    spr(SPRITES.inventory.army, armyX, armyY, -1, 1, 0, 0, 2, 2);
-    const armyValueX = armyX + UI_ARMY_VALUE_OFFSET_X;
-    const armyValueY = armyY + UI_ARMY_VALUE_OFFSET_Y;
-    const armyColor = s.resources.armySize < 6 ? UI_COLOR_WARN : UI_COLOR_TEXT;
-    print(`${s.resources.armySize}`, armyValueX, armyValueY, armyColor);
-    const foodX = statusX;
-    const foodY = armyY + UI_ARMY_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX;
-    spr(SPRITES.inventory.food, foodX, foodY, -1, 1, 0, 0, 2, 2);
-    const foodValueX = foodX + UI_ICON_VALUE_OFFSET_X;
-    const foodValueY = foodY + UI_ICON_VALUE_OFFSET_Y;
-    const foodColor = s.resources.food < FOOD_WARNING_THRESHOLD ? UI_COLOR_WARN : UI_COLOR_TEXT;
-    print(`${s.resources.food}`, foodValueX, foodValueY, foodColor);
-    const goldX = statusX;
-    const goldY = foodY + UI_FOOD_ICON_H_PX + UI_HERO_RESOURCE_GAP_PX;
-    spr(SPRITES.inventory.gold, goldX, goldY, -1, 1, 0, 0, 2, 2);
-    const goldValueX = goldX + UI_GOLD_VALUE_OFFSET_X;
-    const goldValueY = goldY + UI_GOLD_VALUE_OFFSET_Y;
-    print(`${s.resources.gold}`, goldValueX, goldValueY, UI_COLOR_TEXT);
-    drawDeltaOverlays(s, {
-      army: { x: armyX, y: armyY },
-      food: { x: foodX, y: foodY },
-      gold: { x: goldX, y: goldY }
-    });
-    const statusBottomY = goldY + UI_GOLD_ICON_H_PX + UI_AFTER_RESOURCES_GAP_PX;
+    let statY = HERO_STATS_Y;
+    const army = { x: HERO_STATS_X, y: statY };
+    drawHeroStat(
+      army.x,
+      army.y,
+      SPRITES.inventory.army,
+      `${s.resources.armySize}`,
+      s.resources.armySize < 6 ? UI_COLOR_WARN : UI_COLOR_TEXT
+    );
+    statY += HERO_STAT_ROW_PX;
+    const food = { x: HERO_STATS_X, y: statY };
+    drawHeroStat(
+      food.x,
+      food.y,
+      SPRITES.inventory.food,
+      `${s.resources.food}`,
+      s.resources.food < FOOD_WARNING_THRESHOLD ? UI_COLOR_WARN : UI_COLOR_TEXT
+    );
+    statY += HERO_STAT_ROW_PX;
+    const gold = { x: HERO_STATS_X, y: statY };
+    drawHeroStat(gold.x, gold.y, SPRITES.inventory.gold, `${s.resources.gold}`, UI_COLOR_TEXT);
+    drawDeltaOverlays(s, { army, food, gold });
+    const statusBottomY = gold.y + 16 + 2;
     const headerBottomY = Math.max(headerBandBottomY, statusBottomY);
     drawLeftPanelDividers(illX, illY, illSize, horizontalDividerY);
     const msgY = headerBottomY + UI_LEFT_PANEL_LORE_TOP_GAP;
@@ -4330,6 +4334,7 @@ ${dir}, ${chosen.d} leagues away.`;
   function drawRightPanel(s, hints) {
     const plan = buildRightGridRenderPlan(s, hints);
     drawRightGridOps(plan.ops);
+    drawCombatHitOddsDebug(s);
     drawRightStatsBand(s);
     drawRightHeldBand(s);
     drawRightPanelDividers();
@@ -4339,6 +4344,12 @@ ${dir}, ${chosen.d} leagues away.`;
       const anchorSpecs = MECHANIC_INDEX.deltaAnchorsByTargetByEncounterKind[encounterKind];
       if (anchorSpecs) drawDeltaOverlays(s, deltaAnchorsFromGridSpecs(anchorSpecs));
     }
+  }
+  function drawCombatHitOddsDebug(s) {
+    if (!SHOW_COMBAT_HIT_ODDS) return;
+    const pct = combatFightHitOddsPercent(s);
+    if (pct == null) return;
+    print(`${pct}%`, 146, 70, UI_COLOR_TEXT);
   }
   function drawRightPanelFrame(s) {
     drawNineSliceFrame(RIGHT_PANEL_X, 0, PANEL_RIGHT_WIDTH, SCREEN_HEIGHT, panelFrameTopLeftFor(s), {
@@ -4360,7 +4371,7 @@ ${dir}, ${chosen.d} leagues away.`;
     }
     contentW += (items.length - 1) * itemGap;
     const bandY = RIGHT_PANEL_TOP_BAND_Y;
-    const iconY = bandY + Math.floor((RIGHT_PANEL_TOP_BAND_H - iconSize) / 2);
+    const iconY = bandY + Math.floor((RIGHT_PANEL_TOP_BAND_H - iconSize) / 2) - 1;
     const textY = bandY + Math.floor((RIGHT_PANEL_TOP_BAND_H - FONT_CHAR_PX) / 2);
     let x = RIGHT_PANEL_INNER_X + Math.floor((RIGHT_PANEL_INNER_W - contentW) / 2);
     for (let i = 0; i < items.length; i++) {
@@ -4385,15 +4396,40 @@ ${dir}, ${chosen.d} leagues away.`;
       x += iconSize + iconGap;
     }
   }
+  function stampDividerGem(x, y, vertical) {
+    spr(SPRITES.ui.dividerGem, x - 3 + (vertical ? -1 : 0), y - 3, 8, 1, 0, vertical ? 1 : 0);
+  }
+  function drawDivider(x0, y0, x1, y1, gemOffset, color) {
+    const horiz = y0 === y1;
+    if (horiz === (x0 === x1)) return;
+    const lo = horiz ? Math.min(x0, x1) : Math.min(y0, y1);
+    const hi = horiz ? Math.max(x0, x1) : Math.max(y0, y1);
+    const span = hi - lo + 1;
+    if (span <= 0) return;
+    const cross = horiz ? y0 : x0;
+    const center = lo + (span - 1 >> 1);
+    if (horiz) rect(lo, cross, span, 1, color);
+    else rect(cross, lo, 1, span, color);
+    for (const along of [center - gemOffset, center + gemOffset]) {
+      stampDividerGem(horiz ? along : cross, horiz ? cross : along, !horiz);
+    }
+  }
   function drawRightPanelDividers() {
-    rect(RIGHT_PANEL_INNER_X, RIGHT_PANEL_TOP_DIVIDER_Y, RIGHT_PANEL_INNER_W, 1, UI_COLOR_RIGHT_PANEL_DIVIDER);
-    rect(RIGHT_PANEL_INNER_X, RIGHT_PANEL_BOTTOM_DIVIDER_Y, RIGHT_PANEL_INNER_W, 1, UI_COLOR_RIGHT_PANEL_DIVIDER);
+    const x = RIGHT_PANEL_INNER_X;
+    const x1 = x + RIGHT_PANEL_INNER_W - 1;
+    const c = UI_COLOR_RIGHT_PANEL_DIVIDER;
+    drawDivider(x, RIGHT_PANEL_TOP_DIVIDER_Y, x1, RIGHT_PANEL_TOP_DIVIDER_Y, 14, c);
+    drawDivider(x, RIGHT_PANEL_BOTTOM_DIVIDER_Y, x1, RIGHT_PANEL_BOTTOM_DIVIDER_Y, 14, c);
   }
   function drawLeftPanelDividers(illX, illY, illSize, horizontalY) {
     const verticalX = illX + illSize + Math.floor(UI_LEFT_PANEL_INNER_GAP / 2);
     const verticalH = Math.max(0, horizontalY - illY - UI_LEFT_PANEL_DIVIDER_GAP_PX);
-    rect(verticalX, illY, 1, verticalH, UI_COLOR_LEFT_PANEL_DIVIDER);
-    rect(LEFT_PANEL_INNER_X, horizontalY, LEFT_PANEL_INNER_W, 1, UI_COLOR_LEFT_PANEL_DIVIDER);
+    const c = UI_COLOR_LEFT_PANEL_DIVIDER;
+    if (verticalH > 0) {
+      drawDivider(verticalX, illY, verticalX, illY + verticalH - 1, Math.floor(verticalH / 6.4), c);
+    }
+    const x = LEFT_PANEL_INNER_X;
+    drawDivider(x, horizontalY, x + LEFT_PANEL_INNER_W - 1, horizontalY, 15, c);
   }
   var INVENTORY_STATUS_ORDER = ["bronzeKey", "bloodVial"];
   function heldStatusIcons(s) {

@@ -13,6 +13,7 @@ import {
 import {
   ACTION_FIGHT,
   ACTION_RETURN,
+  fightHitChancePercent,
   spawnEnemyArmy,
 } from '../../src/core/mechanics/defs/combat'
 import { hengeCombatVariant } from '../../src/core/mechanics/defs/henge'
@@ -246,6 +247,25 @@ describe('combat reducer (v0.0.7)', () => {
     const s = makeState(w)
     const next = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     expect(next.encounter?.kind).toBe('combat')
+  })
+})
+
+describe('fightHitChancePercent', () => {
+  it('10v20 +5/+5 → 32% (120/375 winning pairs)', () => {
+    expect(fightHitChancePercent({ playerArmy: 10, enemyArmy: 20, playerRollBonus: 5, enemyRollBonus: 5 })).toBe(32)
+  })
+
+  it('10v40 +5/+5 → lower hit rate than 10v20', () => {
+    const vs20 = fightHitChancePercent({ playerArmy: 10, enemyArmy: 20, playerRollBonus: 5, enemyRollBonus: 5 })
+    const vs40 = fightHitChancePercent({ playerArmy: 10, enemyArmy: 40, playerRollBonus: 5, enemyRollBonus: 5 })
+    expect(vs40).toBeLessThan(vs20)
+    expect(vs40).toBe(18)
+  })
+
+  it('goblin +6/+3 is more favorable than brigand +5/+5 at same sizes', () => {
+    const brigand = fightHitChancePercent({ playerArmy: 10, enemyArmy: 20, playerRollBonus: 5, enemyRollBonus: 5 })
+    const goblin = fightHitChancePercent({ playerArmy: 10, enemyArmy: 20, playerRollBonus: 6, enemyRollBonus: 3 })
+    expect(goblin).toBeGreaterThan(brigand)
   })
 })
 

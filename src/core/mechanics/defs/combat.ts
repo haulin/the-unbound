@@ -55,6 +55,7 @@ type FightRound = {
   enemyDelta: number
   killed: number
 }
+
 function resolveFightRound(opts: {
   rngState: number
   playerArmy: number
@@ -73,6 +74,32 @@ function resolveFightRound(opts: {
     return { rngState: r.rngState, outcome: 'playerHit', nextEnemyArmy, enemyDelta: nextEnemyArmy - enemyArmy, killed }
   }
   return { rngState: r.rngState, outcome: 'enemyHit', nextEnemyArmy: enemyArmy, enemyDelta: 0, killed: 0 }
+}
+
+/** P(w >= b) for one fight round, rounded; w ~ U[0..playerRollMax), b ~ U[0..enemyRollMax), ties → player. */
+export function fightHitChancePercent(opts: {
+  playerArmy: number
+  enemyArmy: number
+  playerRollBonus: number
+  enemyRollBonus: number
+}): number {
+  const wMax = Math.max(1, Math.trunc(opts.playerArmy) + opts.playerRollBonus)
+  const bMax = Math.max(1, Math.trunc(opts.enemyArmy) + opts.enemyRollBonus)
+  let wins = 0
+  for (let b = 0; b < wMax && b < bMax; b++) wins += wMax - b
+  return Math.round((wins / (wMax * bMax)) * 100)
+}
+
+export function combatFightHitOddsPercent(state: State): number | null {
+  const enc = state.encounter
+  if (!enc || enc.kind !== 'combat' || enc.enemyArmySize <= 0 || state.resources.armySize <= 0) return null
+  const variant = combatVariantForEncounter(state)
+  return fightHitChancePercent({
+    playerArmy: state.resources.armySize,
+    enemyArmy: enc.enemyArmySize,
+    playerRollBonus: variant.playerRollBonus,
+    enemyRollBonus: variant.enemyRollBonus,
+  })
 }
 
 // ---- Right-grid + action dispatch -------------------------------------------------

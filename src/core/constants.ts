@@ -13,6 +13,8 @@ export const WORLD_WIDTH = 10
 export const WORLD_HEIGHT = 10
 export const INITIAL_SEED = 47 // Don't go higher than 4 digits because of UI limitations.
 export const ENABLE_ANIMATIONS = true
+/** Debug: show next-round hit % below the Fight button in combat. */
+export const SHOW_COMBAT_HIT_ODDS = true
 
 export const SIGNPOST_COUNT = 6
 

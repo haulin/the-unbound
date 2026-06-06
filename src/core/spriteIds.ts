@@ -85,6 +85,7 @@ export const SPRITES = {
     previewGrain: 308,
     badgePrice: 310,
     badgeLeft: 311,
+    dividerGem: 312,
   },
 } as const
 

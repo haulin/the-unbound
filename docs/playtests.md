@@ -133,7 +133,8 @@ v0.8: composer-2.5-fast, 13.8m, US$10.56
 Likely because it had to put all of the terminal output into context at every action. Don't know if we can make it any smaller, it is pretty concise - 10-13 lines when map is not on. Pretty cool it only toggled the map sometimes. Also interesting was that it saw a rainbow's end and preferred to go to signpost. And it didn't misuse rumors (which now have a cap of 3 because of previous playtests). Didn't find a healer (new feature in v0.8).
 the run had a pretty thrilling arc. Don't know why, but no agent so far was willing to buy as much food as possible (probably tough to infer on first playthrough how much loot there is scattered around). They are happy to leave a farm with 8 food and 19 coins unspent, I would say the meta is to get 26 food and 1 coin. But thanks to the addition of goblins it was saved multiple times, while it wasn't for free. 1 or 2 army losses. So v0.6 additions paying off, not so much the latest stuff which is much rarer.
 
-button badges (Phase 1, human):
+button badges, illustration swap - $19.43, 35M tokens, composer-2.5
+Human smoke:
 - Net positive: clean UI, prices on buttons, unobstructed left illustrations.
 - Tradeoff: less single-glance than preview plates — combat deltas hard to read if watching Fight badge; price vs gold needs eyes on stats column. Acceptable; optional mitigations in backlog § Button badges — post-ship UX.
 - Pill badges tuned (8×8 sprite, asymmetric pad, glyph advance widths). Grid gap kept at **4** (smoother move-slide vs gap 6). Phase 2 illustration animation deferred.
