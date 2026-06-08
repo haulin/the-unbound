@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/core/mechanics'
 import { goblinCombatVariant } from '../../src/core/mechanics/defs/woods'
+import { SPRITES } from '../../src/core/spriteIds'
 import {
   GOBLIN_FOOD_FACTOR,
   GOBLIN_FOOD_NOISE,
@@ -82,6 +83,6 @@ describe('goblinCombatVariant identity', () => {
   it('softer +6/+3 round math + goblin sprite', () => {
     expect(goblinCombatVariant.playerRollBonus).toBe(6)
     expect(goblinCombatVariant.enemyRollBonus).toBe(3)
-    expect(goblinCombatVariant.illustrationSpriteId).toBe(130)
+    expect(goblinCombatVariant.illustrationSpriteId).toBe(SPRITES.enemies.goblin)
   })
 })

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { cellIdForPos } from '../../../src/core/cells'
 import { ACTION_NEW_RUN } from '../../../src/core/constants'
 import { processAction } from '../../../src/core/processAction'
 import {
@@ -139,19 +140,20 @@ describe('renderState — left panels', () => {
 })
 
 describe('renderState — encounter line', () => {
-  it('renders the encounter kind without plate stats', () => {
+  it('renders the encounter kind with illustration flavor', () => {
     const s = freshState()
+    s.world.cells[s.player.position.y]![s.player.position.x] = { kind: 'mountain' }
+    const sourceCellId = cellIdForPos(s.world, s.player.position)
     s.encounter = {
       kind: 'combat',
       enemyArmySize: 8,
       initialSpawn: 8,
       armyAtCombatStart: 10,
-      sourceCellId: 0,
+      sourceCellId,
       restoreMessage: '',
     }
     const out = renderState(s)
-    expect(out).toContain('encounter: combat')
-    expect(out).not.toMatch(/encounter: combat\s+\[/)
+    expect(out).toContain('encounter: combat [flavor: enemy]')
   })
 
   it('appends fight badge suffix on action labels', () => {

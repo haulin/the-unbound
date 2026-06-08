@@ -140,7 +140,7 @@ describe('v0.5 the wyrm acceptance', () => {
       badge: { variant: 'price', text: `-${WYRM_PAY_GOLD_COST}` },
     })
     expect(rightGrid(after, 1, 0)).toMatchObject({
-      spriteId: SPRITES.actions.fight,
+      spriteId: SPRITES.enemies.wyrm,
       action: { type: ACTION_FIGHT },
       badge: { variant: 'left', text: `${WYRM_INITIAL_HEALTH}` },
     })

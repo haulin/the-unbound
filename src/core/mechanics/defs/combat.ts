@@ -13,11 +13,12 @@ import type {
   World,
 } from '../../types'
 import {
-  badgedGridButton,
+  gridActionCell,
   combatLoreMessage,
   encounterStableLine,
   makeRightGrid,
   type CellBadge,
+  type GridActionRow,
 } from '../encounterHelpers'
 import type { Change } from '../../reducer'
 import type { MechanicDef, ReduceEncounterAction, TileEnterResult } from '../types'
@@ -31,12 +32,20 @@ export const ACTION_COMBAT_PAY = 'COMBAT_PAY' as const
 export const ACTION_RETURN = 'RETURN' as const
 
 type CombatActionResult = Change | readonly Change[] | null
-type CombatActionSpec = { spriteId: number; reduce: (s: State) => CombatActionResult }
+type CombatActionSpec = GridActionRow & { reduce: (s: State) => CombatActionResult }
 
 const COMBAT_ACTIONS = {
-  [ACTION_FIGHT]:      { spriteId: SPRITES.actions.fight,  reduce: reduceCombatFight  },
-  [ACTION_COMBAT_PAY]: { spriteId: SPRITES.inventory.gold, reduce: reduceCombatPay    },
-  [ACTION_RETURN]:     { spriteId: SPRITES.actions.return, reduce: reduceCombatReturn },
+  [ACTION_FIGHT]: {
+    spriteId: (s: State) => combatVariantForEncounter(s).illustrationSpriteId,
+    reduce: reduceCombatFight,
+    badge: combatFightBadge,
+  },
+  [ACTION_COMBAT_PAY]: {
+    spriteId: SPRITES.inventory.gold,
+    reduce: reduceCombatPay,
+    badge: combatPayBadge,
+  },
+  [ACTION_RETURN]: { spriteId: SPRITES.actions.return, reduce: reduceCombatReturn },
 } as const satisfies Record<string, CombatActionSpec>
 
 export type CombatAction = { type: keyof typeof COMBAT_ACTIONS }
@@ -211,8 +220,8 @@ function combatPayBadge(state: State): CellBadge | null {
 const combatRightGrid = makeRightGrid({
   leaveAction: { type: ACTION_RETURN },
   leaveBadge: { variant: 'price', text: '-1' },
-  left: badgedGridButton(COMBAT_ACTIONS, ACTION_FIGHT, combatFightBadge),
-  top: badgedGridButton(COMBAT_ACTIONS, ACTION_COMBAT_PAY, combatPayBadge),
+  left: gridActionCell(COMBAT_ACTIONS, ACTION_FIGHT),
+  top: gridActionCell(COMBAT_ACTIONS, ACTION_COMBAT_PAY),
 })
 
 const reduceCombatAction: ReduceEncounterAction = (prevState: State, action: Action) => {

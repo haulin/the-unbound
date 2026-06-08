@@ -24,10 +24,13 @@ export const UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR = 8
 
 // In-game map: fixed viewport centered on player, torus-wrapped.
 export const UI_MAP_VIEWPORT_CELLS = 9 // odd so player sits at exact center
-export const UI_MAP_CELL_PITCH_PX = 6
+export const UI_MAP_CELL_PITCH_PX = 7
+// 9×7px grid leaves 1px slack in the 64×64 band; nudge right to balance margins.
+export const UI_MAP_GRID_OFFSET_X_PX = 1
 export const UI_MAP_POI_TEXT_COLOR = 13
 export const UI_MAP_POI_UNCOMMITTED_TEXT_COLOR = UI_COLOR_BG
 export const UI_MAP_POI_TEXT_OFFSET_X_PX = 1
+export const UI_MAP_POI_TEXT_OFFSET_Y_PX = 1
 
 // Right-panel seed/position/steps band — dimmer than hero stats (UI_COLOR_TEXT).
 export const UI_COLOR_RIGHT_STATS_TEXT = UI_COLOR_POI_DESC

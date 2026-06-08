@@ -52,4 +52,3 @@ export function getRightGridCellDef(s: State, row: number, col: number): RightGr
 
   return { action: null }
 }
-

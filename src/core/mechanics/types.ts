@@ -112,7 +112,7 @@ export type MechanicEncounter = {
   kind: EncounterKind
   reduceAction?: ReduceEncounterAction
   rightGrid?: RightGridProvider
-  illustrationSpriteId?: (state: State) => number
+  illustrationSpriteId?: number | ((state: State) => number)
   deltaAnchorsByTarget?: Partial<Record<DeltaAnimTarget, DeltaAnchorSpec>>
   previewEncounter?: PreviewEncounterProvider
 }

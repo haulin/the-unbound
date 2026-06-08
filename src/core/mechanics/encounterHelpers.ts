@@ -253,16 +253,9 @@ export function offersToGridLayout<T extends string>(offers: readonly T[]): Reco
 // state-dependent content.
 export type RightGridActionCell = { spriteId: number; action: Action; badge?: CellBadge }
 
-export type GridActionBadge = CellBadge | ((s: State) => CellBadge | null)
-
-function attachGridBadge(
-  cell: RightGridActionCell,
-  badge: GridActionBadge | undefined,
-  s: State,
-): RightGridActionCell {
-  if (!badge) return cell
-  const resolved = typeof badge === 'function' ? badge(s) : badge
-  return resolved ? { ...cell, badge: resolved } : cell
+export type GridActionRow = {
+  spriteId: number | ((s: State) => number)
+  badge?: CellBadge | ((s: State) => CellBadge | null)
 }
 
 export type RightGridActionSlot =
@@ -282,29 +275,21 @@ function resolveActionSlot(slot: RightGridActionSlot | undefined, s: State): Rig
   return typeof slot === 'function' ? slot(s) : slot
 }
 
-// Build a grid button from an entry in a mechanic's action table. Keeps the
-// grid declaration in lockstep with the table — the spriteId comes from the
-// same row that owns the reducer.
-export function gridButton<K extends Action['type']>(
-  table: Record<K, { spriteId: number }>,
-  action: K,
-): RightGridActionCell {
-  return { spriteId: table[action].spriteId, action: { type: action } as Action }
-}
-
-export function badgedGridButton<K extends Action['type']>(
-  table: Record<K, { spriteId: number }>,
-  action: K,
-  badge?: GridActionBadge,
-): (s: State) => RightGridActionCell | null {
-  return (s) => attachGridBadge(gridButton(table, action), badge, s)
-}
-
-export function offerGridCell<K extends Action['type']>(
-  table: Record<K, { spriteId: number; badge?: GridActionBadge }>,
+// Grid cell from an action-table row — sprite, action, and badge stay on the
+// same row as the reducer (static or `(s) => …` for variant art / live counts).
+export function gridActionCell<K extends Action['type']>(
+  table: Record<K, GridActionRow>,
   action: K,
 ): (s: State) => RightGridActionCell | null {
-  return (s) => attachGridBadge(gridButton(table, action), table[action].badge, s)
+  return (s) => {
+    const row = table[action]
+    const spriteId = typeof row.spriteId === 'function' ? row.spriteId(s) : row.spriteId
+    const cell: RightGridActionCell = { spriteId, action: { type: action } as Action }
+    const badge = row.badge
+    if (!badge) return cell
+    const resolved = typeof badge === 'function' ? badge(s) : badge
+    return resolved ? { ...cell, badge: resolved } : cell
+  }
 }
 
 export function makeRightGrid(spec: RightGridSpec): RightGridProvider {

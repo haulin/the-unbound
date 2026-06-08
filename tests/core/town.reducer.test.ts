@@ -86,6 +86,19 @@ describe('town reducer', () => {
     expect(next.ui.message).toContain(FOOD_CARRY_FULL_MESSAGE)
   })
 
+  it('buy food when at carry cap and broke: no-gold message, not carry-full', () => {
+    const s0 = makeState()
+    s0.resources.food = 10
+    s0.resources.gold = 0
+
+    const next = processAction(s0, { type: ACTION_TOWN_BUY_FOOD })!
+    expect(next.resources.gold).toBe(0)
+    expect(next.resources.food).toBe(10)
+    expect(next.ui.message).not.toContain(FOOD_CARRY_FULL_MESSAGE)
+    const line = next.ui.message.split('\n').slice(1).join('\n')
+    expect(TOWN_NO_GOLD_LINES).toContain(line)
+  })
+
   it('repeated buy food in the same visit reuses the same success line', () => {
     const s0 = makeState()
     s0.resources.gold = 999

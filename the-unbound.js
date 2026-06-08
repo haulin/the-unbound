@@ -477,7 +477,7 @@
       healer: 232,
       gold: 204
     },
-    // 16x16 opponent-side stats and boss illustrations.
+    // 16x16 opponent-side combat illustrations.
     enemies: {
       wyrm: 134,
       enemy: 132,
@@ -495,8 +495,8 @@
       goal: 110,
       rumor: 142
     },
-    // 16x16 decorative centerpieces for encounter grids (never actionable).
-    centers: {
+    // 16x16 encounter left-panel illustrations (shops, game-over art).
+    flavor: {
       farmBarn: 162,
       locksmithKiln: 164,
       marketStall: 168,
@@ -517,8 +517,9 @@
       panelBorderBlood: 261,
       panelBorderBronze: 264,
       gridActionBorder: 267,
-      mapHereMarker: 306,
-      mapBackground: 307,
+      mapHereMarker: 313,
+      mapBackgroundA: 306,
+      mapBackgroundB: 307,
       previewGrain: 308,
       badgePrice: 310,
       badgeLeft: 311,
@@ -970,7 +971,10 @@
         seenEncounterKinds.add(ek);
         if (m.encounter.rightGrid) rightGridByEncounterKind2[ek] = m.encounter.rightGrid;
         if (m.encounter.reduceAction) reduceEncounterActionByEncounterKind[ek] = m.encounter.reduceAction;
-        if (m.encounter.illustrationSpriteId) illustrationByEncounterKind[ek] = m.encounter.illustrationSpriteId;
+        if (m.encounter.illustrationSpriteId !== void 0) {
+          const ill = m.encounter.illustrationSpriteId;
+          illustrationByEncounterKind[ek] = typeof ill === "function" ? ill : () => ill;
+        }
         if (m.encounter.deltaAnchorsByTarget) {
           deltaAnchorsByTargetByEncounterKind[ek] = m.encounter.deltaAnchorsByTarget;
         }
@@ -1333,23 +1337,20 @@ ${body}`;
     }
     return layout;
   }
-  function attachGridBadge(cell, badge, s) {
-    if (!badge) return cell;
-    const resolved = typeof badge === "function" ? badge(s) : badge;
-    return resolved ? { ...cell, badge: resolved } : cell;
-  }
   function resolveActionSlot(slot, s) {
     if (!slot) return null;
     return typeof slot === "function" ? slot(s) : slot;
   }
-  function gridButton(table, action) {
-    return { spriteId: table[action].spriteId, action: { type: action } };
-  }
-  function badgedGridButton(table, action, badge) {
-    return (s) => attachGridBadge(gridButton(table, action), badge, s);
-  }
-  function offerGridCell(table, action) {
-    return (s) => attachGridBadge(gridButton(table, action), table[action].badge, s);
+  function gridActionCell(table, action) {
+    return (s) => {
+      const row = table[action];
+      const spriteId = typeof row.spriteId === "function" ? row.spriteId(s) : row.spriteId;
+      const cell = { spriteId, action: { type: action } };
+      const badge = row.badge;
+      if (!badge) return cell;
+      const resolved = typeof badge === "function" ? badge(s) : badge;
+      return resolved ? { ...cell, badge: resolved } : cell;
+    };
   }
   function makeRightGrid(spec) {
     return (s, row, col) => {
@@ -1604,8 +1605,8 @@ ${body}`;
   }
   var locksmithRightGrid = makeRightGrid({
     leaveAction: { type: ACTION_LOCKSMITH_LEAVE },
-    top: offerGridCell(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_GOLD),
-    left: offerGridCell(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_FOOD)
+    top: gridActionCell(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_GOLD),
+    left: gridActionCell(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_FOOD)
   });
   var locksmithMechanic = {
     id: "locksmith",
@@ -1622,7 +1623,7 @@ ${body}`;
       reduceAction: reduceLocksmithAction,
       previewEncounter: previewEncounterProvider("locksmith"),
       rightGrid: locksmithRightGrid,
-      illustrationSpriteId: () => SPRITES.centers.locksmithKiln
+      illustrationSpriteId: SPRITES.flavor.locksmithKiln
     }
   };
 
@@ -1756,11 +1757,11 @@ ${dir}, ${chosen.d} leagues away.`;
   };
   function reduceFarmBuyFood(state2, farm) {
     const title = poiTitleFor(farm.name, "Farm");
+    const result = buy(state2.resources, { gold: FARM_BUY_FOOD_GOLD_COST, gain: { food: FARM_BUY_FOOD_AMOUNT } });
+    if (result.outcome === "noFunds") return noGoldResponse(state2, title);
     if (state2.resources.food >= foodCarryCap(state2.resources)) {
       return setEncounterMessage(title, FOOD_CARRY_FULL_MESSAGE);
     }
-    const result = buy(state2.resources, { gold: FARM_BUY_FOOD_GOLD_COST, gain: { food: FARM_BUY_FOOD_AMOUNT } });
-    if (result.outcome === "noFunds") return noGoldResponse(state2, title);
     return {
       resources: applyFoodCapOnGain(state2.resources, result.resources),
       message: loreMessage(title, encounterStableLine(state2, "farm.buyFood", FARM_BUY_FOOD_LINES))
@@ -1794,7 +1795,7 @@ ${dir}, ${chosen.d} leagues away.`;
   function farmOfferSlot(s, slot) {
     const farm = getCellAt(s.world, s.player.position);
     const offer = offersToGridLayout(farm.offers)[slot];
-    return offer ? offerGridCell(FARM_OFFERS, offer)(s) : null;
+    return offer ? gridActionCell(FARM_OFFERS, offer)(s) : null;
   }
   function reduceFarmBuyBeast(state2, farm) {
     const title = poiTitleFor(farm.name, "Farm");
@@ -1826,7 +1827,7 @@ ${dir}, ${chosen.d} leagues away.`;
       reduceAction: reduceFarmAction,
       previewEncounter: previewEncounterProvider("farm"),
       rightGrid: farmRightGrid,
-      illustrationSpriteId: () => SPRITES.centers.farmBarn
+      illustrationSpriteId: SPRITES.flavor.farmBarn
     }
   };
 
@@ -1881,7 +1882,7 @@ ${dir}, ${chosen.d} leagues away.`;
   function campOfferSlot(s, slot) {
     const camp = getCellAt(s.world, s.player.position);
     const offer = offersToGridLayout(camp.offers)[slot];
-    return offer ? offerGridCell(CAMP_OFFERS, offer)(s) : null;
+    return offer ? gridActionCell(CAMP_OFFERS, offer)(s) : null;
   }
   var onEnterCamp = ({ cell, world, pos, stepCount }) => {
     if (cell.kind !== "camp") return {};
@@ -1960,7 +1961,7 @@ ${dir}, ${chosen.d} leagues away.`;
       reduceAction: reduceCampAction,
       previewEncounter: previewEncounterProvider("camp"),
       rightGrid: campRightGrid,
-      illustrationSpriteId: () => SPRITES.centers.campfire
+      illustrationSpriteId: SPRITES.flavor.campfire
     }
   };
 
@@ -1969,8 +1970,16 @@ ${dir}, ${chosen.d} leagues away.`;
   var ACTION_COMBAT_PAY = "COMBAT_PAY";
   var ACTION_RETURN = "RETURN";
   var COMBAT_ACTIONS = {
-    [ACTION_FIGHT]: { spriteId: SPRITES.actions.fight, reduce: reduceCombatFight },
-    [ACTION_COMBAT_PAY]: { spriteId: SPRITES.inventory.gold, reduce: reduceCombatPay },
+    [ACTION_FIGHT]: {
+      spriteId: (s) => combatVariantForEncounter(s).illustrationSpriteId,
+      reduce: reduceCombatFight,
+      badge: combatFightBadge
+    },
+    [ACTION_COMBAT_PAY]: {
+      spriteId: SPRITES.inventory.gold,
+      reduce: reduceCombatPay,
+      badge: combatPayBadge
+    },
     [ACTION_RETURN]: { spriteId: SPRITES.actions.return, reduce: reduceCombatReturn }
   };
   function spawnEnemyArmy(opts) {
@@ -2075,8 +2084,8 @@ ${dir}, ${chosen.d} leagues away.`;
   var combatRightGrid = makeRightGrid({
     leaveAction: { type: ACTION_RETURN },
     leaveBadge: { variant: "price", text: "-1" },
-    left: badgedGridButton(COMBAT_ACTIONS, ACTION_FIGHT, combatFightBadge),
-    top: badgedGridButton(COMBAT_ACTIONS, ACTION_COMBAT_PAY, combatPayBadge)
+    left: gridActionCell(COMBAT_ACTIONS, ACTION_FIGHT),
+    top: gridActionCell(COMBAT_ACTIONS, ACTION_COMBAT_PAY)
   });
   var reduceCombatAction = (prevState, action) => {
     switch (action.type) {
@@ -2576,11 +2585,11 @@ ${dir}, ${chosen.d} leagues away.`;
   };
   function reduceTownBuyFood(state2, town) {
     const title = poiTitleFor(town.name, "Town");
+    const result = buy(state2.resources, { gold: town.prices.foodGold, gain: { food: town.bundles.food } });
+    if (result.outcome === "noFunds") return noGoldResponse(state2, title);
     if (state2.resources.food >= foodCarryCap(state2.resources)) {
       return setEncounterMessage(title, FOOD_CARRY_FULL_MESSAGE);
     }
-    const result = buy(state2.resources, { gold: town.prices.foodGold, gain: { food: town.bundles.food } });
-    if (result.outcome === "noFunds") return noGoldResponse(state2, title);
     return {
       resources: applyFoodCapOnGain(state2.resources, result.resources),
       message: loreMessage(title, encounterStableLine(state2, "town.buyFood", TOWN_BUY_LINES))
@@ -2673,7 +2682,7 @@ ${dir}, ${chosen.d} leagues away.`;
   function townOfferSlot(s, slot) {
     const town = getCellAt(s.world, s.player.position);
     const offer = offersToGridLayout(town.offers)[slot];
-    return offer ? offerGridCell(TOWN_OFFERS, offer)(s) : null;
+    return offer ? gridActionCell(TOWN_OFFERS, offer)(s) : null;
   }
   var townRightGrid = makeRightGrid({
     leaveAction: { type: ACTION_TOWN_LEAVE },
@@ -2696,7 +2705,7 @@ ${dir}, ${chosen.d} leagues away.`;
       reduceAction: reduceTownAction,
       previewEncounter: previewEncounterProvider("town"),
       rightGrid: townRightGrid,
-      illustrationSpriteId: () => SPRITES.centers.marketStall
+      illustrationSpriteId: SPRITES.flavor.marketStall
     }
   };
 
@@ -3391,10 +3400,12 @@ ${dir}, ${chosen.d} leagues away.`;
   var UI_TEXTURE_TILE_PX = 8;
   var UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR = 8;
   var UI_MAP_VIEWPORT_CELLS = 9;
-  var UI_MAP_CELL_PITCH_PX = 6;
+  var UI_MAP_CELL_PITCH_PX = 7;
+  var UI_MAP_GRID_OFFSET_X_PX = 1;
   var UI_MAP_POI_TEXT_COLOR = 13;
   var UI_MAP_POI_UNCOMMITTED_TEXT_COLOR = UI_COLOR_BG;
   var UI_MAP_POI_TEXT_OFFSET_X_PX = 1;
+  var UI_MAP_POI_TEXT_OFFSET_Y_PX = 1;
   var UI_COLOR_RIGHT_STATS_TEXT = UI_COLOR_POI_DESC;
   var UI_COLOR_GRID_CELL_BORDER = 14;
   var UI_COLOR_GRID_CELL_BORDER_META = 15;
@@ -4140,22 +4151,23 @@ ${dir}, ${chosen.d} leagues away.`;
       cursorByTarget[a.params.target] = xCursor + label.length * FONT_CHAR_PX + UI_DELTA_GAP_PX;
     }
   }
-  function drawMap(s, x, y, sizePx) {
+  function drawMap(s, x, y, _sizePx) {
     const { markers } = computeGameMapView(s);
     const w = Math.max(1, s.world.width);
     const h = Math.max(1, s.world.height);
     const viewport = Math.max(1, UI_MAP_VIEWPORT_CELLS);
     const pitch = Math.max(1, UI_MAP_CELL_PITCH_PX);
     const radius = Math.floor(viewport / 2);
-    const gridX = x + Math.floor((sizePx - pitch * viewport) / 2);
-    const gridY = y + Math.floor((sizePx - pitch * viewport) / 2);
+    const gridX = x + UI_MAP_GRID_OFFSET_X_PX;
+    const gridY = y;
     const centerX = gridX + radius * pitch;
     const centerY = gridY + radius * pitch;
     const px = s.player.position.x;
     const py = s.player.position.y;
     for (let vy = -radius; vy <= radius; vy++) {
       for (let vx = -radius; vx <= radius; vx++) {
-        spr(SPRITES.ui.mapBackground, centerX + vx * pitch, centerY + vy * pitch, 0);
+        const bg = vx + vy & 1 ? SPRITES.ui.mapBackgroundB : SPRITES.ui.mapBackgroundA;
+        spr(bg, centerX + vx * pitch, centerY + vy * pitch, 0);
       }
     }
     for (let i = 0; i < markers.length; i++) {
@@ -4164,9 +4176,14 @@ ${dir}, ${chosen.d} leagues away.`;
       const dy = torusDelta(py, m.pos.y, h);
       if (Math.abs(dx) > radius || Math.abs(dy) > radius) continue;
       const color = m.isMapped ? UI_MAP_POI_TEXT_COLOR : UI_MAP_POI_UNCOMMITTED_TEXT_COLOR;
-      print(m.label, centerX + dx * pitch + UI_MAP_POI_TEXT_OFFSET_X_PX, centerY + dy * pitch, color);
+      print(
+        m.label,
+        centerX + dx * pitch + UI_MAP_POI_TEXT_OFFSET_X_PX,
+        centerY + dy * pitch + UI_MAP_POI_TEXT_OFFSET_Y_PX,
+        color
+      );
     }
-    spr(SPRITES.ui.mapHereMarker, centerX - 1, centerY - 1, 0);
+    spr(SPRITES.ui.mapHereMarker, centerX - 1, centerY - 1, 0, 1, 0, 0, 2, 2);
   }
   function panelFrameTopLeftFor(s) {
     const inv = s.resources.inventory;
@@ -4192,7 +4209,7 @@ ${dir}, ${chosen.d} leagues away.`;
     } else if (leftPanel.kind === LEFT_PANEL_KIND_SPRITE) {
       drawIllustrationWithTextureOverlay(leftPanel.spriteId, illX, illY);
     } else if (s.run.isGameOver) {
-      drawIllustrationWithTextureOverlay(SPRITES.centers.tombstone, illX, illY);
+      drawIllustrationWithTextureOverlay(SPRITES.flavor.tombstone, illX, illY);
     } else {
       const illSpriteId = encounterIllustrationSpriteId(s) ?? spriteIdAtPos;
       drawIllustrationWithTextureOverlay(illSpriteId, illX, illY);
@@ -4259,7 +4276,7 @@ ${dir}, ${chosen.d} leagues away.`;
     if (!SHOW_COMBAT_HIT_ODDS) return;
     const pct = combatFightHitOddsPercent(s);
     if (pct == null) return;
-    print(`${pct}%`, 146, 70, UI_COLOR_TEXT);
+    print(`${pct}%`, 146, 72, UI_COLOR_TEXT);
   }
   function drawRightPanelFrame(s) {
     drawNineSliceFrame(RIGHT_PANEL_X, 0, PANEL_RIGHT_WIDTH, SCREEN_HEIGHT, panelFrameTopLeftFor(s), {

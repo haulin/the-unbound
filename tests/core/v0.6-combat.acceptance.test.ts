@@ -60,7 +60,7 @@ describe('v0.6 combat balance acceptance', () => {
     expect(variant).not.toBe(brigandCombatVariant)
     expect(variant.playerRollBonus).toBe(6)
     expect(variant.enemyRollBonus).toBe(3)
-    expect(variant.illustrationSpriteId).toBe(130)
+    expect(variant.illustrationSpriteId).toBe(SPRITES.enemies.goblin)
     expect(GOBLIN_ENCOUNTER_LINES).toContain(opened.ui.message)
   })
 

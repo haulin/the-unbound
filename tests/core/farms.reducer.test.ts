@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
-import { ACTION_MOVE, INITIAL_FOOD } from '../../src/core/constants'
-import { ACTION_FARM_LEAVE } from '../../src/core/mechanics/defs/farm'
+import { ACTION_MOVE, FARM_BUY_FOOD_GOLD_COST, INITIAL_FOOD, TOWN_NO_GOLD_LINES } from '../../src/core/constants'
+import { ACTION_FARM_BUY_FOOD, ACTION_FARM_LEAVE } from '../../src/core/mechanics/defs/farm'
+import { FOOD_CARRY_FULL_MESSAGE } from '../../src/core/foodCarry'
 import type { State, World } from '../../src/core/types'
 import { makeResources } from './_helpers/makeResources'
 
@@ -80,5 +81,18 @@ describe('farms + food reducer', () => {
     expect(s.encounter).toBe(null)
     const next = processAction(s, { type: ACTION_MOVE, dx: 1, dy: 0 })!
     expect(next.player.position).toEqual({ x: 2, y: 1 })
+  })
+
+  it('buy food at carry cap with insufficient gold: no-gold message, not carry-full', () => {
+    let s = makeState()
+    s = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
+    s.resources = makeResources({ food: 10, gold: FARM_BUY_FOOD_GOLD_COST - 1, armySize: 5 })
+
+    const next = processAction(s, { type: ACTION_FARM_BUY_FOOD })!
+    expect(next.resources.gold).toBe(FARM_BUY_FOOD_GOLD_COST - 1)
+    expect(next.resources.food).toBe(10)
+    expect(next.ui.message).not.toContain(FOOD_CARRY_FULL_MESSAGE)
+    const line = next.ui.message.split('\n').slice(1).join('\n')
+    expect(TOWN_NO_GOLD_LINES).toContain(line)
   })
 })

@@ -10,8 +10,8 @@ describe('SPRITES registry', () => {
     expect(SPRITES.inventory.gold).toBe(204)
     expect(SPRITES.inventory.beast).toBe(226)
     expect(SPRITES.inventory.healer).toBe(232)
-    expect(SPRITES.centers.farmBarn).toBe(162)
-    expect(SPRITES.centers.locksmithKiln).toBe(164)
+    expect(SPRITES.flavor.farmBarn).toBe(162)
+    expect(SPRITES.flavor.locksmithKiln).toBe(164)
   })
 
   it('aligns thematically-related sprites into the same column', () => {
@@ -31,7 +31,7 @@ describe('SPRITES registry', () => {
     expect(col(SPRITES.poi.locksmith)).toBe(4)
     expect(col(SPRITES.actions.fight)).toBe(4)
     expect(col(SPRITES.enemies.enemy)).toBe(4)
-    expect(col(SPRITES.centers.locksmithKiln)).toBe(4)
+    expect(col(SPRITES.flavor.locksmithKiln)).toBe(4)
     expect(col(SPRITES.inventory.bronzeKey)).toBe(4)
 
     // Col 6: cave/wyrm/blood (the "wyrm's lair" column).
@@ -39,4 +39,5 @@ describe('SPRITES registry', () => {
     expect(col(SPRITES.enemies.wyrm)).toBe(6)
     expect(col(SPRITES.inventory.bloodVial)).toBe(6)
   })
+
 })

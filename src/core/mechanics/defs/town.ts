@@ -35,7 +35,7 @@ import {
   loreMessage,
   makeRightGrid,
   noGoldResponse,
-  offerGridCell,
+  gridActionCell,
   openNamedPoiEncounter,
   poiTitleFor,
   previewEncounterProvider,
@@ -169,12 +169,12 @@ const reduceTownAction: ReduceEncounterAction = (state, action) => {
 
 function reduceTownBuyFood(state: State, town: TownCell): Change {
   const title = poiTitleFor(town.name, 'Town')
-  if (state.resources.food >= foodCarryCap(state.resources)) {
-    return setEncounterMessage(title, FOOD_CARRY_FULL_MESSAGE)
-  }
 
   const result = buy(state.resources, { gold: town.prices.foodGold, gain: { food: town.bundles.food } })
   if (result.outcome === 'noFunds') return noGoldResponse(state, title)
+  if (state.resources.food >= foodCarryCap(state.resources)) {
+    return setEncounterMessage(title, FOOD_CARRY_FULL_MESSAGE)
+  }
 
   return {
     resources: applyFoodCapOnGain(state.resources, result.resources),
@@ -281,7 +281,7 @@ const placeNamedTowns: PlaceWorldProvider = ({ cells, rngState, seed }) => {
 function townOfferSlot(s: State, slot: keyof ReturnType<typeof offersToGridLayout<TownOfferKind>>) {
   const town = getCellAt(s.world, s.player.position) as TownCell
   const offer = offersToGridLayout(town.offers)[slot]
-  return offer ? offerGridCell(TOWN_OFFERS, offer)(s) : null
+  return offer ? gridActionCell(TOWN_OFFERS, offer)(s) : null
 }
 
 const townRightGrid = makeRightGrid({
@@ -306,6 +306,6 @@ export const townMechanic: MechanicDef = {
     reduceAction: reduceTownAction,
     previewEncounter: previewEncounterProvider('town'),
     rightGrid: townRightGrid,
-    illustrationSpriteId: () => SPRITES.centers.marketStall,
+    illustrationSpriteId: SPRITES.flavor.marketStall,
   },
 }

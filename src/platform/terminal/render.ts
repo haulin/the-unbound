@@ -2,7 +2,8 @@ import { ACTION_TOGGLE_MINIMAP, LOST_COORD_LABEL } from '../../core/constants'
 import { foodCarryCap } from '../../core/foodCarry'
 import { computeGameMapView } from '../../core/gameMap'
 import { torusDelta, wrapIndex } from '../../core/math'
-import { getRightGridCellDef, type RightGridCellDef } from '../../core/rightGrid'
+import { getRightGridCellDef, type RightGridCellDef, encounterIllustrationSpriteId } from '../../core/rightGrid'
+import { SPRITES } from '../../core/spriteIds'
 import type { CellBadge } from '../../core/mechanics/encounterHelpers'
 import {
   LEFT_PANEL_KIND_MAP,
@@ -179,7 +180,14 @@ function renderResources(s: State): string {
 
 function renderEncounter(s: State): string[] {
   if (!s.encounter) return []
-  return [`encounter: ${s.encounter.kind}`]
+  const kind = s.encounter.kind
+  const id = encounterIllustrationSpriteId(s)
+  const flavor =
+    id !== null
+      ? Object.entries({ ...SPRITES.flavor, ...SPRITES.enemies }).find(([, sid]) => sid === id)?.[0]
+      : undefined
+  if (flavor) return [`encounter: ${kind} [flavor: ${flavor}]`]
+  return [`encounter: ${kind}`]
 }
 
 function renderMessage(message: string): string[] {

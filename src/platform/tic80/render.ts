@@ -186,7 +186,7 @@ function drawDeltaOverlays(
   }
 }
 
-function drawMap(s: State, x: number, y: number, sizePx: number) {
+function drawMap(s: State, x: number, y: number, _sizePx: number) {
   const { markers } = computeGameMapView(s)
   const w = Math.max(1, s.world.width)
   const h = Math.max(1, s.world.height)
@@ -194,18 +194,20 @@ function drawMap(s: State, x: number, y: number, sizePx: number) {
   const viewport = Math.max(1, UI.UI_MAP_VIEWPORT_CELLS)
   const pitch = Math.max(1, UI.UI_MAP_CELL_PITCH_PX)
   const radius = Math.floor(viewport / 2)
-  const gridX = x + Math.floor((sizePx - pitch * viewport) / 2)
-  const gridY = y + Math.floor((sizePx - pitch * viewport) / 2)
+  const gridX = x + UI.UI_MAP_GRID_OFFSET_X_PX
+  const gridY = y
   const centerX = gridX + radius * pitch
   const centerY = gridY + radius * pitch
 
   const px = s.player.position.x
   const py = s.player.position.y
 
-  // Tile background: stamp the 8x8 map background sprite (visible area is 6x6), aligned top-left.
+  // 7x7 art in 8x8 sprites; checkerboard pair for seamless tiling. Grid is screen-fixed.
   for (let vy = -radius; vy <= radius; vy++) {
     for (let vx = -radius; vx <= radius; vx++) {
-      spr(SPRITES.ui.mapBackground, centerX + vx * pitch, centerY + vy * pitch, 0)
+      const bg =
+        (vx + vy) & 1 ? SPRITES.ui.mapBackgroundB : SPRITES.ui.mapBackgroundA
+      spr(bg, centerX + vx * pitch, centerY + vy * pitch, 0)
     }
   }
 
@@ -215,12 +217,17 @@ function drawMap(s: State, x: number, y: number, sizePx: number) {
     const dy = torusDelta(py, m.pos.y, h)
     if (Math.abs(dx) > radius || Math.abs(dy) > radius) continue
     const color = m.isMapped ? UI.UI_MAP_POI_TEXT_COLOR : UI.UI_MAP_POI_UNCOMMITTED_TEXT_COLOR
-    print(m.label, centerX + dx * pitch + UI.UI_MAP_POI_TEXT_OFFSET_X_PX, centerY + dy * pitch, color)
+    print(
+      m.label,
+      centerX + dx * pitch + UI.UI_MAP_POI_TEXT_OFFSET_X_PX,
+      centerY + dy * pitch + UI.UI_MAP_POI_TEXT_OFFSET_Y_PX,
+      color,
+    )
   }
 
   // Player marker never disappears on the rolling map.
-  // 8x8 outline sprite, inset -1,-1 so it surrounds the full pitch cell.
-  spr(SPRITES.ui.mapHereMarker, centerX - 1, centerY - 1, 0)
+  // 9x9 corner brackets in a 16x16 slot; inset -1,-1 frames the 7px pitch cell.
+  spr(SPRITES.ui.mapHereMarker, centerX - 1, centerY - 1, 0, 1, 0, 0, 2, 2)
 }
 
 // Visual reward escalation: bronze > blood > default. Ordered so the chrome
@@ -254,7 +261,7 @@ function drawLeftPanel({ state: s, ui }: RenderContext) {
   } else if (leftPanel.kind === LEFT_PANEL_KIND_SPRITE) {
     drawIllustrationWithTextureOverlay(leftPanel.spriteId, illX, illY)
   } else if (s.run.isGameOver) {
-    drawIllustrationWithTextureOverlay(SPRITES.centers.tombstone, illX, illY)
+    drawIllustrationWithTextureOverlay(SPRITES.flavor.tombstone, illX, illY)
   } else {
     const illSpriteId = encounterIllustrationSpriteId(s) ?? spriteIdAtPos
     drawIllustrationWithTextureOverlay(illSpriteId, illX, illY)
@@ -328,7 +335,7 @@ function drawCombatHitOddsDebug(s: State) {
   if (!SHOW_COMBAT_HIT_ODDS) return
   const pct = combatFightHitOddsPercent(s)
   if (pct == null) return
-  print(`${pct}%`, 146, 70, UI.UI_COLOR_TEXT)
+  print(`${pct}%`, 146, 72, UI.UI_COLOR_TEXT)
 }
 
 function drawRightPanelFrame(s: State) {

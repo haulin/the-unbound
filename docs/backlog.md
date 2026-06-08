@@ -260,12 +260,10 @@ Effects available to current or future slots. Includes both already-wired-to-dem
 
 ## Tech follow-ups
 
-- Animation scheduling: consider extracting reducer-side animation enqueueing into a dedicated pure helper once iteration stabilizes.
 - Spawn safety: ensure starting position is at least ~5 tiles away (torus Manhattan) from the Gate (and maybe other PoIs).
 - Mechanics registry: add a build-time validator that every `Encounter['kind']` value has a registered `reduceEncounterAction` handler. Today the dispatch silently no-ops if a handler is missing — fine in practice but unfriendly when adding a new encounter and forgetting to wire it.
 - Reducer global-allowlist tests: add a focused unit test asserting that `ACTION_TICK` prunes anims and `ACTION_TOGGLE_MAP` works during an active encounter. Today these are covered indirectly via acceptance tests; an explicit reducer-level test would lock the contract that globals always run before encounter dispatch.
 - Mechanics registry: replace the runtime `throw` checks in `src/core/mechanics/registry.ts` (rightGrid/reduceEncounterAction without encounterKind, duplicate encounterKind, kind-not-claimed for `enterFoodCostByKind` / `moveEventPolicyByKind`, policy percent ranges) with type-level constraints. Once moved into types, the file shrinks to ~15 lines of pure derivation.
-- Animation framework: domain code (`src/core/mechanics/defs/combat.ts`, `src/core/mechanics/encounterHelpers.ts`) shouldn't reference `ENABLE_ANIMATIONS`. The `enqueue*` helpers should no-op silently when animations are off, and only the renderer should branch.
 - Combat lore categorization (`ambush` vs `provoked`): combat owns intent-keyed line pools; source mechanics (henge, woods, swamp, mountain) signal intent rather than passing prebuilt strings. Defer until a third combat trigger appears.
 - Encounter open: each `onEnterTile` for an encounter mechanic re-checks `cell.kind` and re-fetches the cell via `getCellAt`. The dispatcher already narrows `cell.kind`; the second guard is dead defensive code. Drop after a sweep.
 

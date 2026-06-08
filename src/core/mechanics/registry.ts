@@ -66,7 +66,10 @@ export function buildMechanicIndex(mechanics: readonly MechanicDef[]): MechanicI
       seenEncounterKinds.add(ek)
       if (m.encounter.rightGrid) rightGridByEncounterKind[ek] = m.encounter.rightGrid
       if (m.encounter.reduceAction) reduceEncounterActionByEncounterKind[ek] = m.encounter.reduceAction
-      if (m.encounter.illustrationSpriteId) illustrationByEncounterKind[ek] = m.encounter.illustrationSpriteId
+      if (m.encounter.illustrationSpriteId !== undefined) {
+        const ill = m.encounter.illustrationSpriteId
+        illustrationByEncounterKind[ek] = typeof ill === 'function' ? ill : () => ill
+      }
       if (m.encounter.deltaAnchorsByTarget) {
         deltaAnchorsByTargetByEncounterKind[ek] = m.encounter.deltaAnchorsByTarget
       }

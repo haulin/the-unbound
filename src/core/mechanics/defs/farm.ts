@@ -22,7 +22,7 @@ import {
   loreMessage,
   makeRightGrid,
   noGoldResponse,
-  offerGridCell,
+  gridActionCell,
   openNamedPoiEncounter,
   poiTitleFor,
   previewEncounterProvider,
@@ -108,12 +108,12 @@ const reduceFarmAction: ReduceEncounterAction = (state, action) => {
 
 function reduceFarmBuyFood(state: State, farm: FarmCell): Change {
   const title = poiTitleFor(farm.name, 'Farm')
-  if (state.resources.food >= foodCarryCap(state.resources)) {
-    return setEncounterMessage(title, FOOD_CARRY_FULL_MESSAGE)
-  }
 
   const result = buy(state.resources, { gold: FARM_BUY_FOOD_GOLD_COST, gain: { food: FARM_BUY_FOOD_AMOUNT } })
   if (result.outcome === 'noFunds') return noGoldResponse(state, title)
+  if (state.resources.food >= foodCarryCap(state.resources)) {
+    return setEncounterMessage(title, FOOD_CARRY_FULL_MESSAGE)
+  }
 
   return {
     resources: applyFoodCapOnGain(state.resources, result.resources),
@@ -151,7 +151,7 @@ const placeNamedFarms: PlaceWorldProvider = ({ cells, rngState, seed }) => {
 function farmOfferSlot(s: State, slot: keyof ReturnType<typeof offersToGridLayout<FarmOfferKind>>) {
   const farm = getCellAt(s.world, s.player.position) as FarmCell
   const offer = offersToGridLayout(farm.offers)[slot]
-  return offer ? offerGridCell(FARM_OFFERS, offer)(s) : null
+  return offer ? gridActionCell(FARM_OFFERS, offer)(s) : null
 }
 
 function reduceFarmBuyBeast(state: State, farm: FarmCell): Change {
@@ -186,6 +186,6 @@ export const farmMechanic: MechanicDef = {
     reduceAction: reduceFarmAction,
     previewEncounter: previewEncounterProvider('farm'),
     rightGrid: farmRightGrid,
-    illustrationSpriteId: () => SPRITES.centers.farmBarn,
+    illustrationSpriteId: SPRITES.flavor.farmBarn,
   },
 }

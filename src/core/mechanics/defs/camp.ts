@@ -23,7 +23,7 @@ import {
   leaveEncounter,
   loreMessage,
   makeRightGrid,
-  offerGridCell,
+  gridActionCell,
   openNamedPoiEncounter,
   poiTitleFor,
   previewEncounterProvider,
@@ -106,7 +106,7 @@ const placeNamedCamps: PlaceWorldProvider = ({ cells, rngState, seed }) => {
 function campOfferSlot(s: State, slot: keyof ReturnType<typeof offersToGridLayout<CampOfferKind>>) {
   const camp = getCellAt(s.world, s.player.position) as CampCell
   const offer = offersToGridLayout(camp.offers)[slot]
-  return offer ? offerGridCell(CAMP_OFFERS, offer)(s) : null
+  return offer ? gridActionCell(CAMP_OFFERS, offer)(s) : null
 }
 
 const onEnterCamp: OnEnterTile = ({ cell, world, pos, stepCount }) => {
@@ -195,6 +195,6 @@ export const campMechanic: MechanicDef = {
     reduceAction: reduceCampAction,
     previewEncounter: previewEncounterProvider('camp'),
     rightGrid: campRightGrid,
-    illustrationSpriteId: () => SPRITES.centers.campfire,
+    illustrationSpriteId: SPRITES.flavor.campfire,
   },
 }

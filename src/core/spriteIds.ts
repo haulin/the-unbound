@@ -38,7 +38,7 @@ export const SPRITES = {
     gold: 204,
   },
 
-  // 16x16 opponent-side stats and boss illustrations.
+  // 16x16 opponent-side combat illustrations.
   enemies: {
     wyrm: 134,
     enemy: 132,
@@ -57,8 +57,8 @@ export const SPRITES = {
     rumor: 142,
   },
 
-  // 16x16 decorative centerpieces for encounter grids (never actionable).
-  centers: {
+  // 16x16 encounter left-panel illustrations (shops, game-over art).
+  flavor: {
     farmBarn: 162,
     locksmithKiln: 164,
     marketStall: 168,
@@ -81,8 +81,9 @@ export const SPRITES = {
     panelBorderBlood: 261,
     panelBorderBronze: 264,
     gridActionBorder: 267,
-    mapHereMarker: 306,
-    mapBackground: 307,
+    mapHereMarker: 313,
+    mapBackgroundA: 306,
+    mapBackgroundB: 307,
     previewGrain: 308,
     badgePrice: 310,
     badgeLeft: 311,

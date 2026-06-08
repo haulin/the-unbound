@@ -62,7 +62,7 @@ describe('rightGrid badges', () => {
     expect(grid(s, 1, 0)).toMatchObject({ badge: { variant: 'price', text: '-3' } })
     expect(grid(s, 0, 1)).toMatchObject({ badge: { variant: 'price', text: '-5' } })
     expect(grid(s, 2, 1)).toMatchObject({ badge: { variant: 'price', text: '-12' } })
-    expect(encounterIllustrationSpriteId(s)).toBe(SPRITES.centers.marketStall)
+    expect(encounterIllustrationSpriteId(s)).toBe(SPRITES.flavor.marketStall)
   })
 
   it('camp search has no badge; scout hire shows price', () => {
@@ -104,7 +104,7 @@ describe('rightGrid badges', () => {
     )
     const grid = rightGrid('combat')
     expect(grid(s, 1, 0)).toMatchObject({
-      spriteId: SPRITES.actions.fight,
+      spriteId: SPRITES.enemies.enemy,
       action: { type: ACTION_FIGHT },
       badge: { variant: 'left', text: `${enemyArmySize}` },
     })
@@ -136,7 +136,11 @@ describe('rightGrid badges', () => {
     )
     const grid = rightGrid('combat')
     expect(encounterIllustrationSpriteId(s)).toBe(SPRITES.enemies.wyrm)
-    expect(grid(s, 1, 0)).toMatchObject({ badge: { variant: 'left', text: `${WYRM_INITIAL_HEALTH}` } })
+    expect(grid(s, 1, 0)).toMatchObject({
+      spriteId: SPRITES.enemies.wyrm,
+      action: { type: ACTION_FIGHT },
+      badge: { variant: 'left', text: `${WYRM_INITIAL_HEALTH}` },
+    })
     expect(grid(s, 0, 1)).toMatchObject({ badge: { variant: 'price', text: `-${WYRM_PAY_GOLD_COST}` } })
   })
 

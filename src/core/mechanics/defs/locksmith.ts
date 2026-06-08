@@ -22,7 +22,7 @@ import {
   leaveEncounter,
   loreMessage,
   makeRightGrid,
-  offerGridCell,
+  gridActionCell,
   openNamedPoiEncounter,
   previewEncounterProvider,
   setEncounterMessage,
@@ -148,8 +148,8 @@ function useBloodVial(resources: State['resources']): State['resources'] {
 
 const locksmithRightGrid = makeRightGrid({
   leaveAction: { type: ACTION_LOCKSMITH_LEAVE },
-  top: offerGridCell(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_GOLD),
-  left: offerGridCell(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_FOOD),
+  top: gridActionCell(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_GOLD),
+  left: gridActionCell(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_FOOD),
 })
 
 export const locksmithMechanic: MechanicDef = {
@@ -167,6 +167,6 @@ export const locksmithMechanic: MechanicDef = {
     reduceAction: reduceLocksmithAction,
     previewEncounter: previewEncounterProvider('locksmith'),
     rightGrid: locksmithRightGrid,
-    illustrationSpriteId: () => SPRITES.centers.locksmithKiln,
+    illustrationSpriteId: SPRITES.flavor.locksmithKiln,
   },
 }
