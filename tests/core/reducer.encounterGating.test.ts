@@ -34,7 +34,8 @@ function makeState(): State {
       sourceCellId: 4,
       restoreMessage: 'X',
     },
-    ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+    ui: { message: '', leftPanel: { kind: 'auto' } },
+    pendingEvents: [],
   }
 }
 

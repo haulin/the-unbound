@@ -3,22 +3,19 @@ import {
   ACTION_NEW_RUN,
   ACTION_RESTART,
   ACTION_SHOW_GOAL,
-  ACTION_TICK,
   ACTION_TOGGLE_MAP,
   ACTION_TOGGLE_MINIMAP,
-  ENABLE_ANIMATIONS,
   GOAL_NARRATIVE,
   INITIAL_ARMY_SIZE,
   INITIAL_FOOD,
   INITIAL_GOLD,
   MAP_HINT_MESSAGE,
-  MOVE_SLIDE_FRAMES,
   FOOD_COST_DEFAULT,
 } from './constants'
 import { gameOverMessage, applyArmyZeroGameOver } from './gameOver'
 import { SPRITES } from './spriteIds'
 import { generateWorld } from './world'
-import { applyEnterAnims, onEnterDefaultTerrain } from './mechanics/encounterHelpers'
+import { onEnterDefaultTerrain } from './mechanics/encounterHelpers'
 import { MECHANIC_INDEX } from './mechanics'
 import type { TileEnterResult } from './mechanics/types'
 import {
@@ -27,61 +24,111 @@ import {
   LEFT_PANEL_KIND_MINIMAP,
   LEFT_PANEL_KIND_SPRITE,
   type Action,
-  type Anim,
+  type DeltaAnimTarget,
+  type DomainEvent,
+  type Encounter,
   type LeftPanel,
+  type Player,
   type Resources,
+  type Run,
   type State,
   type Ui,
   type Cell,
+  type World,
 } from './types'
-import { applyDeltas, pushResourceDeltas, type ResourceDelta } from './mechanics/encounterHelpers'
-import { enqueueAnim, enqueueGridTransition } from './uiAnim'
 import { applyFoodCapOnGain } from './foodCarry'
 import { updateRunPathMemoryAfterMove } from './gameMap'
 
-const { onEnterTileByKind } = MECHANIC_INDEX
-const { enterFoodCostByKind } = MECHANIC_INDEX
-const { reduceEncounterActionByEncounterKind } = MECHANIC_INDEX
+// MECHANIC_INDEX is read lazily through `MECHANIC_INDEX.foo[...]` accessors
+// inside function bodies. Reading at module top-level (e.g.
+// `const { onEnterTileByKind } = MECHANIC_INDEX`) would crash under circular
+// imports because the index isn't built yet when reducer.ts first evaluates.
 
+// Central state transition primitive. Mechanics return `Change` (or
+// `Change[]` for multi-beat); the dispatcher applies them via `commit` /
+// `applyChanges`. Resource-diff events are auto-derived from the post-clamp
+// `resources` (callers pass the final value, not deltas); explicit events
+// from `change.events` are appended after.
 
-function tickClock(ui: Ui): Ui {
+export type Change = {
+  world?: World
+  resources?: Resources
+  run?: Run
+  encounter?: Encounter | null
+  player?: Player
+  message?: string
+  leftPanel?: LeftPanel
+  // Explicit events the caller wants to emit (e.g. positionChanged,
+  // encounterOpened). Auto-derived resource events come first, then these in
+  // order. Mechanics never insert `phaseBoundary` here — the dispatcher does
+  // that between Changes in a `Change[]`.
+  events?: readonly DomainEvent[]
+}
+
+export function commit(state: State, change: Change): State {
+  const nextResources = change.resources ?? state.resources
+  const nextWorld = change.world ?? state.world
+  const nextRun = change.run ?? state.run
+  const nextEncounter = change.encounter !== undefined ? change.encounter : state.encounter
+  const nextPlayer = change.player ?? state.player
+  const nextMessage = change.message ?? state.ui.message
+  const nextLeftPanel = change.leftPanel ?? state.ui.leftPanel
+
+  const newEvents: DomainEvent[] = []
+  if (change.resources !== undefined) {
+    appendResourceDiffEvents(newEvents, state.resources, nextResources)
+  }
+  if (change.events) {
+    for (let i = 0; i < change.events.length; i++) newEvents.push(change.events[i]!)
+  }
+
   return {
-    message: ui.message,
-    leftPanel: ui.leftPanel,
-    clock: { frame: ui.clock.frame + 1 },
-    anim: ui.anim,
+    world: nextWorld,
+    player: nextPlayer,
+    run: nextRun,
+    resources: nextResources,
+    encounter: nextEncounter,
+    ui: { message: nextMessage, leftPanel: nextLeftPanel },
+    pendingEvents:
+      newEvents.length === 0 ? state.pendingEvents : [...state.pendingEvents, ...newEvents],
   }
 }
 
-function pruneExpiredAnims(ui: Ui): Ui {
-  const frame = ui.clock.frame
-  const active = ui.anim.active
-  const kept: Anim[] = []
-
-  for (let i = 0; i < active.length; i++) {
-    const a = active[i]!
-    const startFrame = a.startFrame
-    const durationFrames = a.durationFrames
-    const endFrame = startFrame + Math.max(0, durationFrames)
-    if (frame < endFrame) kept.push(a)
-  }
-
-  if (kept.length === active.length) return ui
-  return {
-    message: ui.message,
-    leftPanel: ui.leftPanel,
-    clock: ui.clock,
-    anim: { nextId: ui.anim.nextId, active: kept },
-  }
+// Append one `resourceChanged` event per non-zero per-target delta.
+// Mechanics that need the cost and gain shown as separate popups split them
+// across beats of a `Change[]` rather than emitting explicit events here.
+function appendResourceDiffEvents(
+  out: DomainEvent[],
+  prev: Resources,
+  next: Resources,
+): void {
+  pushIfDelta(out, 'food', next.food - prev.food)
+  pushIfDelta(out, 'gold', next.gold - prev.gold)
+  pushIfDelta(out, 'army', next.armySize - prev.armySize)
 }
 
-export function hasBlockingAnim(ui: Ui): boolean {
-  const active = ui.anim.active
-  for (let i = 0; i < active.length; i++) {
-    if (active[i]!.blocksInput) return true
-  }
-  return false
+function pushIfDelta(out: DomainEvent[], target: DeltaAnimTarget, delta: number): void {
+  if (delta) out.push({ kind: 'resourceChanged', target, delta })
 }
+
+// Apply a sequence of Changes with implicit `phaseBoundary` events between
+// beats. Each Change is one logical "beat" of the action; events within a
+// beat may run concurrently per the translator's policy, beats wait for the
+// prior beat's blocking work.
+export function applyChanges(state: State, changes: readonly Change[]): State {
+  let next = state
+  for (let i = 0; i < changes.length; i++) {
+    if (i > 0) {
+      next = { ...next, pendingEvents: [...next.pendingEvents, { kind: 'phaseBoundary' }] }
+    }
+    next = commit(next, changes[i]!)
+  }
+  return next
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
 
 function clearSpriteFocusIfAny(ui: Ui): LeftPanel {
   if (ui.leftPanel.kind === LEFT_PANEL_KIND_SPRITE) return { kind: LEFT_PANEL_KIND_AUTO }
@@ -94,25 +141,12 @@ function initialMessageForStart(): string {
 }
 
 function reduceGoal(s: State): State {
-  const prevUi = s.ui
-  const prevLeftPanel = prevUi.leftPanel
+  const prevLeftPanel = s.ui.leftPanel
   const nextLeftPanel: LeftPanel =
     prevLeftPanel.kind === LEFT_PANEL_KIND_MINIMAP
       ? prevLeftPanel
       : { kind: LEFT_PANEL_KIND_SPRITE, spriteId: SPRITES.actions.goal }
-  return {
-    world: s.world,
-    player: s.player,
-    run: s.run,
-    resources: s.resources,
-    encounter: s.encounter,
-    ui: {
-      clock: prevUi.clock,
-      anim: prevUi.anim,
-      message: GOAL_NARRATIVE,
-      leftPanel: nextLeftPanel,
-    },
-  }
+  return commit(s, { message: GOAL_NARRATIVE, leftPanel: nextLeftPanel })
 }
 
 function reduceToggleMinimap(s: State): State {
@@ -120,74 +154,42 @@ function reduceToggleMinimap(s: State): State {
   const prevLeftPanel = prevUi.leftPanel
 
   if (prevLeftPanel.kind === LEFT_PANEL_KIND_MAP) {
-    const nextMessage = prevUi.message === MAP_HINT_MESSAGE ? prevLeftPanel.restoreMessage : prevUi.message
-    return {
-      world: s.world,
-      player: s.player,
-      run: s.run,
-      resources: s.resources,
-      encounter: s.encounter,
-      ui: {
-        clock: prevUi.clock,
-        anim: prevUi.anim,
-        message: nextMessage,
-        leftPanel: { kind: LEFT_PANEL_KIND_MINIMAP },
-      },
-    }
+    const nextMessage =
+      prevUi.message === MAP_HINT_MESSAGE ? prevLeftPanel.restoreMessage : prevUi.message
+    return commit(s, {
+      message: nextMessage,
+      leftPanel: { kind: LEFT_PANEL_KIND_MINIMAP },
+    })
   }
 
   const nextLeftPanel: LeftPanel =
-    prevLeftPanel.kind === LEFT_PANEL_KIND_MINIMAP ? { kind: LEFT_PANEL_KIND_AUTO } : { kind: LEFT_PANEL_KIND_MINIMAP }
-  return {
-    world: s.world,
-    player: s.player,
-    run: s.run,
-    resources: s.resources,
-    encounter: s.encounter,
-    ui: {
-      clock: prevUi.clock,
-      anim: prevUi.anim,
-      message: prevUi.message,
-      leftPanel: nextLeftPanel,
-    },
-  }
+    prevLeftPanel.kind === LEFT_PANEL_KIND_MINIMAP
+      ? { kind: LEFT_PANEL_KIND_AUTO }
+      : { kind: LEFT_PANEL_KIND_MINIMAP }
+  return commit(s, { leftPanel: nextLeftPanel })
 }
 
 function reduceToggleMap(s: State): State {
   const prevUi = s.ui
   const prevLeftPanel = prevUi.leftPanel
 
-  // Close: restore prior panel + message (unless overwritten).
   if (prevLeftPanel.kind === LEFT_PANEL_KIND_MAP) {
-    const restoreMessage = prevUi.message === MAP_HINT_MESSAGE ? prevLeftPanel.restoreMessage : prevUi.message
-    return {
-      world: s.world,
-      player: s.player,
-      run: s.run,
-      resources: s.resources,
-      encounter: s.encounter,
-      ui: {
-        clock: prevUi.clock,
-        anim: prevUi.anim,
-        message: restoreMessage,
-        leftPanel: prevLeftPanel.restoreLeftPanel,
-      },
-    }
+    const restoreMessage =
+      prevUi.message === MAP_HINT_MESSAGE ? prevLeftPanel.restoreMessage : prevUi.message
+    return commit(s, {
+      message: restoreMessage,
+      leftPanel: prevLeftPanel.restoreLeftPanel,
+    })
   }
 
-  return {
-    world: s.world,
-    player: s.player,
-    run: s.run,
-    resources: s.resources,
-    encounter: s.encounter,
-    ui: {
-      clock: prevUi.clock,
-      anim: prevUi.anim,
-      message: MAP_HINT_MESSAGE,
-      leftPanel: { kind: LEFT_PANEL_KIND_MAP, restoreLeftPanel: prevLeftPanel, restoreMessage: prevUi.message },
+  return commit(s, {
+    message: MAP_HINT_MESSAGE,
+    leftPanel: {
+      kind: LEFT_PANEL_KIND_MAP,
+      restoreLeftPanel: prevLeftPanel,
+      restoreMessage: prevUi.message,
     },
-  }
+  })
 }
 
 function reduceMove(prevState: State, dx: number, dy: number): State {
@@ -206,64 +208,43 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
 
   const prevRes = prevState.resources
   const prevFood = prevRes.food
-  const cost = enterFoodCostByKind[cell.kind] ?? FOOD_COST_DEFAULT
+  const cost = MECHANIC_INDEX.enterFoodCostByKind[cell.kind] ?? FOOD_COST_DEFAULT
 
-  const foodDeltas: number[] = []
-  const goldDeltas: number[] = []
-  const armyDeltas: number[] = []
   let food: number
   let armySize: number
   if (prevFood >= cost) {
     food = prevFood - cost
-    foodDeltas.push(-cost)
     armySize = prevRes.armySize
   } else {
     food = 0
-    if (prevFood > 0) foodDeltas.push(-prevFood)
     armySize = prevRes.armySize - 1
-    armyDeltas.push(-1)
   }
 
   const baseResources: Resources = { ...prevRes, food, armySize }
 
-  // If the food cost killed the player, skip the tile handler entirely. The mechanic's side
-  // effects (cell mutations, RNG advances, would-be encounters, would-be wins) are all
-  // suppressed: the player died walking onto the tile, they didn't really "use" it. The
-  // game-over message is set below; nothing else from the tile is observable to the player.
+  // If the food cost killed the player, skip the tile handler entirely. The
+  // mechanic's side effects (cell mutations, RNG advances, would-be encounters,
+  // would-be wins) are all suppressed: the player died walking onto the tile.
   const wouldGameOver = baseResources.armySize <= 0
   const ctx = { cell, world, pos: nextPos, stepCount: nextStepCount, resources: baseResources }
   const outcome: TileEnterResult = wouldGameOver
     ? {}
-    : (onEnterTileByKind[cell.kind] ?? onEnterDefaultTerrain)(ctx)
+    : (MECHANIC_INDEX.onEnterTileByKind[cell.kind] ?? onEnterDefaultTerrain)(ctx)
 
   const nextWorld = outcome.world ?? world
   const nextResources = applyFoodCapOnGain(baseResources, outcome.resources ?? baseResources)
-  // Popup the *applied* food delta after carry-cap clamping (prevents +N popups when only +k fits).
-  const appliedFoodDelta = nextResources.food - baseResources.food
-  if (appliedFoodDelta) foodDeltas.push(appliedFoodDelta)
-  const appliedGoldDelta = nextResources.gold - baseResources.gold
-  if (appliedGoldDelta) goldDeltas.push(appliedGoldDelta)
   const nextHasWon = prevState.run.hasWon || !!outcome.hasWon
 
-  // wouldGameOver implies isGameOver (handler skipped, so resources unchanged from baseResources).
-  // Encounter actions that drop army to 0 are finalized in applyArmyZeroGameOver after the handler returns.
   const isGameOver = nextResources.armySize <= 0
-
   const nextEncounter = outcome.encounter ?? null
   const teleported = outcome.teleportTo != null
   const landingPos = teleported ? outcome.teleportTo! : nextPos
-  const finalKnowsPosition = teleported ? false : (prevState.run.knowsPosition || !!outcome.knowsPosition)
+  const finalKnowsPosition = teleported
+    ? false
+    : (prevState.run.knowsPosition || !!outcome.knowsPosition)
   const message = isGameOver
     ? gameOverMessage(nextWorld.seed, nextStepCount)
     : (outcome.message ?? onEnterDefaultTerrain(ctx).message)
-
-  const prevUi = prevState.ui
-  const baseUi: Ui = {
-    message,
-    leftPanel: clearSpriteFocusIfAny(prevUi),
-    clock: prevUi.clock,
-    anim: prevUi.anim,
-  }
 
   const mem = updateRunPathMemoryAfterMove({
     prevPath: prevState.run.path,
@@ -273,55 +254,44 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
     teleported,
   })
 
-  const baseState: State = {
-    world: nextWorld,
-    player: { position: landingPos },
-    run: {
-      ...prevState.run,
-      stepCount: nextStepCount,
-      hasWon: nextHasWon,
-      isGameOver,
-      knowsPosition: finalKnowsPosition,
-      path: mem.path,
-      lostBufferStartIndex: mem.lostBufferStartIndex,
+  // The slide / teleport-flash event is a position fact (not a resource
+  // diff), so it needs explicit emission.
+  const moveEvent: DomainEvent = teleported
+    ? { kind: 'teleported', from: prevPos, to: landingPos }
+    : { kind: 'positionChanged', from: prevPos, to: nextPos, dx, dy }
+
+  // Three beats: cost diff → slide → tile arrival (gain diff + encounter
+  // open). The cost popup is non-blocking, so it floats over the slide
+  // rather than blocking it. `applyChanges` inserts implicit `phaseBoundary`
+  // between beats so the slide (blocking) completes before the gain popup /
+  // encounter-open transition. Splitting cost and arrival also keeps the
+  // two food deltas as separate popups instead of collapsing into a single
+  // net diff.
+  const beats: Change[] = [
+    { resources: baseResources },
+    { player: { position: landingPos }, events: [moveEvent] },
+    {
+      world: nextWorld,
+      run: {
+        ...prevState.run,
+        stepCount: nextStepCount,
+        hasWon: nextHasWon,
+        isGameOver,
+        knowsPosition: finalKnowsPosition,
+        path: mem.path,
+        lostBufferStartIndex: mem.lostBufferStartIndex,
+      },
+      resources: nextResources,
+      encounter: nextEncounter,
+      message,
+      leftPanel: clearSpriteFocusIfAny(prevState.ui),
+      ...(nextEncounter && !isGameOver
+        ? { events: [{ kind: 'encounterOpened', encounterKind: nextEncounter.kind }] }
+        : {}),
     },
-    resources: nextResources,
-    encounter: nextEncounter,
-    ui: baseUi,
-  }
+  ]
 
-  if (!ENABLE_ANIMATIONS) return baseState
-
-  const moveDeltas: ResourceDelta[] = []
-  pushResourceDeltas(moveDeltas, 'food', foodDeltas)
-  pushResourceDeltas(moveDeltas, 'gold', goldDeltas)
-  pushResourceDeltas(moveDeltas, 'army', armyDeltas)
-  let next = applyDeltas(baseState, { message, deltas: moveDeltas })
-  const slideStart = next.ui.clock.frame
-
-  // Mechanic-supplied enter-anims (e.g. grid transitions into an encounter) play AFTER the
-  // move-slide reveal completes.
-  if (outcome.enterAnims && outcome.enterAnims.length) {
-    next = { ...next, ui: applyEnterAnims(next.ui, outcome.enterAnims, slideStart + MOVE_SLIDE_FRAMES) }
-  }
-
-  // Teleport flashes 'blank' → 'overworld' instead of sliding (the player doesn't walk there).
-  if (teleported) {
-    next = { ...next, ui: enqueueGridTransition(next.ui, { startFrame: slideStart, from: 'blank', to: 'overworld' }) }
-  } else {
-    next = {
-      ...next,
-      ui: enqueueAnim(next.ui, {
-        kind: 'moveSlide',
-        startFrame: slideStart,
-        durationFrames: MOVE_SLIDE_FRAMES,
-        blocksInput: true,
-        params: { fromPos: { x: prevPos.x, y: prevPos.y }, toPos: { x: nextPos.x, y: nextPos.y }, dx, dy },
-      }),
-    }
-  }
-
-  return next
+  return applyChanges(prevState, beats)
 }
 
 function reduceRestart(s: State): State {
@@ -340,25 +310,17 @@ export function processAction(prevState: State | null, action: Action): State | 
     const world = generated.world
     const playerPos = generated.startPosition
 
-    const hasWon = false
-
-    const baseUi: Ui = {
+    const ui: Ui = {
       message: initialMessageForStart(),
       leftPanel: { kind: LEFT_PANEL_KIND_AUTO },
-      clock: { frame: 0 },
-      anim: { nextId: 1, active: [] },
     }
-
-    const ui = ENABLE_ANIMATIONS
-      ? enqueueGridTransition(baseUi, { startFrame: 0, from: 'blank', to: 'overworld' })
-      : baseUi
 
     return {
       world,
       player: { position: { x: playerPos.x, y: playerPos.y } },
       run: {
         stepCount: 0,
-        hasWon,
+        hasWon: false,
         isGameOver: false,
         knowsPosition: false,
         path: [],
@@ -374,36 +336,54 @@ export function processAction(prevState: State | null, action: Action): State | 
       },
       encounter: null,
       ui,
+      pendingEvents: [{ kind: 'runStarted' }],
     }
   }
 
   if (prevState == null) return null
 
-  // Global allowlist: actions that always work regardless of encounter state.
-  // Order: TICK first because it's the highest-frequency action (one per frame).
-  if (action.type === ACTION_TICK) return reduceTick(prevState)
-  if (action.type === ACTION_RESTART) return reduceRestart(prevState)
-  if (action.type === ACTION_SHOW_GOAL) return reduceGoal(prevState)
-  if (action.type === ACTION_TOGGLE_MINIMAP) return reduceToggleMinimap(prevState)
-  if (action.type === ACTION_TOGGLE_MAP) return reduceToggleMap(prevState)
+  // `pendingEvents` is per-action: each platform reads it from the returned
+  // state and clears it on its own boundary. Reset here so every dispatch
+  // starts with a clean event log.
+  const stateBeforeDispatch: State =
+    prevState.pendingEvents.length === 0
+      ? prevState
+      : { ...prevState, pendingEvents: [] }
 
-  // Encounter dispatch: per-encounter mechanic owns its own action handlers. Skipped on
-  // game-over / win so handlers can assume an alive, in-progress run. Returns null when
-  // the handler doesn't claim this action (fall through to the move/no-op branches below).
-  if (prevState.encounter && !prevState.run.isGameOver && !prevState.run.hasWon) {
-    const handler = reduceEncounterActionByEncounterKind[prevState.encounter.kind]
+  // Global allowlist: actions that always work regardless of encounter state.
+  if (action.type === ACTION_RESTART) return reduceRestart(stateBeforeDispatch)
+  if (action.type === ACTION_SHOW_GOAL) return reduceGoal(stateBeforeDispatch)
+  if (action.type === ACTION_TOGGLE_MINIMAP) return reduceToggleMinimap(stateBeforeDispatch)
+  if (action.type === ACTION_TOGGLE_MAP) return reduceToggleMap(stateBeforeDispatch)
+
+  // Encounter dispatch: per-encounter mechanic owns its own action handlers.
+  if (
+    stateBeforeDispatch.encounter &&
+    !stateBeforeDispatch.run.isGameOver &&
+    !stateBeforeDispatch.run.hasWon
+  ) {
+    const handler =
+      MECHANIC_INDEX.reduceEncounterActionByEncounterKind[stateBeforeDispatch.encounter.kind]
     if (handler) {
-      const next = handler(prevState, action)
-      if (next != null) return applyArmyZeroGameOver(next)
+      const result = handler(stateBeforeDispatch, action)
+      if (result != null) {
+        return applyArmyZeroGameOver(applyEncounterResult(stateBeforeDispatch, result))
+      }
     }
   }
 
-  if (action.type === ACTION_MOVE) return reduceMove(prevState, action.dx, action.dy)
-  return prevState
+  if (action.type === ACTION_MOVE) return reduceMove(stateBeforeDispatch, action.dx, action.dy)
+  return stateBeforeDispatch
 }
 
-function reduceTick(prevState: State): State {
-  const tickedUi = ENABLE_ANIMATIONS ? pruneExpiredAnims(tickClock(prevState.ui)) : prevState.ui
-  return { ...prevState, ui: tickedUi }
+// A mechanic can return:
+//   - `Change` (single beat) — apply via `commit`.
+//   - `Change[]` (multi-beat) — apply via `applyChanges` (implicit
+//     phaseBoundary between beats).
+function applyEncounterResult(
+  state: State,
+  result: Change | readonly Change[],
+): State {
+  if (Array.isArray(result)) return applyChanges(state, result as readonly Change[])
+  return commit(state, result as Change)
 }
-

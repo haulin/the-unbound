@@ -77,7 +77,8 @@ function stateOnAmbush(opts: {
       armySize: opts.playerArmy,
     }),
     encounter: null,
-    ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+    ui: { message: '', leftPanel: { kind: 'auto' } },
+    pendingEvents: [],
   }
 }
 
@@ -147,7 +148,8 @@ export function stateOnHenge(opts: {
       armySize: opts.playerArmy,
     }),
     encounter: null,
-    ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+    ui: { message: '', leftPanel: { kind: 'auto' } },
+    pendingEvents: [],
   }
 }
 
@@ -187,7 +189,8 @@ export function stateOnLair(opts: { playerArmy: number; food?: number; gold?: nu
       armySize: opts.playerArmy,
     }),
     encounter: null,
-    ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+    ui: { message: '', leftPanel: { kind: 'auto' } },
+    pendingEvents: [],
   }
 }
 

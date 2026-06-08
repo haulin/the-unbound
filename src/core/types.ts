@@ -3,7 +3,6 @@ import type {
   ACTION_NEW_RUN,
   ACTION_RESTART,
   ACTION_SHOW_GOAL,
-  ACTION_TICK,
   ACTION_TOGGLE_MAP,
   ACTION_TOGGLE_MINIMAP,
 } from './constants'
@@ -121,37 +120,12 @@ export type LeftPanelMap = {
 
 export type LeftPanel = LeftPanelBase | LeftPanelMap
 
-export type UiClock = { frame: number }
-
-export type BaseAnim = {
-  id: number
-  startFrame: number
-  durationFrames: number
-  blocksInput: boolean
-}
-
-export type MoveSlideAnim = BaseAnim & {
-  kind: 'moveSlide'
-  params: { fromPos: Vec2; toPos: Vec2; dx: number; dy: number }
-}
-
+// Resource targets a `resourceChanged` DomainEvent can describe. TIC-80's
+// delta-popup animation reuses this enum verbatim (hence the legacy "Anim"
+// suffix); treat it as a domain resource id, not a renderer concept.
 export type DeltaAnimTarget = 'food' | 'gold' | 'army' | 'enemyArmy'
 
-export type DeltaAnim = BaseAnim & {
-  kind: 'delta'
-  params: { target: DeltaAnimTarget; delta: number }
-}
-
-export type GridTransitionAnim = BaseAnim & {
-  kind: 'gridTransition'
-  params: { from: GridFromKind; to: GridToKind }
-}
-
-export type Anim = MoveSlideAnim | DeltaAnim | GridTransitionAnim
-
-export type UiAnim = { nextId: number; active: Anim[] }
-
-export type Ui = { message: string; leftPanel: LeftPanel; clock: UiClock; anim: UiAnim }
+export type Ui = { message: string; leftPanel: LeftPanel }
 
 export type Player = { position: Vec2 }
 
@@ -216,13 +190,42 @@ export type LocksmithEncounter = {
 export type Encounter = CombatEncounter | CampEncounter | TownEncounter | FarmEncounter | LocksmithEncounter
 export type EncounterKind = Encounter['kind']
 
-// Grid-transition source/target. The right-grid cross can fly in/out between
-// the overworld view, an encounter view, or a fully blank view (used for
-// teleport "lost" reveals). Kept here so `GridTransitionAnim` stays self-contained.
+// Grid-transition source/target. Used by `encounterOpened` / `encounterClosed`
+// / `teleported` DomainEvents and by TIC-80's grid-transition animation. The
+// right-grid cross can fly in/out between the overworld view, an encounter
+// view, or a fully blank view (used for teleport "lost" reveals).
 export type GridFromKind = 'blank' | 'overworld' | EncounterKind
 export type GridToKind = 'overworld' | EncounterKind
 
-export type State = { world: World; player: Player; run: Run; resources: Resources; encounter: Encounter | null; ui: Ui }
+// ---- Domain events -----------------------------------------------------------
+//
+// Pure facts about what just happened in the game world, emitted by reducers
+// via `commit()` and consumed by per-platform translators. `phaseBoundary` is
+// the one exception — a translator instruction inserted by orchestration code
+// (e.g. `applyChanges` between beats) to serialize subsequent events behind
+// the prior phase's blocking work.
+export type DomainEvent =
+  | { kind: 'runStarted' }
+  | { kind: 'resourceChanged'; target: DeltaAnimTarget; delta: number }
+  | { kind: 'positionChanged'; from: Vec2; to: Vec2; dx: number; dy: number }
+  | { kind: 'teleported'; from: Vec2; to: Vec2 }
+  | { kind: 'encounterOpened'; encounterKind: EncounterKind }
+  | {
+      kind: 'encounterClosed'
+      encounterKind: EncounterKind
+      outcome: 'leave' | 'victory' | 'flee' | 'paid' | 'recruit' | 'purchase'
+    }
+  | { kind: 'phaseBoundary' }
+
+export type State = {
+  world: World
+  player: Player
+  run: Run
+  resources: Resources
+  encounter: Encounter | null
+  ui: Ui
+  pendingEvents: readonly DomainEvent[]
+}
 
 // Global actions + per-mechanic action unions aggregated from the defs.
 export type Action =
@@ -232,7 +235,6 @@ export type Action =
   | { type: typeof ACTION_TOGGLE_MINIMAP }
   | { type: typeof ACTION_TOGGLE_MAP }
   | { type: typeof ACTION_MOVE; dx: number; dy: number }
-  | { type: typeof ACTION_TICK }
   | CombatAction
   | CampAction
   | TownAction

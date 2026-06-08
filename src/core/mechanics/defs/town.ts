@@ -24,11 +24,11 @@ import {
 } from '../../constants'
 import { cellIdForPos, getCellAt } from '../../cells'
 import { applyFoodCapOnGain, foodCarryCap, FOOD_CARRY_FULL_MESSAGE } from '../../foodCarry'
+import type { Change } from '../../reducer'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
 import type { Cell, State, TownCell, TownEncounter } from '../../types'
 import {
-  applyDeltas,
   buy,
   encounterStableLine,
   leaveEncounter,
@@ -72,7 +72,7 @@ type TownOfferSpec = {
   category: OfferCategory
   spriteId: number
   priceKey: TownPriceKey
-  reduce: (s: State, town: TownCell) => State
+  reduce: (s: State, town: TownCell) => Change
   badge: (s: State) => CellBadge
 }
 
@@ -150,68 +150,68 @@ const onEnterTown: OnEnterTile = ({ cell, world, pos, stepCount, resources }) =>
   return { ...opened, knowsPosition: true, resources: nextResources }
 }
 
-const reduceTownAction: ReduceEncounterAction = (prevState, action) => {
-  if (action.type !== ACTION_TOWN_LEAVE && !(action.type in TOWN_OFFERS)) return null
-  if (action.type === ACTION_TOWN_LEAVE) return leaveEncounter(prevState, 'town')
-
-  const town = getCellAt(prevState.world, prevState.player.position) as TownCell
-  return TOWN_OFFERS[action.type as TownOfferKind].reduce(prevState, town)
+const reduceTownAction: ReduceEncounterAction = (state, action) => {
+  switch (action.type) {
+    case ACTION_TOWN_LEAVE:
+      return leaveEncounter(state, 'town')
+    case ACTION_TOWN_BUY_FOOD:
+    case ACTION_TOWN_BUY_TROOPS:
+    case ACTION_TOWN_HIRE_SCOUT:
+    case ACTION_TOWN_HIRE_HEALER:
+    case ACTION_TOWN_BUY_RUMOR: {
+      const town = getCellAt(state.world, state.player.position) as TownCell
+      return TOWN_OFFERS[action.type].reduce(state, town)
+    }
+    default:
+      return null
+  }
 }
 
-function reduceTownBuyFood(prevState: State, town: TownCell): State {
+function reduceTownBuyFood(state: State, town: TownCell): Change {
   const title = poiTitleFor(town.name, 'Town')
-  if (prevState.resources.food >= foodCarryCap(prevState.resources)) {
-    return setEncounterMessage(prevState, title, FOOD_CARRY_FULL_MESSAGE)
+  if (state.resources.food >= foodCarryCap(state.resources)) {
+    return setEncounterMessage(title, FOOD_CARRY_FULL_MESSAGE)
   }
 
-  const result = buy(prevState.resources, { gold: town.prices.foodGold, gain: { food: town.bundles.food } })
-  if (result.outcome === 'noFunds') return noGoldResponse(prevState, title)
+  const result = buy(state.resources, { gold: town.prices.foodGold, gain: { food: town.bundles.food } })
+  if (result.outcome === 'noFunds') return noGoldResponse(state, title)
 
-  const clamped = applyFoodCapOnGain(prevState.resources, result.resources)
-  const appliedFoodDelta = clamped.food - prevState.resources.food
-  const deltas = result.deltas.map((d) => (d.target === 'food' ? { ...d, delta: appliedFoodDelta } : d))
-
-  const line = encounterStableLine(prevState, 'town.buyFood', TOWN_BUY_LINES)
-  return applyDeltas(prevState, {
-    resources: clamped,
-    message: loreMessage(title, line),
-    deltas,
-  })
+  return {
+    resources: applyFoodCapOnGain(state.resources, result.resources),
+    message: loreMessage(title, encounterStableLine(state, 'town.buyFood', TOWN_BUY_LINES)),
+  }
 }
 
-function reduceTownBuyTroops(prevState: State, town: TownCell): State {
+function reduceTownBuyTroops(state: State, town: TownCell): Change {
   const title = poiTitleFor(town.name, 'Town')
-  const result = buy(prevState.resources, { gold: town.prices.troopsGold, gain: { armySize: town.bundles.troops } })
-  if (result.outcome === 'noFunds') return noGoldResponse(prevState, title)
+  const result = buy(state.resources, { gold: town.prices.troopsGold, gain: { armySize: town.bundles.troops } })
+  if (result.outcome === 'noFunds') return noGoldResponse(state, title)
 
-  const line = encounterStableLine(prevState, 'town.buyTroops', TOWN_BUY_LINES)
-  return applyDeltas(prevState, {
+  return {
     resources: result.resources,
-    message: loreMessage(title, line),
-    deltas: result.deltas,
-  })
+    message: loreMessage(title, encounterStableLine(state, 'town.buyTroops', TOWN_BUY_LINES)),
+  }
 }
 
-function reduceTownHireScout(prevState: State, town: TownCell): State {
+function reduceTownHireScout(state: State, town: TownCell): Change {
   const title = poiTitleFor(town.name, 'Town')
-  const refused = refuseCompanionHire(prevState, title, 'scout')
+  const refused = refuseCompanionHire(state, title, 'scout')
   if (refused) return refused
 
-  const rnd = RNG.createRunCopyRandom(prevState)
-  const result = buy(prevState.resources, { gold: town.prices.companionHireGold, gain: { party: ['scout'] } })
-  if (result.outcome === 'noFunds') return noGoldResponse(prevState, title)
+  const result = buy(state.resources, { gold: town.prices.companionHireGold, gain: { party: ['scout'] } })
+  if (result.outcome === 'noFunds') return noGoldResponse(state, title)
 
-  return applyDeltas(prevState, {
+  const rnd = RNG.createRunCopyRandom(state)
+  return {
     resources: result.resources,
     message: loreMessage(title, rnd.perMoveLine(TOWN_SCOUT_HIRE_LINES, { cellId: town.id })),
-    deltas: result.deltas,
-  })
+  }
 }
 
-function reduceTownHireHealer(prevState: State, town: TownCell): State {
+function reduceTownHireHealer(state: State, town: TownCell): Change {
   const title = poiTitleFor(town.name, 'Town')
-  const rnd = RNG.createRunCopyRandom(prevState)
-  return hireCompanion(prevState, {
+  const rnd = RNG.createRunCopyRandom(state)
+  return hireCompanion(state, {
     prefix: title,
     slotId: 'healer',
     goldCost: town.prices.companionHireGold,
@@ -219,29 +219,25 @@ function reduceTownHireHealer(prevState: State, town: TownCell): State {
   })
 }
 
-function reduceTownBuyRumor(prevState: State, town: TownCell): State {
+function reduceTownBuyRumor(state: State, town: TownCell): Change {
   const title = poiTitleFor(town.name, 'Town')
-  const enc = prevState.encounter
-  if (!enc || enc.kind !== 'town') return prevState
+  const enc = state.encounter as TownEncounter
   if (enc.rumorsBought >= TOWN_RUMORS_PER_VISIT_MAX) {
-    const line = encounterStableLine(prevState, 'rumor.cap', TOWN_RUMOR_EXHAUSTED_LINES)
-    return setEncounterMessage(prevState, title, line)
+    return setEncounterMessage(title, encounterStableLine(state, 'rumor.cap', TOWN_RUMOR_EXHAUSTED_LINES))
   }
 
-  const result = buy(prevState.resources, { gold: town.prices.rumorGold, gain: {} })
-  if (result.outcome === 'noFunds') return noGoldResponse(prevState, title)
+  const result = buy(state.resources, { gold: town.prices.rumorGold, gain: {} })
+  if (result.outcome === 'noFunds') return noGoldResponse(state, title)
 
   const pool = rumorPool()
-  const pick = RNG.createRunCopyRandom(prevState).advanceCursor(`town.rumor.${town.id}`, pool, { salt: town.id })
+  const pick = RNG.createRunCopyRandom(state).advanceCursor(`town.rumor.${town.id}`, pool, { salt: town.id })
   const nextEncounter: TownEncounter = { ...enc, rumorsBought: enc.rumorsBought + 1 }
-  return applyDeltas(
-    { ...prevState, encounter: nextEncounter, run: pick.nextState.run },
-    {
-      resources: result.resources,
-      message: loreMessage(title, pick.line),
-      deltas: result.deltas,
-    },
-  )
+  return {
+    encounter: nextEncounter,
+    run: pick.nextState.run,
+    resources: result.resources,
+    message: loreMessage(title, pick.line),
+  }
 }
 
 const placeNamedTowns: PlaceWorldProvider = ({ cells, rngState, seed }) => {
@@ -288,9 +284,8 @@ function townOfferSlot(s: State, slot: keyof ReturnType<typeof offersToGridLayou
   return offer ? offerGridCell(TOWN_OFFERS, offer)(s) : null
 }
 
-const { provider: townRightGrid, illustrationFor: townIllustration } = makeRightGrid({
+const townRightGrid = makeRightGrid({
   leaveAction: { type: ACTION_TOWN_LEAVE },
-  illustrationSpriteId: SPRITES.centers.marketStall,
   top: (s) => townOfferSlot(s, 'top'),
   left: (s) => townOfferSlot(s, 'left'),
   bottom: (s) => townOfferSlot(s, 'bottom'),
@@ -311,6 +306,6 @@ export const townMechanic: MechanicDef = {
     reduceAction: reduceTownAction,
     previewEncounter: previewEncounterProvider('town'),
     rightGrid: townRightGrid,
-    illustrationSpriteId: townIllustration,
+    illustrationSpriteId: () => SPRITES.centers.marketStall,
   },
 }

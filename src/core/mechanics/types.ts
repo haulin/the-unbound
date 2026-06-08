@@ -7,13 +7,12 @@ import type {
   DeltaAnimTarget,
   Encounter,
   EncounterKind,
-  GridFromKind,
-  GridToKind,
   Resources,
   State,
   Vec2,
   World,
 } from '../types'
+import type { Change } from '../reducer'
 import type { RightGridCellDef } from '../rightGrid'
 import type { CombatCloseOutcome, CombatVariantConfig } from './defs/combat'
 
@@ -38,10 +37,6 @@ export type MoveEventPolicy = {
 
 export type RightGridProvider = (s: State, row: number, col: number) => RightGridCellDef
 
-// Anim a mechanic asks the reducer to enqueue from `TileEnterResult.enterAnims`.
-// `afterFrames` is an offset (in frames) relative to the move-slide reveal.
-export type AnimSpec = { kind: 'gridTransition'; from: GridFromKind; to: GridToKind; afterFrames?: number }
-
 export type TileEnterCtx = {
   cell: Cell
   world: World
@@ -51,7 +46,7 @@ export type TileEnterCtx = {
 }
 
 // Single hook covering: tile-enter side effects, optional encounter open, optional cell mutations,
-// optional teleport, optional enter-animations.
+// optional teleport.
 //
 // Field omission semantics:
 //   - world / resources / encounter / message omitted = unchanged from caller.
@@ -61,8 +56,11 @@ export type TileEnterCtx = {
 //   - message omitted = the reducer applies the default-terrain lore message for cell.kind.
 //   - teleportTo omitted = no teleport; if set, reducer overrides the player's landing position.
 //
-// Resource-change popups: the reducer computes one food-delta popup automatically from
-// `resources.food` diff (after carry-cap clamping). Mechanics don't pass deltas explicitly.
+// Resource-change popups: `commit()` auto-derives `resourceChanged` events
+// from the prev → next resources diff (post carry-cap clamp), so handlers
+// never build delta arrays. Encounter-open: `reduceMove` reads `outcome.encounter`
+// and emits an explicit `encounterOpened` event on the arrival beat — handlers
+// only set the field; the event is the reducer's job.
 export type TileEnterResult = {
   world?: World
   resources?: Resources
@@ -73,15 +71,19 @@ export type TileEnterResult = {
   // false from here — only `teleportTo` clears the player's known position.
   knowsPosition?: boolean
   teleportTo?: Vec2 | null
-  enterAnims?: readonly AnimSpec[]
 }
 
 export type OnEnterTile = (ctx: TileEnterCtx) => TileEnterResult
 
-// Per-encounter action reducer. Returns null to mean "I don't handle this action"
-// (the main reducer falls through to global-allowlist or move handling).
-// Returns a State (possibly === prevState) to mean "I claim this action".
-export type ReduceEncounterAction = (state: State, action: Action) => State | null
+// Per-encounter action reducer. Returns:
+//   - `null` for "I don't handle this action" (the main reducer falls through
+//     to global-allowlist or move handling).
+//   - A single `Change` for a one-beat action (most PoI offers).
+//   - A `Change[]` for a multi-beat action (combat fight + close, etc.). The
+//     dispatcher inserts an implicit `phaseBoundary` event between beats so
+//     each beat's blocking animations serialize cleanly.
+export type EncounterReducerResult = Change | readonly Change[] | null
+export type ReduceEncounterAction = (state: State, action: Action) => EncounterReducerResult
 
 // Mechanic-owned feature placement during worldgen. The runner in `world.ts`
 // calls each mechanic's `placeWorld` in `MECHANICS` array order; each placer
@@ -129,12 +131,12 @@ export type MechanicDef = {
   placeWorld?: PlaceWorldProvider
 
   combatVariantByKind?: Partial<Record<CellKind, CombatVariantConfig>>
-  // Post-combat hook fired by `reduceCombatVictory`, `reduceCombatReturn`
-  // (flee), and `reduceCombatPay` (recruit success). Receives the encounter
-  // snapshot captured before it's cleared, so the hook can read e.g. the
-  // wounded count or the source cell id. Wyrm uses this to flip its lair's
-  // `isBled` flag on victory; henge uses it to maintain the persistent-band
-  // state machine (flee syncs `currentGroup`, victory/recruit clears it and
-  // starts cooldown).
+  // Post-combat hook invoked by `buildCombatCloseBeat` on the close path of
+  // `reduceCombatFight` (victory), `reduceCombatReturn` (flee), and
+  // `reduceCombatPay` (paid / recruit). Receives a synthetic snapshot with
+  // the encounter still set, so the hook can read e.g. the wounded count or
+  // the source cell id. Wyrm uses this to flip its lair's `isBled` flag on
+  // victory; henge uses it to maintain the persistent-band state machine
+  // (flee syncs `currentGroup`, victory/recruit clears it and starts cooldown).
   onCombatClosed?: (state: State, outcome: CombatCloseOutcome, encounter: CombatEncounter) => State
 }

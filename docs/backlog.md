@@ -11,6 +11,7 @@ Tentative milestones plus ideas in other sections below. Each milestone should c
 - Arriving in a farm with 1 food gives food, but game over as well.
 - Food delta UX: consider collapsing `-1` + `+N` into a single animated net delta when both occur on the same move.
 - Two signposts should not point to the same PoI?
+- Staggered delta popups jump mid-animation. When multiple deltas for the same target run concurrently (e.g. spam-buying food), `drawDeltaOverlays` packs them left-to-right based on the *currently-active* anim list, so as soon as the leftmost one expires the survivors shift left into its column. Pre-existing — became more visible with multi-beat moves. Desired behavior: each delta holds its column for its full lifetime; new deltas pick the leftmost free column (so a finished slot 0 gets re-used before slot N+1). Likely fix: stamp a stable `slot` index on the `DeltaAnim` at translation time (lowest free integer among same-target deltas with `endFrame > phaseCursor`) and render at `anchor.x + slot * fixedSlotWidth` instead of the running cursor.
 
 ## Polish for demo:
 - Balance pass: town prices, scout cost, combat gold drops...
@@ -26,14 +27,14 @@ Tentative milestones plus ideas in other sections below. Each milestone should c
 - make rainbows modals - if player chooses to not take gold, next visit it increases, maybe sell rumors as well - camps can do the same
 - Fight hit/miss is shown in lore lines.
 - first hit in fights does a max N damage (10?)
+- show round number during fights
+- battle log - every fight attempt marks ✓/✗ in the lore lines
 - sound fx
 - Consider making roads cost food only ~50% of the time (mechanics/balance change; would require tests + tuning).
 - skip modal if nothing to do (not enough money or cooldown - camp/farm/town)
 - every 28 days a plague comes that kills half your army
 - buying scout shows animation - switch to show map, reveal tiles, hide map (if it was hidden)
-- show round number during fights
-- battle log - every fight attempt marks ✓/✗ in the lore lines
-- morale modifying battle odds, +2, +5, +10% either way (curse could lower it, praying at altar could clear a curse)
+- morale modifying battle odds, +2, +5, +10% either way (curse could lower it, praying at altar could clear a curse, brewery would increase it for food and gold and step)
 - active item that allows you to auto-win a fight or land a hit at least
 - passive item no food consumed for 10 steps
 - bank gives interest on deposits
@@ -42,17 +43,19 @@ Tentative milestones plus ideas in other sections below. Each milestone should c
 - plant a tree to pick 5 free food every cooldown
 - different types of enemies (magic/strength) or different loot drops
 - companion that allows you to recruit goblins (goblin chief?)
+- companion that shows combat hit odds (strategist?)
 - Camp local map — see *Camp local map* in Deferred backlog.
 - maybe adjust worldgen as it feels like swamps & mountains are too common
 - When I accidentally leave a town I cannot return, have to step out and back. Consider 5 action buttons with middle leave/reenter.
 - PoI leave lines (camp/farm farewell)
+- increased difficulty after first win
 
 
 **v0.9 — Slot System: Trading & Farm Animals**
 
 See `docs/2026-05-27-slot-system-design.md` for the full design.
 
-- The Crossing PoI: new sell-only PoI. Buttons show held slots' sprites; tapping sells that slot for half its purchase price. Instance name pool: Salt Crossing, Crow's, Brass, Three-Lane, Big Oak, Stoneford, Pilgrim's. Worldgen: 1–2 per map.
+- The Crossing PoI: new sell-only PoI. Buttons show held slots' sprites; tapping sells that slot for half its purchase price. Instance name pool: Salt Crossing, Brass, Three-Lane, Big Oak, Stoneford, Pilgrim's. Worldgen: 1–2 per map.
 - Sprite-flash animation primitive: pulse slot icon when event-triggered effect fires. Shared by all slots with event-driven P or N.
 - Boar specialty added to Farm pool. P3' opening volley (~25% of enemy army at combat start) + N15 bidirectional Mule exclusion. New 16×16 sprite (low body, bristled back, tusks). Lore lines for `BOAR_*` and `*_REFUSED_LINES` already in `lore.ts`.
 - Mule update (paired with Boar): wire Mule end of the bidirectional exclusion. Mule N1 (-1 food per Camp Search) gets the sprite-flash treatment in passing. Also implement mule negative. Mule upside is not communicated well enough. Only one lore line spells it out.
@@ -77,7 +80,8 @@ See `docs/2026-05-27-slot-system-design.md` for the full design.
 - Gambling mini-game (bet gold, contextual buttons, slight house edge)
 - Tavern flavor text pool (warmer, unreliable narrator register)
 - Tavern rumors may reveal which Town carries which specialty hire (Scout / Healer / Fisherman).
-- Collectibles to find. Maybe just getting one of each creatures (healer/scout/beast) - shows on home page instead of question marks. Another home page challenge icon is - not using a map the whole run.
+- Collectibles to find. Maybe just getting one of each creatures (healer/scout/beast) - shows on home page instead of question marks.
+- Achievements - challenge icons - not using a map the whole run. Pacifist run - do not land a hit the whole run. Open gate with increased difficulty.
 
 **v0.13 — Second Gate (Silver)**
 - Silver keyholder, silver gate, silver border
@@ -254,12 +258,9 @@ Effects available to current or future slots. Includes both already-wired-to-dem
 - Cannot coexist with another named slot
 
 
-## Tech
+## Tech follow-ups
+
 - Animation scheduling: consider extracting reducer-side animation enqueueing into a dedicated pure helper once iteration stabilizes.
-
-
-## Prototype follow-ups
-
 - Spawn safety: ensure starting position is at least ~5 tiles away (torus Manhattan) from the Gate (and maybe other PoIs).
 - Mechanics registry: add a build-time validator that every `Encounter['kind']` value has a registered `reduceEncounterAction` handler. Today the dispatch silently no-ops if a handler is missing — fine in practice but unfriendly when adding a new encounter and forgetting to wire it.
 - Reducer global-allowlist tests: add a focused unit test asserting that `ACTION_TICK` prunes anims and `ACTION_TOGGLE_MAP` works during an active encounter. Today these are covered indirectly via acceptance tests; an explicit reducer-level test would lock the contract that globals always run before encounter dispatch.

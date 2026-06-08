@@ -5,12 +5,11 @@ import {
   ACTION_RESTART,
   CAMP_COOLDOWN_MOVES,
   CAMP_FOOD_GAIN,
-  ENABLE_ANIMATIONS,
   INITIAL_FOOD,
 } from '../../src/core/constants'
 import { ACTION_CAMP_LEAVE, ACTION_CAMP_SEARCH } from '../../src/core/mechanics/defs/camp'
 import { gameOverMessage as expectedGameOverLine } from '../../src/core/gameOver'
-import type { DeltaAnim, State, World } from '../../src/core/types'
+import type { State, World } from '../../src/core/types'
 import { makeResources } from './_helpers/makeResources'
 
 function makeWorld(): World {
@@ -40,7 +39,8 @@ function makeState(): State {
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
     resources: makeResources({ food: INITIAL_FOOD, gold: 0, armySize: 1 }),
     encounter: null,
-    ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+    ui: { message: '', leftPanel: { kind: 'auto' } },
+    pendingEvents: [],
   }
 }
 
@@ -65,7 +65,8 @@ describe('army + camps + game over', () => {
       run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
       resources: makeResources({ food: 2, gold: 0, armySize: 5 }),
       encounter: null,
-      ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+      ui: { message: '', leftPanel: { kind: 'auto' } },
+      pendingEvents: [],
     }
 
     const next = processAction(s, { type: ACTION_MOVE, dx: 1, dy: 0 })!
@@ -93,7 +94,8 @@ describe('army + camps + game over', () => {
       run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
       resources: makeResources({ food: 1, gold: 0, armySize: 5 }),
       encounter: null,
-      ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+      ui: { message: '', leftPanel: { kind: 'auto' } },
+      pendingEvents: [],
     }
 
     const next = processAction(s, { type: ACTION_MOVE, dx: 1, dy: 0 })!
@@ -124,10 +126,10 @@ describe('army + camps + game over', () => {
     const next = processAction(onto, { type: ACTION_CAMP_SEARCH })!
     expect(next.resources.food).toBe(CAMP_FOOD_GAIN)
 
-    if (ENABLE_ANIMATIONS) {
-      const foodDeltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'food')
-      expect(foodDeltas.some((a) => a.params.delta === CAMP_FOOD_GAIN)).toBe(true)
-    }
+    const foodDeltas = next.pendingEvents.filter(
+      (e) => e.kind === 'resourceChanged' && e.target === 'food',
+    )
+    expect(foodDeltas.some((e) => e.kind === 'resourceChanged' && e.delta === CAMP_FOOD_GAIN)).toBe(true)
   })
 
   it('a camp can be searched again once cooldown has passed', () => {

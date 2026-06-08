@@ -80,6 +80,7 @@ export const SPRITES = {
     panelBorder: 258,
     panelBorderBlood: 261,
     panelBorderBronze: 264,
+    gridActionBorder: 267,
     mapHereMarker: 306,
     mapBackground: 307,
     previewGrain: 308,

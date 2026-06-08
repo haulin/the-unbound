@@ -1,25 +1,10 @@
 import { readFileSync } from 'node:fs'
-import { ACTION_NEW_RUN, ACTION_TICK } from '../../core/constants'
+import { ACTION_NEW_RUN } from '../../core/constants'
 import { processAction } from '../../core/processAction'
-import { hasBlockingAnim } from '../../core/reducer'
 import type { State } from '../../core/types'
 import { parseBlind, parseMoves, parseMovesFile, parseSeed } from './args'
 import { actionForKey } from './input'
 import { renderState } from './render'
-
-// Animations are advisory in this platform — the agent doesn't see them.
-// We tick the clock until no blocking anim remains so the next prompt is
-// always actionable.
-function drainAnimations(state: State): State {
-  let s = state
-  let safety = 1024
-  while (s && hasBlockingAnim(s.ui) && safety-- > 0) {
-    const next = processAction(s, { type: ACTION_TICK })
-    if (!next) return s
-    s = next
-  }
-  return s
-}
 
 const args = process.argv.slice(2)
 const blind = parseBlind(args)
@@ -29,7 +14,7 @@ if (!initial) {
   process.exit(1)
   throw new Error('unreachable')
 }
-let state: State = drainAnimations(initial)
+let state: State = initial
 
 function paintAndPrompt(): void {
   if (!state) return
@@ -50,7 +35,7 @@ if (replayMoves !== null) {
     const action = actionForKey(state, ch, { blind })
     if (!action) continue
     const next = processAction(state, action)
-    if (next) state = drainAnimations(next)
+    if (next) state = next
   }
   console.log(renderState(state, { blind }))
   process.exit(0)
@@ -81,7 +66,7 @@ stdin.on('data', (chunk) => {
     const action = actionForKey(state, ch, { blind })
     if (!action) continue
     const next = processAction(state, action)
-    if (next) state = drainAnimations(next)
+    if (next) state = next
   }
 
   paintAndPrompt()

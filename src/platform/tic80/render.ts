@@ -1,5 +1,4 @@
 import {
-  ENABLE_ANIMATIONS,
   FOOD_WARNING_THRESHOLD,
   LORE_MAX_CHARS_PER_LINE,
   LOST_COORD_LABEL,
@@ -20,6 +19,7 @@ import {
   type DeltaAnimTarget,
   type State,
 } from '../../core/types'
+import type { Tic80UiState } from './anim'
 import { PANEL_LEFT_WIDTH, SCREEN_HEIGHT } from './layout'
 import * as Layout from './layout'
 import * as UI from './uiConstants'
@@ -27,11 +27,20 @@ import type { RenderHints } from './input'
 import { drawNineSliceFrame } from './nineSlice'
 import { buildRightGridRenderPlan, badgeTextAnchorPx, type RightGridRenderOp } from './rightGridRenderPlan'
 
-export function renderFrame(s: State, hints: RenderHints) {
+// Bundled inputs for the TIC-80 render pass. Orchestrators take this single
+// arg; pure deep helpers (delta overlays, anim lookups) stay on focused
+// args so their dependencies remain visible at the call site.
+export type RenderContext = {
+  state: State
+  ui: Tic80UiState
+  hints: RenderHints
+}
+
+export function renderFrame(ctx: RenderContext) {
   cls(UI.UI_COLOR_BG)
-  drawRightPanel(s, hints)
+  drawRightPanel(ctx)
   // Draw left panel last so it masks any right-panel animation overflow into x < PANEL_LEFT_WIDTH.
-  drawLeftPanel(s)
+  drawLeftPanel(ctx)
 }
 
 // ----------------------------
@@ -140,22 +149,23 @@ function deltaAnchorsFromGridSpecs(
   return anchors
 }
 
-// Animated +/- delta overlays. One shared pass for every delta animation —
-// callers wire up which targets to draw and where each one anchors.
 function drawHeroStat(x: number, y: number, spriteId: number, text: string, color: number) {
   spr(spriteId, x, y, -1, 1, 0, 0, 2, 2)
   print(text, x + 19, y + 5, color) // 16px icon + 3px label gap; 5px text baseline
 }
 
-function drawDeltaOverlays(s: State, anchors: Partial<Record<DeltaAnimTarget, DeltaAnchor>>) {
-  if (!ENABLE_ANIMATIONS) return
-  const anims = s.ui.anim.active
-  const frame = s.ui.clock.frame
+function drawDeltaOverlays(
+  ui: Tic80UiState,
+  anchors: Partial<Record<DeltaAnimTarget, DeltaAnchor>>,
+) {
+  const anims = ui.anim.active
+  const frame = ui.clock.frame
   const cursorByTarget: Partial<Record<DeltaAnimTarget, number>> = {}
 
   for (let i = 0; i < anims.length; i++) {
     const a = anims[i]!
     if (a.kind !== 'delta') continue
+    if (frame < a.startFrame) continue
     const anchor = anchors[a.params.target]
     if (!anchor) continue
     const delta = a.params.delta
@@ -222,7 +232,7 @@ function panelFrameTopLeftFor(s: State): number {
   return SPRITES.ui.panelBorder
 }
 
-function drawLeftPanel(s: State) {
+function drawLeftPanel({ state: s, ui }: RenderContext) {
   rect(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, UI.UI_COLOR_BG)
   drawNineSliceFrame(0, 0, PANEL_LEFT_WIDTH, SCREEN_HEIGHT, panelFrameTopLeftFor(s), {
     fallbackBorderColor: UI.UI_COLOR_DIM,
@@ -270,7 +280,7 @@ function drawLeftPanel(s: State) {
 
   const gold = { x: HERO_STATS_X, y: statY }
   drawHeroStat(gold.x, gold.y, SPRITES.inventory.gold, `${s.resources.gold}`, UI.UI_COLOR_TEXT)
-  drawDeltaOverlays(s, { army, food, gold })
+  drawDeltaOverlays(ui, { army, food, gold })
 
   const statusBottomY = gold.y + 16 + 2
   const headerBottomY = Math.max(headerBandBottomY, statusBottomY)
@@ -297,8 +307,9 @@ function drawLeftPanel(s: State) {
 // ----------------------------
 // Right panel
 // ----------------------------
-function drawRightPanel(s: State, hints: RenderHints) {
-  const plan = buildRightGridRenderPlan(s, hints)
+function drawRightPanel(ctx: RenderContext) {
+  const { state: s, ui } = ctx
+  const plan = buildRightGridRenderPlan(ctx)
   drawRightGridOps(plan.ops)
   drawCombatHitOddsDebug(s)
   drawRightStatsBand(s)
@@ -309,7 +320,7 @@ function drawRightPanel(s: State, hints: RenderHints) {
   const encounterKind = s.encounter?.kind ?? null
   if (encounterKind) {
     const anchorSpecs = MECHANIC_INDEX.deltaAnchorsByTargetByEncounterKind[encounterKind]
-    if (anchorSpecs) drawDeltaOverlays(s, deltaAnchorsFromGridSpecs(anchorSpecs))
+    if (anchorSpecs) drawDeltaOverlays(ui, deltaAnchorsFromGridSpecs(anchorSpecs))
   }
 }
 
@@ -492,6 +503,12 @@ function drawRightGridOps(ops: RightGridRenderOp[]) {
     else if (op.kind === 'print') print(op.text, op.x, op.y, op.color)
     else if (op.kind === 'badgePill') {
       drawHorizontalBadgePill(op.spriteId, op.x, op.y, op.w, op.h, op.capPx, op.sheetWidthPx, op.colorkey)
+    }
+    else if (op.kind === 'nineSlice') {
+      drawNineSliceFrame(op.x, op.y, op.w, op.h, op.topLeftSpriteId, {
+        colorkey: op.colorkey,
+        fallbackBorderColor: UI.UI_COLOR_GRID_CELL_BORDER,
+      })
     }
     else spr(op.spriteId, op.x, op.y, op.colorkey, op.scale, op.flip, op.rotate, op.w, op.h)
   }

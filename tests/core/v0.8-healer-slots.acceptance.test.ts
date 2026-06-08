@@ -32,7 +32,8 @@ function makeState(town: TownCell, resources = makeResources({ food: 10, gold: 2
     run: { stepCount: 5, hasWon: false, isGameOver: false, knowsPosition: true, path: [], lostBufferStartIndex: null },
     resources,
     encounter: null,
-    ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+    ui: { message: '', leftPanel: { kind: 'auto' } },
+    pendingEvents: [],
   }
 }
 
@@ -151,7 +152,8 @@ describe('v0.8 healer + slots acceptance', () => {
         party: ['healer'],
       }),
       encounter: null,
-      ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+      ui: { message: '', leftPanel: { kind: 'auto' } },
+      pendingEvents: [],
     }
     const inCombat = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     expect(inCombat.encounter?.kind).toBe('combat')

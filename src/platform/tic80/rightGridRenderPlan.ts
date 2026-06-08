@@ -1,16 +1,13 @@
-import {
-  ENABLE_ANIMATIONS,
-  GRID_TRANSITION_STEP_FRAMES,
-} from '../../core/constants'
 import { MECHANIC_INDEX } from '../../core/mechanics'
 import { getRightGridCellDef, type RightGridCellDef } from '../../core/rightGrid'
 import type { CellBadge } from '../../core/mechanics/encounterHelpers'
 import { getSpriteIdAt } from '../../core/cells'
-import type { GridFromKind, GridTransitionAnim, MoveSlideAnim, State } from '../../core/types'
+import type { GridFromKind, State } from '../../core/types'
 import { SPRITES } from '../../core/spriteIds'
 import * as Layout from './layout'
-import type { RenderHints } from './input'
 import * as UI from './uiConstants'
+import type { GridTransitionAnim, MoveSlideAnim, Tic80UiState } from './anim'
+import type { RenderContext } from './render'
 
 type Cell = { row: number; col: number }
 type Rect = { x: number; y: number; w: number; h: number }
@@ -28,6 +25,15 @@ export type RightGridRenderOp =
       h: number
       capPx: number
       sheetWidthPx: number
+      colorkey: number
+    }
+  | {
+      kind: 'nineSlice'
+      x: number
+      y: number
+      w: number
+      h: number
+      topLeftSpriteId: number
       colorkey: number
     }
   | {
@@ -64,12 +70,11 @@ export function gridCrossRevealPhaseIndex(row: number, col: number): number {
 }
 
 export function gridTransitionDurationFrames(): number {
-  return Math.max(1, GRID_TRANSITION_STEP_FRAMES | 0) * GRID_CROSS_REVEAL_ORDER.length
+  return Math.max(1, UI.GRID_TRANSITION_STEP_FRAMES | 0) * GRID_CROSS_REVEAL_ORDER.length
 }
 
-function findGridTransitionAnim(s: State): GridTransitionAnim | null {
-  if (!ENABLE_ANIMATIONS) return null
-  const anims = s.ui.anim.active
+function findGridTransitionAnim(ui: Tic80UiState): GridTransitionAnim | null {
+  const anims = ui.anim.active
   for (let i = 0; i < anims.length; i++) {
     const a = anims[i]!
     if (a.kind === 'gridTransition') return a as GridTransitionAnim
@@ -79,15 +84,15 @@ function findGridTransitionAnim(s: State): GridTransitionAnim | null {
 
 // Returns the from/to mode for this cell at the current spiral reveal phase,
 // or null if no transition is active or the cell isn't part of the cross.
-function transitionModeForCell(s: State, row: number, col: number): GridFromKind | null {
-  const transition = findGridTransitionAnim(s)
+function transitionModeForCell(ui: Tic80UiState, row: number, col: number): GridFromKind | null {
+  const transition = findGridTransitionAnim(ui)
   if (!transition) return null
   const idx = gridCrossRevealPhaseIndex(row, col)
   if (idx < 0) return null
-  const frame = s.ui.clock.frame | 0
+  const frame = ui.clock.frame | 0
   const start = transition.startFrame | 0
   if (frame < start) return transition.params.from
-  const stepFrames = Math.max(1, GRID_TRANSITION_STEP_FRAMES | 0)
+  const stepFrames = Math.max(1, UI.GRID_TRANSITION_STEP_FRAMES | 0)
   const phase = Math.floor((frame - start) / stepFrames)
   return phase >= idx ? transition.params.to : transition.params.from
 }
@@ -151,7 +156,7 @@ function badgeTopLeftPx(row: number, col: number): { x: number; y: number } {
 // no-border rule, and the cross-reveal animation in one place. Border ops and
 // sprite ops downstream both read from this single source so they animate in
 // lockstep.
-function viewForCell(s: State, row: number, col: number): CellView {
+function viewForCell({ state: s, ui }: RenderContext, row: number, col: number): CellView {
   if (isMetaCornerCell({ row, col })) {
     const def = getRightGridCellDef(s, row, col)
     return { spriteId: def.spriteId ?? null, category: 'meta' }
@@ -164,7 +169,7 @@ function viewForCell(s: State, row: number, col: number): CellView {
     return { spriteId: view.spriteId, category: 'empty' }
   }
 
-  const mode = transitionModeForCell(s, row, col)
+  const mode = transitionModeForCell(ui, row, col)
   if (mode === 'blank') return { spriteId: null, category: 'empty' }
 
   const stateAt = mode != null ? synthesizeStateForMode(s, mode) : s
@@ -203,6 +208,18 @@ function rectbOp(x: number, y: number, w: number, h: number, color: number): Rig
   return { kind: 'rectb', x, y, w, h, color }
 }
 
+function nineSliceOp(x: number, y: number, w: number, h: number, topLeftSpriteId: number): RightGridRenderOp {
+  return {
+    kind: 'nineSlice',
+    x,
+    y,
+    w,
+    h,
+    topLeftSpriteId,
+    colorkey: UI.UI_GRID_ACTION_BORDER_COLORKEY,
+  }
+}
+
 function borderOpsForCell(row: number, col: number, category: CellCategory): RightGridRenderOp[] {
   if (category === 'empty') return []
   const o = cellOriginPx(row, col)
@@ -212,7 +229,7 @@ function borderOpsForCell(row: number, col: number, category: CellCategory): Rig
     return [rectbOp(o.x, o.y, size, size, UI.UI_COLOR_GRID_CELL_BORDER_META)]
   }
   if (category === 'action') {
-    return [rectbOp(o.x, o.y, size, size, UI.UI_COLOR_GRID_CELL_BORDER)]
+    return [nineSliceOp(o.x, o.y, size, size, SPRITES.ui.gridActionBorder)]
   }
   // terrain: double border (outer + inner with 1px gap)
   const inset = UI.UI_GRID_CELL_BORDER_DOUBLE_INSET
@@ -256,11 +273,11 @@ function actionCellOps(row: number, col: number, view: CellView): RightGridRende
   return ops
 }
 
-function cellBorderOps(s: State): RightGridRenderOp[] {
+function cellBorderOps(ctx: RenderContext): RightGridRenderOp[] {
   const ops: RightGridRenderOp[] = []
   for (let row = 0; row < Layout.GRID_ROWS; row++) {
     for (let col = 0; col < Layout.GRID_COLS; col++) {
-      const view = viewForCell(s, row, col)
+      const view = viewForCell(ctx, row, col)
       ops.push(...actionCellOps(row, col, view))
     }
   }
@@ -287,9 +304,8 @@ function drawHoverTintOps(cell: Cell): RightGridRenderOp[] {
   return [rectOp(o.x, o.y, Layout.CELL_SIZE_PX, Layout.CELL_SIZE_PX, UI.UI_COLOR_GRID_HOVER_TINT)]
 }
 
-function findMoveSlideAnim(s: State): MoveSlideAnim | null {
-  if (!ENABLE_ANIMATIONS) return null
-  const anims = s.ui.anim.active
+function findMoveSlideAnim(ui: Tic80UiState): MoveSlideAnim | null {
+  const anims = ui.anim.active
   for (let i = 0; i < anims.length; i++) {
     const a = anims[i]!
     if (a.kind === 'moveSlide') return a as MoveSlideAnim
@@ -378,14 +394,14 @@ function maskGridGapsOps(): RightGridRenderOp[] {
   ]
 }
 
-function buildStaticPlan(s: State, hover: Cell | null): RightGridRenderPlan {
+function buildStaticPlan(ctx: RenderContext, hover: Cell | null): RightGridRenderPlan {
   const ops: RightGridRenderOp[] = []
 
   for (let row = 0; row < Layout.GRID_ROWS; row++) {
     for (let col = 0; col < Layout.GRID_COLS; col++) {
       if (hover && hover.row === row && hover.col === col) ops.push(...drawHoverTintOps({ row, col }))
 
-      const view = viewForCell(s, row, col)
+      const view = viewForCell(ctx, row, col)
       if (view.spriteId == null) continue
 
       const o = spriteOriginInCellPx(row, col)
@@ -393,12 +409,17 @@ function buildStaticPlan(s: State, hover: Cell | null): RightGridRenderPlan {
     }
   }
 
-  ops.push(...cellBorderOps(s))
+  ops.push(...cellBorderOps(ctx))
   return { ops }
 }
 
-function buildMoveSlidePlan(s: State, anim: MoveSlideAnim, hover: Cell | null): RightGridRenderPlan {
-  const frame = s.ui.clock.frame | 0
+function buildMoveSlidePlan(
+  ctx: RenderContext,
+  anim: MoveSlideAnim,
+  hover: Cell | null,
+): RightGridRenderPlan {
+  const { state: s, ui } = ctx
+  const frame = ui.clock.frame | 0
   const startFrame = anim.startFrame | 0
   const durationFrames = Math.max(1, anim.durationFrames | 0)
   const t = Math.max(0, Math.min(durationFrames, frame - startFrame))
@@ -463,14 +484,13 @@ function buildMoveSlidePlan(s: State, anim: MoveSlideAnim, hover: Cell | null): 
     }
   }
 
-  ops.push(...cellBorderOps(s))
+  ops.push(...cellBorderOps(ctx))
   return { ops }
 }
 
-export function buildRightGridRenderPlan(s: State, hints: RenderHints): RightGridRenderPlan {
-  const hover = hints.rightGridHoverCell
-  const moveSlide = findMoveSlideAnim(s)
-  if (!moveSlide) return buildStaticPlan(s, hover)
-  return buildMoveSlidePlan(s, moveSlide, hover)
+export function buildRightGridRenderPlan(ctx: RenderContext): RightGridRenderPlan {
+  const hover = ctx.hints.rightGridHoverCell
+  const moveSlide = findMoveSlideAnim(ctx.ui)
+  if (!moveSlide) return buildStaticPlan(ctx, hover)
+  return buildMoveSlidePlan(ctx, moveSlide, hover)
 }
-

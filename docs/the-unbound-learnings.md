@@ -152,6 +152,7 @@ Animation should improve feel/legibility without infecting game logic.
 
 - Prefer **animation as data** advanced by a simple clock/tick, so it can be replaced or disabled without rewriting core mechanics.
 - Prefer **renderer consumes models, not mechanics**: compute deterministic models in core; platform renderers should not replicate game rules.
+- **Core emits timing-free events; platform stamps the frames.** Core mechanics return state diffs plus a list of `DomainEvent`s describing what changed (resource, position, encounter open/close, phase boundaries). The platform owns its own clock and animation queue, and a single translator converts events to timed entries. `core/` must never import from `platform/`, and core code must never reference animation frame counts, easing, or "is animation enabled" flags — those are platform concerns. The translator is the only choke point where the timing policy lives.
 
 ### Docs reflect the final intent, not the history
 

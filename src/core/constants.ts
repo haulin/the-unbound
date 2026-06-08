@@ -12,7 +12,6 @@ export const SCOUT_GLOBAL_REVEAL_KINDS: readonly CellKind[] = ['farm', 'camp', '
 export const WORLD_WIDTH = 10
 export const WORLD_HEIGHT = 10
 export const INITIAL_SEED = 47 // Don't go higher than 4 digits because of UI limitations.
-export const ENABLE_ANIMATIONS = true
 /** Debug: show next-round hit % below the Fight button in combat. */
 export const SHOW_COMBAT_HIT_ODDS = true
 
@@ -167,8 +166,6 @@ export function terrainLoreLinesForKind(kind: CellKind): readonly string[] {
   }
 }
 
-export const FOOD_DELTA_FRAMES = 36
-
 // Lore strings + name pools are defined in `lore.ts`.
 
 // Terrain move events (lost / ambush / quiet)
@@ -190,8 +187,6 @@ export const MOUNTAIN_FIND_FOOD_BASE = 2
 
 export const TERRAIN_FIND_AMOUNT_NOISE = 2
 // LOST_* are defined in `lore.ts`.
-
-export const GRID_TRANSITION_STEP_FRAMES = 5
 
 export const BRIGAND_RECRUIT_MAX_REMAINING = 5
 export const BRIGAND_GOLD_NOISE = 3
@@ -216,8 +211,6 @@ export const ACTION_MOVE = 'MOVE' as const
 export const ACTION_SHOW_GOAL = 'SHOW_GOAL' as const
 export const ACTION_TOGGLE_MINIMAP = 'TOGGLE_MINIMAP' as const
 export const ACTION_TOGGLE_MAP = 'TOGGLE_MAP' as const
-export const ACTION_TICK = 'TICK' as const
 
-export const MOVE_SLIDE_FRAMES = 15
 export const LORE_MAX_CHARS_PER_LINE = 20
 

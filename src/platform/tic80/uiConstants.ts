@@ -14,20 +14,6 @@ export const UI_COLOR_BAD = 2 // red
 export const UI_COLOR_POI_NAME = 11
 export const UI_COLOR_POI_DESC = 13
 export const UI_COLOR_GRID_HOVER_TINT = 15
-// Right-panel seed/position/steps band — dimmer than hero stats (UI_COLOR_TEXT).
-export const UI_COLOR_RIGHT_STATS_TEXT = UI_COLOR_POI_DESC
-// Right-grid cell borders. Action/terrain share one color; shape (single vs
-// double) carries the distinction.
-export const UI_COLOR_GRID_CELL_BORDER = 14
-export const UI_COLOR_GRID_CELL_BORDER_META = 15
-
-export const UI_GRID_CELL_BORDER_DOUBLE_INSET = 2
-
-export const UI_COLOR_RIGHT_PANEL_DIVIDER = 15
-
-export const UI_STATS_BAND_ITEM_GAP_PX = 3
-export const UI_STATS_BAND_ICON_VALUE_GAP_PX = 2
-export const UI_HELD_BAND_ICON_GAP_PX = 2
 
 // Sprite IDs are referenced directly from `SPRITES` in the renderer.
 
@@ -42,6 +28,23 @@ export const UI_MAP_CELL_PITCH_PX = 6
 export const UI_MAP_POI_TEXT_COLOR = 13
 export const UI_MAP_POI_UNCOMMITTED_TEXT_COLOR = UI_COLOR_BG
 export const UI_MAP_POI_TEXT_OFFSET_X_PX = 1
+
+// Right-panel seed/position/steps band — dimmer than hero stats (UI_COLOR_TEXT).
+export const UI_COLOR_RIGHT_STATS_TEXT = UI_COLOR_POI_DESC
+// Right-grid cell borders. Action/terrain share one color; shape (single vs
+// double) carries the distinction.
+export const UI_COLOR_GRID_CELL_BORDER = 14
+export const UI_COLOR_GRID_CELL_BORDER_META = 15
+// Right-grid action button nine-slice: keyed #8 so hover tint shows through cutouts.
+export const UI_GRID_ACTION_BORDER_COLORKEY = UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR
+
+export const UI_GRID_CELL_BORDER_DOUBLE_INSET = 2
+
+export const UI_COLOR_RIGHT_PANEL_DIVIDER = 15
+
+export const UI_STATS_BAND_ITEM_GAP_PX = 3
+export const UI_STATS_BAND_ICON_VALUE_GAP_PX = 2
+export const UI_HELD_BAND_ICON_GAP_PX = 2
 
 // Right grid sprite draw policy.
 export const UI_RIGHT_GRID_SPRITE_SCALE = 1 // 16->16
@@ -86,4 +89,13 @@ export const UI_DELTA_OFFSET_X = 2
 export const UI_DELTA_OFFSET_Y = 2
 export const UI_DELTA_RISE_PX = 6
 export const UI_DELTA_GAP_PX = -4
+
+// Animation timing (frames).
+export const MOVE_SLIDE_FRAMES = 15
+export const FOOD_DELTA_FRAMES = 36
+export const GRID_TRANSITION_STEP_FRAMES = 5
+
+// When false, the translator is a no-op and the renderer paints the static
+// post-dispatch state.
+export const ENABLE_ANIMATIONS = true
 

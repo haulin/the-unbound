@@ -77,7 +77,8 @@ function makeState(world: World): State {
     },
     resources: makeResources({ food: 5, gold: 0, armySize: 5 }),
     encounter: null,
-    ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+    ui: { message: '', leftPanel: { kind: 'auto' } },
+    pendingEvents: [],
   }
 }
 
@@ -163,7 +164,7 @@ describe('v0.4 farm modal', () => {
     expect(onto.encounter?.kind).toBe('farm')
 
     const ignored = processAction(onto, { type: ACTION_MOVE, dx: 1, dy: 0 })!
-    expect(ignored).toBe(onto)
+    expect(ignored).toEqual({ ...onto, pendingEvents: [] })
 
     const left = processAction(onto, { type: ACTION_FARM_LEAVE })!
     expect(left.encounter).toBe(null)

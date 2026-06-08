@@ -6,11 +6,11 @@ export const CartMeta = {
 }
 
 export function cartTitle() {
-  return `The Unbound (prototype ${CartMeta.version})`
+  return `The Unbound (MVP ${CartMeta.version})`
 }
 
 export function cartDesc() {
-  return `Prototype ${CartMeta.version} toward the North Star`
+  return `MVP ${CartMeta.version} toward the North Star`
 }
 
 export function metadataBlockLines() {

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
 import {
   BARKEEP_TIPS,
-  ENABLE_ANIMATIONS,
   TOWN_BUY_LINES,
   TOWN_NO_GOLD_LINES,
   COMPANION_ALREADY_LINES,
@@ -18,7 +17,7 @@ import {
 import { FOOD_CARRY_FULL_MESSAGE } from '../../src/core/foodCarry'
 import { encounterStableLine } from '../../src/core/mechanics/encounterHelpers'
 import { RNG } from '../../src/core/rng'
-import type { Cell, DeltaAnim, GridTransitionAnim, State, TownCell, World } from '../../src/core/types'
+import type { Cell, State, TownCell, World } from '../../src/core/types'
 import { makeResources } from './_helpers/makeResources'
 
 function grass(): Cell {
@@ -57,7 +56,8 @@ function makeState(seed = 7): State {
     run: { stepCount: 10, hasWon: false, isGameOver: false, knowsPosition: true, path: [], lostBufferStartIndex: null },
     resources: makeResources({ food: 0, gold: 0, armySize: 5 }),
     encounter: { kind: 'town', sourceCellId: 4, restoreMessage: 'restored', rumorsBought: 0 },
-    ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+    ui: { message: '', leftPanel: { kind: 'auto' } },
+    pendingEvents: [],
   }
 }
 
@@ -159,28 +159,29 @@ describe('town reducer', () => {
     expect(next.ui.message).toBe(`Stonebridge Town\n${expectedLine}`)
   })
 
-  it('leave: clears encounter and restores message (and animates when enabled)', () => {
+  it('leave: clears encounter, restores message, and emits encounterClosed event', () => {
     const s0 = makeState()
     s0.ui.message = 'in town'
 
     const next = processAction(s0, { type: ACTION_TOWN_LEAVE })!
     expect(next.encounter).toBe(null)
     expect(next.ui.message).toBe('restored')
-
-    if (ENABLE_ANIMATIONS) {
-      const trans = next.ui.anim.active.filter((a): a is GridTransitionAnim => a.kind === 'gridTransition')
-      expect(trans.some((a) => a.params.from === 'town' && a.params.to === 'overworld')).toBe(true)
-    }
+    expect(next.pendingEvents).toContainEqual({
+      kind: 'encounterClosed',
+      encounterKind: 'town',
+      outcome: 'leave',
+    })
   })
 
-  it('successful purchases enqueue goldDelta when animations enabled', () => {
+  it('successful purchases emit a gold resourceChanged event', () => {
     const s0 = makeState()
     s0.resources.gold = 3
 
     const next = processAction(s0, { type: ACTION_TOWN_BUY_FOOD })!
-    if (!ENABLE_ANIMATIONS) return
-    const deltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'gold')
-    expect(deltas.some((d) => d.params.delta === -3)).toBe(true)
+    const goldDeltas = next.pendingEvents.filter(
+      (e) => e.kind === 'resourceChanged' && e.target === 'gold',
+    )
+    expect(goldDeltas.some((e) => e.kind === 'resourceChanged' && e.delta === -3)).toBe(true)
 
     const body = next.ui.message.split('\n').slice(1).join('\n')
     expect(TOWN_BUY_LINES.some((l) => l === body)).toBe(true)

@@ -1,6 +1,6 @@
 # The Unbound
 
-The Unbound is an in-progress project. This repository currently contains a small TIC-80 prototype built as a stepping stone toward the North Star.
+The Unbound is an in-progress project. This repository currently contains the TIC-80 MVP — progressing towards the North Star.
 
 ## North Star
 
@@ -42,6 +42,14 @@ npm run verify
 - `npm run dev`: watch mode (TypeScript watch + bundle watch); keeps running through transient errors
 - `npm test`: run unit tests for `src/core/**`
 - `npm run verify`: build + test (the “everything should be green” command)
+- `npm run play`: text-based terminal version — headless dev iteration and agent playtests
+
+### Terminal play (optional)
+
+`npm run play` runs the game in a text-based terminal that reads the same core as the TIC-80 cart. Two uses:
+
+- **Headless dev iteration** — verify reducer behaviour without launching TIC-80.
+- **Blind agent playtests** — drive the game from a subagent loop to surface design friction. See `docs/the-unbound-learnings.md` (Agent playtesting) for the recipe and `docs/plans/2026-05-30-terminal-platform-design.md` for architecture.
 
 ## Local dev notes (optional)
 

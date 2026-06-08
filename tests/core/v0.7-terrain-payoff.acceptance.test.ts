@@ -3,7 +3,6 @@ import '../../src/core/mechanics'
 import { processAction } from '../../src/core/processAction'
 import {
   ACTION_MOVE,
-  ENABLE_ANIMATIONS,
   FOOD_COST_DEFAULT,
   FOOD_COST_MOUNTAIN,
   FOOD_COST_SWAMP,
@@ -22,7 +21,7 @@ import { tryQuietFind } from '../../src/core/mechanics/encounterHelpers'
 import { MOUNTAIN_QUIET_FIND } from '../../src/core/mechanics/defs/mountain'
 import { SWAMP_QUIET_FIND } from '../../src/core/mechanics/defs/swamp'
 import { RNG } from '../../src/core/rng'
-import type { Cell, DeltaAnim, State, World } from '../../src/core/types'
+import type { Cell, State, World } from '../../src/core/types'
 import { findAmbushSeed } from './_helpers/v0.6Combat'
 import { makeResources } from './_helpers/makeResources'
 
@@ -79,7 +78,8 @@ function makeState(world: World, overrides?: Partial<State['resources']>): State
     },
     resources: makeResources({ food: 10, gold: 5, armySize: 10, ...overrides }),
     encounter: null,
-    ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+    ui: { message: '', leftPanel: { kind: 'auto' } },
+    pendingEvents: [],
   }
 }
 
@@ -147,12 +147,10 @@ describe('v0.7 terrain payoff acceptance', () => {
     expect(cell.kind).toBe('rainbowEnd')
     if (cell.kind === 'rainbowEnd') expect(cell.hasPaidOut).toBe(true)
 
-    if (ENABLE_ANIMATIONS) {
-      const goldDeltas = onto!.ui.anim.active.filter(
-        (a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'gold',
-      )
-      expect(goldDeltas.some((d) => d.params.delta === RAINBOW_END_GOLD_PAYOUT)).toBe(true)
-    }
+    const goldDeltas = onto!.pendingEvents.filter(
+      (e) => e.kind === 'resourceChanged' && e.target === 'gold',
+    )
+    expect(goldDeltas.some((e) => e.kind === 'resourceChanged' && e.delta === RAINBOW_END_GOLD_PAYOUT)).toBe(true)
   })
 
   describe('tryQuietFind (swamp/mountain specs)', () => {
@@ -194,13 +192,11 @@ describe('v0.7 terrain payoff acceptance', () => {
     expect(next.resources.food).toBeGreaterThan(s0.resources.food)
     expect(next.resources.gold).toBeGreaterThanOrEqual(s0.resources.gold)
 
-    if (ENABLE_ANIMATIONS) {
-      const foodGain = next.resources.food - s0.resources.food + FOOD_COST_SWAMP
-      const foodDeltas = next.ui.anim.active.filter(
-        (a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'food',
-      )
-      expect(foodDeltas.some((d) => d.params.delta === foodGain)).toBe(true)
-    }
+    const foodGain = next.resources.food - s0.resources.food + FOOD_COST_SWAMP
+    const foodDeltas = next.pendingEvents.filter(
+      (e) => e.kind === 'resourceChanged' && e.target === 'food',
+    )
+    expect(foodDeltas.some((e) => e.kind === 'resourceChanged' && e.delta === foodGain)).toBe(true)
   })
 
   it('mountain quiet find seed: lore is mountain find line and gold rises', () => {
@@ -212,13 +208,11 @@ describe('v0.7 terrain payoff acceptance', () => {
     expect(TERRAIN_LORE_BY_KIND.mountain).not.toContain(next.ui.message)
     expect(next.resources.gold).toBeGreaterThan(s0.resources.gold)
 
-    if (ENABLE_ANIMATIONS) {
-      const goldGain = next.resources.gold - s0.resources.gold
-      const goldDeltas = next.ui.anim.active.filter(
-        (a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'gold',
-      )
-      expect(goldDeltas.some((d) => d.params.delta === goldGain)).toBe(true)
-    }
+    const goldGain = next.resources.gold - s0.resources.gold
+    const goldDeltas = next.pendingEvents.filter(
+      (e) => e.kind === 'resourceChanged' && e.target === 'gold',
+    )
+    expect(goldDeltas.some((e) => e.kind === 'resourceChanged' && e.delta === goldGain)).toBe(true)
   })
 
   it('mountain ambush seed: combat opens with no terrain find payout', () => {

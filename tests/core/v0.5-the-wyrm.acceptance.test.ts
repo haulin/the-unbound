@@ -85,7 +85,8 @@ function makeState(world: World, overrides: { food?: number; gold?: number; army
       armySize: overrides.armySize ?? 10,
     }),
     encounter: null,
-    ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+    ui: { message: '', leftPanel: { kind: 'auto' } },
+    pendingEvents: [],
   }
 }
 

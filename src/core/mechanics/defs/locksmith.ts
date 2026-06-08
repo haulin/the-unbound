@@ -13,11 +13,11 @@ import {
   LOCKSMITH_PURCHASE_LINES,
   LOCKSMITH_VISITED_LINES,
 } from '../../lore'
+import type { Change } from '../../reducer'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
 import type { LocksmithEncounter, State } from '../../types'
 import {
-  applyDeltasAndClose,
   buy,
   leaveEncounter,
   loreMessage,
@@ -42,7 +42,7 @@ export const ACTION_LOCKSMITH_LEAVE = 'LOCKSMITH_LEAVE' as const
 
 type LocksmithActionSpec = {
   spriteId: number
-  reduce: (s: State, enc: LocksmithEncounter) => State
+  reduce: (s: State, enc: LocksmithEncounter) => Change
   badge: CellBadge
 }
 
@@ -87,25 +87,32 @@ const onEnterLocksmith: OnEnterTile = ({ cell, world, pos, stepCount, resources 
   })
 }
 
-const reduceLocksmithAction: ReduceEncounterAction = (prevState, action) => {
-  if (action.type !== ACTION_LOCKSMITH_LEAVE && !(action.type in LOCKSMITH_ACTIONS)) return null
-  if (action.type === ACTION_LOCKSMITH_LEAVE) return leaveEncounter(prevState, 'locksmith')
-
-  const enc = prevState.encounter as LocksmithEncounter
-  return LOCKSMITH_ACTIONS[action.type as keyof typeof LOCKSMITH_ACTIONS].reduce(prevState, enc)
+const reduceLocksmithAction: ReduceEncounterAction = (state, action) => {
+  switch (action.type) {
+    case ACTION_LOCKSMITH_LEAVE:
+      return leaveEncounter(state, 'locksmith')
+    case ACTION_LOCKSMITH_PAY_GOLD:
+    case ACTION_LOCKSMITH_PAY_FOOD: {
+      const enc = state.encounter as LocksmithEncounter
+      return LOCKSMITH_ACTIONS[action.type].reduce(state, enc)
+    }
+    default:
+      return null
+  }
 }
 
-function reduceLocksmithPayGold(prevState: State, enc: LocksmithEncounter): State {
-  const rnd = RNG.createRunCopyRandom(prevState)
-  const result = buy(prevState.resources, { gold: LOCKSMITH_KEY_GOLD_COST, gain: { inventory: ['bronzeKey'] } })
+function reduceLocksmithPayGold(state: State, enc: LocksmithEncounter): Change {
+  const rnd = RNG.createRunCopyRandom(state)
+  const result = buy(state.resources, { gold: LOCKSMITH_KEY_GOLD_COST, gain: { inventory: ['bronzeKey'] } })
   if (result.outcome === 'noFunds') {
-    return setEncounterMessage(prevState, LOCKSMITH_NAME, rnd.perMoveLine(TOWN_NO_GOLD_LINES, { cellId: enc.sourceCellId }))
+    return setEncounterMessage(LOCKSMITH_NAME, rnd.perMoveLine(TOWN_NO_GOLD_LINES, { cellId: enc.sourceCellId }))
   }
-  return applyDeltasAndClose(prevState, {
-    resources: consumeBlood(result.resources),
+  return {
+    resources: useBloodVial(result.resources),
     message: loreMessage(LOCKSMITH_NAME, rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)),
-    deltas: result.deltas,
-  }, 'locksmith')
+    encounter: null,
+    events: [{ kind: 'encounterClosed', encounterKind: 'locksmith', outcome: 'purchase' }],
+  }
 }
 
 const placeLocksmith: PlaceWorldProvider = ({ cells, rngState, seed }) => {
@@ -120,27 +127,27 @@ const placeLocksmith: PlaceWorldProvider = ({ cells, rngState, seed }) => {
   return { rngState }
 }
 
-function reduceLocksmithPayFood(prevState: State, _enc: LocksmithEncounter): State {
-  const rnd = RNG.createRunCopyRandom(prevState)
-  const result = buy(prevState.resources, { food: LOCKSMITH_KEY_FOOD_COST, gain: { inventory: ['bronzeKey'] } })
+function reduceLocksmithPayFood(state: State, _enc: LocksmithEncounter): Change {
+  const rnd = RNG.createRunCopyRandom(state)
+  const result = buy(state.resources, { food: LOCKSMITH_KEY_FOOD_COST, gain: { inventory: ['bronzeKey'] } })
   if (result.outcome === 'noFunds') {
-    return setEncounterMessage(prevState, LOCKSMITH_NAME, rnd.perMoveLine(LOCKSMITH_NO_FOOD_LINES))
+    return setEncounterMessage(LOCKSMITH_NAME, rnd.perMoveLine(LOCKSMITH_NO_FOOD_LINES))
   }
-  return applyDeltasAndClose(prevState, {
-    resources: consumeBlood(result.resources),
+  return {
+    resources: useBloodVial(result.resources),
     message: loreMessage(LOCKSMITH_NAME, rnd.perMoveLine(LOCKSMITH_PURCHASE_LINES)),
-    deltas: result.deltas,
-  }, 'locksmith')
+    encounter: null,
+    events: [{ kind: 'encounterClosed', encounterKind: 'locksmith', outcome: 'purchase' }],
+  }
 }
 
-function consumeBlood(resources: State['resources']): State['resources'] {
+function useBloodVial(resources: State['resources']): State['resources'] {
   if (!resources.inventory.includes('bloodVial')) return resources
   return { ...resources, inventory: resources.inventory.filter((slot) => slot !== 'bloodVial') }
 }
 
-const { provider: locksmithRightGrid, illustrationFor: locksmithIllustration } = makeRightGrid({
+const locksmithRightGrid = makeRightGrid({
   leaveAction: { type: ACTION_LOCKSMITH_LEAVE },
-  illustrationSpriteId: SPRITES.centers.locksmithKiln,
   top: offerGridCell(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_GOLD),
   left: offerGridCell(LOCKSMITH_ACTIONS, ACTION_LOCKSMITH_PAY_FOOD),
 })
@@ -160,6 +167,6 @@ export const locksmithMechanic: MechanicDef = {
     reduceAction: reduceLocksmithAction,
     previewEncounter: previewEncounterProvider('locksmith'),
     rightGrid: locksmithRightGrid,
-    illustrationSpriteId: locksmithIllustration,
+    illustrationSpriteId: () => SPRITES.centers.locksmithKiln,
   },
 }

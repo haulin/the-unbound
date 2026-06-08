@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
 import {
   ACTION_MOVE,
-  ENABLE_ANIMATIONS,
   GOBLIN_ENCOUNTER_LINES,
   HENGE_BAND_MAX,
   HENGE_BAND_MIN,
@@ -18,7 +17,7 @@ import {
 } from '../../src/core/mechanics/defs/combat'
 import { hengeCombatVariant } from '../../src/core/mechanics/defs/henge'
 import { RNG } from '../../src/core/rng'
-import type { DeltaAnim, State, World } from '../../src/core/types'
+import type { State, World } from '../../src/core/types'
 import { makeResources } from './_helpers/makeResources'
 
 function makeWorld(opts: { seed: number; dstKind: 'henge' | 'woods'; rngState: number }): World {
@@ -47,7 +46,8 @@ function makeState(w: World): State {
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
     resources: makeResources({ food: INITIAL_FOOD, gold: INITIAL_GOLD, armySize: 5 }),
     encounter: null,
-    ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+    ui: { message: '', leftPanel: { kind: 'auto' } },
+    pendingEvents: [],
   }
 }
 
@@ -180,17 +180,25 @@ describe('combat reducer (v0.0.7)', () => {
     expect(next.world.rngState >>> 0).toBe(expectedRng)
     expect(next.ui.message).not.toBe('')
 
-    if (ENABLE_ANIMATIONS) {
-      const enemyDeltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'enemyArmy')
-      expect(enemyDeltas.length).toBe(1)
-      expect(enemyDeltas[0]!.params.delta).toBe(-1)
+    const enemyDeltas = next.pendingEvents.filter(
+      (e) => e.kind === 'resourceChanged' && e.target === 'enemyArmy',
+    )
+    expect(enemyDeltas.length).toBe(1)
+    expect(enemyDeltas[0]!.kind === 'resourceChanged' && enemyDeltas[0]!.delta).toBe(-1)
 
-      const foodDeltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'food')
-      if (expectedFoodBonus) expect(foodDeltas.some((d) => d.params.delta === expectedFoodBonus)).toBe(true)
-
-      const goldDeltas = next.ui.anim.active.filter((a): a is DeltaAnim => a.kind === 'delta' && a.params.target === 'gold')
-      expect(goldDeltas.some((d) => d.params.delta === expectedGold)).toBe(true)
+    const foodDeltas = next.pendingEvents.filter(
+      (e) => e.kind === 'resourceChanged' && e.target === 'food',
+    )
+    if (expectedFoodBonus) {
+      expect(
+        foodDeltas.some((e) => e.kind === 'resourceChanged' && e.delta === expectedFoodBonus),
+      ).toBe(true)
     }
+
+    const goldDeltas = next.pendingEvents.filter(
+      (e) => e.kind === 'resourceChanged' && e.target === 'gold',
+    )
+    expect(goldDeltas.some((e) => e.kind === 'resourceChanged' && e.delta === expectedGold)).toBe(true)
 
     // Sanity: ensure our chosen rngState is actually a win for this test.
     expect(wRoll >= bRoll).toBe(true)

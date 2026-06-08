@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
-import { ACTION_MOVE, ENABLE_ANIMATIONS, MOVE_SLIDE_FRAMES } from '../../src/core/constants'
+import { ACTION_MOVE } from '../../src/core/constants'
 import { ACTION_TOWN_LEAVE } from '../../src/core/mechanics/defs/town'
-import type { Cell, GridTransitionAnim, State, World } from '../../src/core/types'
+import type { Cell, State, World } from '../../src/core/types'
 import { makeResources } from './_helpers/makeResources'
 
 function grass(): Cell {
@@ -42,7 +42,8 @@ function makeState(world: World): State {
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
     resources: makeResources({ food: 10, gold: 0, armySize: 5 }),
     encounter: null,
-    ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+    ui: { message: '', leftPanel: { kind: 'auto' } },
+    pendingEvents: [],
   }
 }
 
@@ -54,7 +55,9 @@ describe('v0.3 gold+towns acceptance', () => {
     expect(onto.encounter?.kind).toBe('town')
 
     const ignored = processAction(onto, { type: ACTION_MOVE, dx: 1, dy: 0 })!
-    expect(ignored).toBe(onto)
+    // MOVE while in encounter is ignored: same data, except pendingEvents
+    // is reset (every dispatch clears the per-action event log).
+    expect(ignored).toEqual({ ...onto, pendingEvents: [] })
 
     const left = processAction(onto, { type: ACTION_TOWN_LEAVE })!
     expect(left.encounter).toBe(null)
@@ -81,25 +84,33 @@ describe('v0.3 gold+towns acceptance', () => {
     expect(onto.run.knowsPosition).toBe(true)
   })
 
-  it('entering/leaving towns enqueue gridTransition (when animations enabled)', () => {
+  it('entering a town emits encounterOpened event after a phaseBoundary', () => {
     const s0 = makeState(makeWorld(7))
     const onto = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!
 
-    if (ENABLE_ANIMATIONS) {
-      const trans = onto.ui.anim.active.filter((a): a is GridTransitionAnim => a.kind === 'gridTransition')
-      const enter = trans.find((a) => a.params.from === 'overworld' && a.params.to === 'town')
-      expect(enter).toBeDefined()
-      // Encounter grid transition fires AFTER the move-slide reveal completes (one MOVE_SLIDE_FRAMES
-      // delay from the action's startFrame). Locking this in so a future regression that double-counts
-      // the offset (e.g. via afterFrames) trips here.
-      expect(enter!.startFrame).toBe(MOVE_SLIDE_FRAMES)
-    }
+    // The reducer emits three beats with phaseBoundary between each:
+    //   beat 1: cost diff (resourceChanged food cost)
+    //   beat 2: slide (positionChanged)
+    //   beat 3: arrival (resourceChanged tile gain) + encounterOpened
+    // So encounterOpened lands after at least one phaseBoundary, scheduling
+    // the encounter-open grid transition strictly after the slide.
+    const phaseBoundaryIdx = onto.pendingEvents.findIndex((e) => e.kind === 'phaseBoundary')
+    expect(phaseBoundaryIdx).toBeGreaterThanOrEqual(0)
+
+    const slideIdx = onto.pendingEvents.findIndex((e) => e.kind === 'positionChanged')
+    expect(slideIdx).toBeGreaterThan(phaseBoundaryIdx)
+
+    const openedIdx = onto.pendingEvents.findIndex(
+      (e) => e.kind === 'encounterOpened' && e.encounterKind === 'town',
+    )
+    expect(openedIdx).toBeGreaterThan(slideIdx)
 
     const left = processAction(onto, { type: ACTION_TOWN_LEAVE })!
-    if (ENABLE_ANIMATIONS) {
-      const trans2 = left.ui.anim.active.filter((a): a is GridTransitionAnim => a.kind === 'gridTransition')
-      expect(trans2.some((a) => a.params.from === 'town' && a.params.to === 'overworld')).toBe(true)
-    }
+    expect(left.pendingEvents).toContainEqual({
+      kind: 'encounterClosed',
+      encounterKind: 'town',
+      outcome: 'leave',
+    })
   })
 })
 

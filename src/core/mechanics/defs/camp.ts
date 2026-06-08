@@ -14,11 +14,11 @@ import {
 } from '../../constants'
 import { cellIdForPos, getCellAt, setCellAt } from '../../cells'
 import { applyFoodCapOnGain } from '../../foodCarry'
+import type { Change } from '../../reducer'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
 import type { CampCell, Resources, State } from '../../types'
 import {
-  applyDeltas,
   hireCompanion,
   leaveEncounter,
   loreMessage,
@@ -47,7 +47,7 @@ export const ACTION_CAMP_LEAVE = 'CAMP_LEAVE' as const
 type CampActionSpec = {
   category: OfferCategory
   spriteId: number
-  reduce: (s: State) => State
+  reduce: (s: State) => Change
   badge?: (s: State) => CellBadge | null
 }
 
@@ -124,52 +124,48 @@ const onEnterCamp: OnEnterTile = ({ cell, world, pos, stepCount }) => {
   })
 }
 
-const reduceCampAction: ReduceEncounterAction = (prevState, action) => {
-  if (action.type !== ACTION_CAMP_LEAVE && !(action.type in CAMP_OFFERS)) return null
-  if (action.type === ACTION_CAMP_LEAVE) return leaveEncounter(prevState, 'camp')
-  return CAMP_OFFERS[action.type as CampOfferKind].reduce(prevState)
+const reduceCampAction: ReduceEncounterAction = (state, action) => {
+  switch (action.type) {
+    case ACTION_CAMP_LEAVE:
+      return leaveEncounter(state, 'camp')
+    case ACTION_CAMP_SEARCH:
+    case ACTION_CAMP_HIRE_SCOUT:
+      return CAMP_OFFERS[action.type].reduce(state)
+    default:
+      return null
+  }
 }
 
-function reduceCampSearch(prevState: State): State {
-  const campCell = getCellAt(prevState.world, prevState.player.position) as CampCell
+function reduceCampSearch(state: State): Change {
+  const campCell = getCellAt(state.world, state.player.position) as CampCell
   const title = poiTitleFor(campCell.name, 'Camp')
-  const stepCount = prevState.run.stepCount
-  const prevRes = prevState.resources
-  const rnd = RNG.createRunCopyRandom(prevState)
+  const stepCount = state.run.stepCount
+  const prevRes = state.resources
+  const rnd = RNG.createRunCopyRandom(state)
 
   const readyAt = campCell.nextReadyStep ?? 0
   if (stepCount < readyAt) {
-    const line = rnd.perMoveLine(CAMP_EMPTY_LINES, { cellId: campCell.id })
-    return setEncounterMessage(prevState, title, line)
+    return setEncounterMessage(title, rnd.perMoveLine(CAMP_EMPTY_LINES, { cellId: campCell.id }))
   }
 
-  const armyGain = computeCampArmyGain({ seed: prevState.world.seed, campId: campCell.id, stepCount })
+  const armyGain = computeCampArmyGain({ seed: state.world.seed, campId: campCell.id, stepCount })
   const nextCampCell: CampCell = { ...campCell, nextReadyStep: stepCount + CAMP_COOLDOWN_MOVES }
-  const nextWorld = setCellAt(prevState.world, prevState.player.position, nextCampCell)
+  const nextWorld = setCellAt(state.world, state.player.position, nextCampCell)
   const gained: Resources = { ...prevRes, food: prevRes.food + CAMP_FOOD_GAIN, armySize: prevRes.armySize + armyGain }
   const nextResources = applyFoodCapOnGain(prevRes, gained)
-  const foodGain = nextResources.food - prevRes.food
 
-  const line = rnd.perMoveLine(CAMP_RECRUIT_LINES, { cellId: campCell.id })
-
-  return applyDeltas(
-    { ...prevState, world: nextWorld },
-    {
-      resources: nextResources,
-      message: loreMessage(title, line),
-      deltas: [
-        { target: 'food', delta: foodGain },
-        { target: 'army', delta: armyGain },
-      ],
-    },
-  )
+  return {
+    world: nextWorld,
+    resources: nextResources,
+    message: loreMessage(title, rnd.perMoveLine(CAMP_RECRUIT_LINES, { cellId: campCell.id })),
+  }
 }
 
-function reduceCampHireScout(prevState: State): State {
-  const camp = getCellAt(prevState.world, prevState.player.position) as CampCell
+function reduceCampHireScout(state: State): Change {
+  const camp = getCellAt(state.world, state.player.position) as CampCell
   const title = poiTitleFor(camp.name, 'Camp')
-  const rnd = RNG.createRunCopyRandom(prevState)
-  return hireCompanion(prevState, {
+  const rnd = RNG.createRunCopyRandom(state)
+  return hireCompanion(state, {
     prefix: title,
     slotId: 'scout',
     goldCost: camp.companionHireGold,
@@ -177,9 +173,8 @@ function reduceCampHireScout(prevState: State): State {
   })
 }
 
-const { provider: campRightGrid, illustrationFor: campIllustration } = makeRightGrid({
+const campRightGrid = makeRightGrid({
   leaveAction: { type: ACTION_CAMP_LEAVE },
-  illustrationSpriteId: SPRITES.centers.campfire,
   top: (s) => campOfferSlot(s, 'top'),
   left: (s) => campOfferSlot(s, 'left'),
   bottom: (s) => campOfferSlot(s, 'bottom'),
@@ -200,6 +195,6 @@ export const campMechanic: MechanicDef = {
     reduceAction: reduceCampAction,
     previewEncounter: previewEncounterProvider('camp'),
     rightGrid: campRightGrid,
-    illustrationSpriteId: campIllustration,
+    illustrationSpriteId: () => SPRITES.centers.campfire,
   },
 }

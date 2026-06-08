@@ -1,21 +1,25 @@
-import { ENABLE_ANIMATIONS } from '../../constants'
 import { cellIdForPos, getCellAt, posForCellId } from '../../cells'
 import { applyFoodCapOnGain } from '../../foodCarry'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
-import type { Action, CombatEncounter, Encounter, Resources, State, Ui, Vec2, World } from '../../types'
-import { enqueueGridTransition } from '../../uiAnim'
+import type {
+  Action,
+  CombatEncounter,
+  DomainEvent,
+  Resources,
+  Run,
+  State,
+  Vec2,
+  World,
+} from '../../types'
 import {
-  applyDeltas,
   badgedGridButton,
   combatLoreMessage,
   encounterStableLine,
   makeRightGrid,
-  pushResourceDeltas,
-  resourceDeltasFromDiff,
   type CellBadge,
 } from '../encounterHelpers'
-import type { ResourceDelta } from '../encounterHelpers'
+import type { Change } from '../../reducer'
 import type { MechanicDef, ReduceEncounterAction, TileEnterResult } from '../types'
 // Lazy circular: `mechanics/index.ts` builds MECHANIC_INDEX from this file's
 // `combatMechanic`, so the import binding here is only safe to dereference
@@ -26,7 +30,8 @@ export const ACTION_FIGHT = 'FIGHT' as const
 export const ACTION_COMBAT_PAY = 'COMBAT_PAY' as const
 export const ACTION_RETURN = 'RETURN' as const
 
-type CombatActionSpec = { spriteId: number; reduce: (s: State) => State }
+type CombatActionResult = Change | readonly Change[] | null
+type CombatActionSpec = { spriteId: number; reduce: (s: State) => CombatActionResult }
 
 const COMBAT_ACTIONS = {
   [ACTION_FIGHT]:      { spriteId: SPRITES.actions.fight,  reduce: reduceCombatFight  },
@@ -127,30 +132,64 @@ export function applyHealerMend(resources: Resources, enc: CombatEncounter): Res
   return { ...resources, armySize: resources.armySize + mend }
 }
 
-function applyCombatClosed(state: State, outcome: CombatCloseOutcome, encounter: CombatEncounter): State {
-  if (isPreviewSentinel(encounter.sourceCellId)) return state
-  const cell = getCellAt(state.world, posForCellId(state.world, encounter.sourceCellId))
+// Run the registered post-combat hook (wyrm sets `isBled`, henge starts
+// cooldown) on a synthetic snapshot — the hook signature wants `state` with
+// the encounter still set — and project the result down to the fields the
+// close beat actually commits.
+function applyCombatCloseHook(
+  prev: State,
+  args: {
+    world: World
+    resources: Resources
+    run: Run
+    encounter: CombatEncounter
+    outcome: CombatCloseOutcome
+  },
+): { world: World; resources: Resources; run: Run } {
+  const { world, resources, run, encounter, outcome } = args
+  if (isPreviewSentinel(encounter.sourceCellId)) {
+    return { world, resources, run }
+  }
+  const cell = getCellAt(world, posForCellId(world, encounter.sourceCellId))
   const hook = MECHANIC_INDEX.onCombatClosedByKind[cell.kind]
-  if (!hook) return state
-  return hook(state, outcome, encounter)
+  if (!hook) return { world, resources, run }
+
+  const snapshot: State = { ...prev, world, resources, run, encounter }
+  const after = hook(snapshot, outcome, encounter)
+  return { world: after.world, resources: after.resources, run: after.run }
 }
 
-function finishCombatClose(
-  intermediate: State,
-  enc: CombatEncounter,
-  outcome: CombatCloseOutcome,
-  extraDeltas: readonly ResourceDelta[],
-): State {
-  const beforeMend = intermediate.resources
-  const afterMend = applyHealerMend(beforeMend, enc)
-  const closed = applyCombatClosed({ ...intermediate, resources: afterMend }, outcome, enc)
-  const deltas = [...extraDeltas, ...resourceDeltasFromDiff(beforeMend, afterMend)]
-  return applyDeltas(closed, {
-    message: closed.ui.message,
-    resources: afterMend,
-    run: closed.run,
-    deltas,
+// One Change that clears the encounter: applies healer-mend, runs the
+// post-combat hook, sets the close message, and emits `encounterClosed`.
+// `args.resources` is the player's resources at the moment the round resolved
+// (pre-mend); the resource diff drives the close-side popups.
+function buildCombatCloseBeat(
+  prev: State,
+  args: {
+    world: World
+    resources: Resources
+    run: Run
+    encounter: CombatEncounter
+    outcome: CombatCloseOutcome
+    message: string
+  },
+): Change {
+  const mended = applyHealerMend(args.resources, args.encounter)
+  const after = applyCombatCloseHook(prev, {
+    world: args.world,
+    resources: mended,
+    run: args.run,
+    encounter: args.encounter,
+    outcome: args.outcome,
   })
+  return {
+    world: after.world,
+    resources: after.resources,
+    run: after.run,
+    encounter: null,
+    message: args.message,
+    events: [{ kind: 'encounterClosed', encounterKind: 'combat', outcome: args.outcome }],
+  }
 }
 
 function combatFightBadge(state: State): CellBadge | null {
@@ -169,137 +208,129 @@ function combatPayBadge(state: State): CellBadge | null {
   return { variant: 'price', text: `-${cost}` }
 }
 
-const { provider: combatRightGrid, illustrationFor: combatIllustration } = makeRightGrid({
+const combatRightGrid = makeRightGrid({
   leaveAction: { type: ACTION_RETURN },
   leaveBadge: { variant: 'price', text: '-1' },
-  illustrationSpriteId: (s) => combatVariantForEncounter(s).illustrationSpriteId,
   left: badgedGridButton(COMBAT_ACTIONS, ACTION_FIGHT, combatFightBadge),
   top: badgedGridButton(COMBAT_ACTIONS, ACTION_COMBAT_PAY, combatPayBadge),
 })
 
-const reduceCombatAction: ReduceEncounterAction = (prevState: State, action: Action): State | null => {
-  if (!(action.type in COMBAT_ACTIONS)) return null
-  return COMBAT_ACTIONS[action.type as keyof typeof COMBAT_ACTIONS].reduce(prevState)
+const reduceCombatAction: ReduceEncounterAction = (prevState: State, action: Action) => {
+  switch (action.type) {
+    case ACTION_FIGHT:
+    case ACTION_COMBAT_PAY:
+    case ACTION_RETURN:
+      return COMBAT_ACTIONS[action.type].reduce(prevState)
+    default:
+      return null
+  }
 }
 
-function reduceCombatPay(prevState: State): State {
+function reduceCombatPay(prevState: State): CombatActionResult {
   const enc = prevState.encounter
-  if (!enc || enc.kind !== 'combat') return prevState
+  if (!enc || enc.kind !== 'combat') return null
   const variant = combatVariantForEncounter(prevState)
   const payment = variant.payment
   const eligibility = payment.isEligible(enc, prevState.resources)
 
+  // Eligibility refusal: just a message change, no resource diff, no close.
   if (eligibility !== 'ok') {
     const lines = payment.failLines[eligibility]
     if (!lines || lines.length === 0) {
       throw new Error(`combat.pay: variant has no failLines.${eligibility}`)
     }
     const line = encounterStableLine(prevState, `combat.pay.${eligibility}`, lines)
-    return {
-      ...prevState,
-      encounter: enc,
-      ui: { ...prevState.ui, message: combatLoreMessage(prevState, line) || prevState.ui.message },
-    }
+    const message = combatLoreMessage(prevState, line) || prevState.ui.message
+    return { message }
   }
 
   const cost = payment.computeCost(enc)
   const prevRes = prevState.resources
-  const prevWorld = prevState.world
-  const prevUi = prevState.ui
   const afterDeduct: Resources = { ...prevRes, gold: prevRes.gold - cost }
   const afterTroops = payment.onSuccess(afterDeduct, enc)
-  let nextResources: Resources = afterTroops
-  let nextWorld = prevWorld
-  let lootGoldGain = 0
-  let lootFoodGain = 0
-  if (variant.recruitLootScale) {
-    const scale = variant.recruitLootScale(enc)
-    const reward = variant.victoryReward(afterTroops, prevWorld.rngState, enc)
-    const fullGoldGain = reward.resources.gold - afterTroops.gold
-    const fullFoodGain = reward.resources.food - afterTroops.food
-    lootGoldGain = Math.floor(fullGoldGain * scale)
-    lootFoodGain = Math.floor(fullFoodGain * scale)
-    const withLoot: Resources = {
-      ...afterTroops,
-      gold: afterTroops.gold + lootGoldGain,
-      food: afterTroops.food + lootFoodGain,
-    }
-    nextResources = applyFoodCapOnGain(prevRes, withLoot)
-    lootFoodGain = nextResources.food - afterTroops.food
-    nextWorld = { ...prevWorld, rngState: reward.rngState }
-  }
+
   const successPick = RNG.createRunCopyRandom(prevState).advanceCursor('combat.pay.success', payment.successLines)
-  const baseUi: Ui = { ...prevUi, message: combatLoreMessage(prevState, successPick.line || '') || prevUi.message }
-  const intermediate: State = {
-    world: nextWorld,
-    player: prevState.player,
-    run: successPick.nextState.run,
-    resources: nextResources,
-    encounter: null,
-    ui: baseUi,
+  const successMessage = combatLoreMessage(prevState, successPick.line || '') || prevState.ui.message
+
+  // Paid (no recruit loot): single beat — gold cost (and any troop gain from
+  // onSuccess) auto-derived from the diff, encounter closes immediately.
+  if (!variant.recruitLootScale) {
+    return buildCombatCloseBeat(prevState, {
+      world: prevState.world,
+      resources: afterTroops,
+      run: successPick.nextState.run,
+      encounter: enc,
+      outcome: 'paid',
+      message: successMessage,
+    })
   }
-  const closeOutcome: CombatCloseOutcome = variant.recruitLootScale ? 'recruit' : 'paid'
-  const payDeltas: ResourceDelta[] = []
-  pushResourceDeltas(payDeltas, 'gold', [-cost, ...(lootGoldGain > 0 ? [lootGoldGain] : [])])
-  if (lootFoodGain > 0) pushResourceDeltas(payDeltas, 'food', [lootFoodGain])
-  let next = finishCombatClose(intermediate, enc, closeOutcome, payDeltas)
-  if (!ENABLE_ANIMATIONS) return next
-  return { ...next, ui: enqueueGridTransition(next.ui, { from: 'combat', to: 'overworld' }) }
+
+  // Recruit: two beats split cost-payment from close. Beat 1: cost (and any
+  // troop gain) auto-derived. Beat 2: scaled loot diff + close hook +
+  // `encounterClosed` transition; loot popups float over the transition.
+  // Beat 1's popups are non-blocking, so the implicit `phaseBoundary` has no
+  // visible effect — both beats start at the same frame.
+  const scale = variant.recruitLootScale(enc)
+  const reward = variant.victoryReward(afterTroops, prevState.world.rngState, enc)
+  const fullGoldGain = reward.resources.gold - afterTroops.gold
+  const fullFoodGain = reward.resources.food - afterTroops.food
+  const lootGoldGain = Math.floor(fullGoldGain * scale)
+  const lootFoodGain = Math.floor(fullFoodGain * scale)
+  const withLoot: Resources = {
+    ...afterTroops,
+    gold: afterTroops.gold + lootGoldGain,
+    food: afterTroops.food + lootFoodGain,
+  }
+  const cappedLoot = applyFoodCapOnGain(prevRes, withLoot)
+  const nextWorld: World = { ...prevState.world, rngState: reward.rngState }
+
+  const beat1: Change = { resources: afterTroops }
+  const beat2 = buildCombatCloseBeat(prevState, {
+    world: nextWorld,
+    resources: cappedLoot,
+    run: successPick.nextState.run,
+    encounter: enc,
+    outcome: 'recruit',
+    message: successMessage,
+  })
+  return [beat1, beat2]
 }
 
-function reduceCombatReturn(prevState: State): State {
-  if (!prevState.encounter) return prevState
-  if (prevState.encounter.kind !== 'combat') return prevState
+function reduceCombatReturn(prevState: State): CombatActionResult {
   const enc = prevState.encounter
-  const prevUi = prevState.ui
+  if (!enc || enc.kind !== 'combat') return null
 
   const prevRes = prevState.resources
   const nextArmy = prevRes.armySize - 1
   const armyDepleted = nextArmy <= 0
   const nextResources: Resources = { ...prevRes, armySize: Math.max(0, nextArmy) }
-  const fleeVariant = combatVariantForEncounter(prevState)
-  const fleePick = armyDepleted
-    ? null
-    : RNG.createRunCopyRandom(prevState).advanceCursor('combat.exit.flee', fleeVariant.fleeLines)
-  const nextRun = armyDepleted ? prevState.run : fleePick!.nextState.run
-  const nextMessage = armyDepleted
-    ? prevUi.message
-    : combatLoreMessage(prevState, fleePick!.line || '') || prevUi.message
-  const baseUi: Ui = { ...prevUi, message: nextMessage }
-  const intermediate: State = {
+
+  // Army-depleted flee skips the close hook and the flee message — `applyArmyZeroGameOver`
+  // in the dispatcher will turn this into game-over once it reads armySize <= 0.
+  if (armyDepleted) {
+    return { resources: nextResources, encounter: null }
+  }
+
+  const variant = combatVariantForEncounter(prevState)
+  const fleePick = RNG.createRunCopyRandom(prevState).advanceCursor('combat.exit.flee', variant.fleeLines)
+  const fleeMessage = combatLoreMessage(prevState, fleePick.line || '') || prevState.ui.message
+
+  return buildCombatCloseBeat(prevState, {
     world: prevState.world,
-    player: prevState.player,
-    run: nextRun,
     resources: nextResources,
-    encounter: null,
-    ui: baseUi,
-  }
-  const closed = armyDepleted ? intermediate : applyCombatClosed(intermediate, 'flee', enc)
-  let next = applyDeltas(closed, {
-    message: closed.ui.message,
-    resources: nextResources,
-    run: closed.run,
-    deltas: [{ target: 'army', delta: -1 }],
+    run: fleePick.nextState.run,
+    encounter: enc,
+    outcome: 'flee',
+    message: fleeMessage,
   })
-  if (!ENABLE_ANIMATIONS) return next
-  return {
-    ...next,
-    ui: armyDepleted ? next.ui : enqueueGridTransition(next.ui, { from: 'combat', to: 'overworld' }),
-  }
 }
 
-function reduceCombatFight(prevState: State): State {
+function reduceCombatFight(prevState: State): CombatActionResult {
   const enc = prevState.encounter
-  if (!enc || enc.kind !== 'combat') return prevState
+  if (!enc || enc.kind !== 'combat') return null
 
   const prevEnemy = enc.enemyArmySize
-  if (prevEnemy <= 0) {
-    return { world: prevState.world, player: prevState.player, run: prevState.run, resources: prevState.resources, encounter: null, ui: prevState.ui }
-  }
-
   const prevRes = prevState.resources
-  const prevUi = prevState.ui
-
   const variant = combatVariantForEncounter(prevState)
   const round = resolveFightRound({
     rngState: prevState.world.rngState,
@@ -309,85 +340,62 @@ function reduceCombatFight(prevState: State): State {
     enemyRollBonus: variant.enemyRollBonus,
   })
 
-  const foodDeltas: number[] = []
-  const goldDeltas: number[] = []
-  const armyDeltas: number[] = []
-  const enemyDeltas: number[] = []
+  const worldAfterRound: World = { ...prevState.world, rngState: round.rngState }
 
-  let nextResources = prevRes
-  let nextEncounter: Encounter | null = enc
-
-  if (round.outcome === 'playerHit') {
-    const nextEnemy = round.nextEnemyArmy
-    const killed = round.killed
-    if (killed) enemyDeltas.push(-killed)
-
-    nextEncounter = nextEnemy <= 0 ? null : { ...enc, enemyArmySize: nextEnemy }
-  } else {
-    nextResources = { ...nextResources, armySize: nextResources.armySize - 1 }
-    armyDeltas.push(-1)
+  // Player hit, enemy survives: encounter stays open with reduced enemy size.
+  // Single beat — explicit `enemyArmy` event (not auto-derived; not a player
+  // resource), no resource diff, no close.
+  if (round.outcome === 'playerHit' && round.nextEnemyArmy > 0) {
+    const nextEncounter: CombatEncounter = { ...enc, enemyArmySize: round.nextEnemyArmy }
+    const events: DomainEvent[] = round.killed
+      ? [{ kind: 'resourceChanged', target: 'enemyArmy', delta: round.enemyDelta }]
+      : []
+    return {
+      world: worldAfterRound,
+      encounter: nextEncounter,
+      events,
+    }
   }
 
-  let nextWorld = { ...prevState.world, rngState: round.rngState }
-
-  if (round.outcome === 'playerHit' && nextEncounter == null) {
-    const reward = variant.victoryReward(nextResources, nextWorld.rngState, enc)
-    const goldDelta = reward.resources.gold - nextResources.gold
-    if (goldDelta) goldDeltas.push(goldDelta)
-    nextResources = reward.resources
-    nextWorld = { ...nextWorld, rngState: reward.rngState }
+  // Enemy hit: player loses one troop. If army survives, encounter stays open;
+  // if depleted, encounter clears (game-over flips in the dispatcher).
+  if (round.outcome === 'enemyHit') {
+    const resAfterLoss: Resources = { ...prevRes, armySize: prevRes.armySize - 1 }
+    const armyDepleted = resAfterLoss.armySize <= 0
+    return {
+      world: worldAfterRound,
+      resources: resAfterLoss,
+      encounter: armyDepleted ? null : enc,
+    }
   }
-  nextResources = applyFoodCapOnGain(prevRes, nextResources)
-  const appliedFoodDelta = nextResources.food - prevRes.food
-  if (appliedFoodDelta) foodDeltas.push(appliedFoodDelta)
-  const armyDepleted = nextResources.armySize <= 0
-  const victoryPick =
-    !armyDepleted && nextEncounter == null
-      ? RNG.createRunCopyRandom(prevState).advanceCursor('combat.exit.victory', variant.victoryLines)
-      : null
-  const nextRun = armyDepleted
-    ? prevState.run
-    : nextEncounter == null
-      ? victoryPick!.nextState.run
-      : prevState.run
-  const nextMessage =
-    nextEncounter == null && !armyDepleted
-      ? combatLoreMessage(prevState, victoryPick!.line || '') || prevUi.message
-      : prevUi.message
 
-  const baseUi: Ui = { message: nextMessage, leftPanel: prevUi.leftPanel, clock: prevUi.clock, anim: prevUi.anim }
-  const intermediate: State = {
-    world: nextWorld,
-    player: prevState.player,
-    run: nextRun,
-    resources: nextResources,
-    encounter: armyDepleted ? null : nextEncounter,
-    ui: baseUi,
-  }
-  const fightDeltas: ResourceDelta[] = []
-  pushResourceDeltas(fightDeltas, 'food', foodDeltas)
-  pushResourceDeltas(fightDeltas, 'gold', goldDeltas)
-  pushResourceDeltas(fightDeltas, 'army', armyDeltas)
-  pushResourceDeltas(fightDeltas, 'enemyArmy', enemyDeltas)
+  // Player hit, enemy dies → victory close.
+  // Two beats keep round-result and close structurally distinct. Beat 1:
+  // standalone enemy-delta popup. Beat 2: loot diff (auto-derived) +
+  // healer-mend + close hook + `encounterClosed` grid transition; loot
+  // popups float over the transition. The popup in beat 1 is non-blocking,
+  // so in TIC-80 playback both beats start at the same frame — the split
+  // shapes the code, not the timing.
+  const reward = variant.victoryReward(prevRes, worldAfterRound.rngState, enc)
+  const cappedReward = applyFoodCapOnGain(prevRes, reward.resources)
+  const worldAfterReward: World = { ...worldAfterRound, rngState: reward.rngState }
 
-  let next: State
-  if (!armyDepleted && nextEncounter == null) {
-    next = finishCombatClose(intermediate, enc, 'victory', fightDeltas)
-  } else {
-    next = applyDeltas(intermediate, {
-      message: intermediate.ui.message,
-      resources: nextResources,
-      run: nextRun,
-      deltas: fightDeltas,
-    })
-  }
-  next = { ...next, encounter: armyDepleted ? null : nextEncounter }
-  if (!ENABLE_ANIMATIONS) return next
+  const victoryPick = RNG.createRunCopyRandom(prevState).advanceCursor('combat.exit.victory', variant.victoryLines)
+  const victoryMessage = combatLoreMessage(prevState, victoryPick.line || '') || prevState.ui.message
 
-  if (!armyDepleted && nextEncounter == null) {
-    next = { ...next, ui: enqueueGridTransition(next.ui, { from: 'combat', to: 'overworld' }) }
-  }
-  return next
+  const enemyEvents: DomainEvent[] = round.killed
+    ? [{ kind: 'resourceChanged', target: 'enemyArmy', delta: round.enemyDelta }]
+    : []
+  const beat1: Change = { world: worldAfterRound, events: enemyEvents }
+  const beat2 = buildCombatCloseBeat(prevState, {
+    world: worldAfterReward,
+    resources: cappedReward,
+    run: victoryPick.nextState.run,
+    encounter: enc,
+    outcome: 'victory',
+    message: victoryMessage,
+  })
+  return [beat1, beat2]
 }
 
 export type EnemySpawn = (rngState: number) => { rngState: number; enemyArmy: number }
@@ -423,7 +431,6 @@ export function startCombatEncounter(args: {
     world: nextWorld,
     encounter,
     message: args.encounterMessage,
-    enterAnims: [{ kind: 'gridTransition', from: 'overworld', to: 'combat' }],
   }
 }
 
@@ -476,7 +483,7 @@ export const combatMechanic: MechanicDef = {
   encounter: {
     kind: 'combat',
     rightGrid: combatRightGrid,
-    illustrationSpriteId: combatIllustration,
+    illustrationSpriteId: (s) => combatVariantForEncounter(s).illustrationSpriteId,
     reduceAction: reduceCombatAction,
     deltaAnchorsByTarget: { enemyArmy: { row: 1, col: 0, goodSign: -1 } },
     previewEncounter: (): CombatEncounter => ({

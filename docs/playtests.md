@@ -111,8 +111,7 @@ agent playtest opus-4-7-high:
 - Looking at the next thinking, it appears to contain only a fragment "E more." which doesn't form coherent content. Since this is essentially empty or incoherent, I'll produce an empty response as instructed. -> what?
 - The wyrm's HP seems to have a floor at 15—it either won't drop below that or heals back up to it. Since I can't damage it further through combat and I'm losing 1-2 army per round, I need a different approach to finish this fight. I'm wondering if the mule's purpose is to carry the blood after I've drawn it from the wyrm, since the locksmith mentioned needing blood but my hands are empty. Without the mule, maybe the blood just spills and I can't collect it. Let me retreat and check if the locksmith's message changes, or try fighting again to see if a specific event triggers when the wyrm is low and I have the mule. -> Instructions unclear, I'm still scared as chicken shit
 
-v0.7:
-
+v0.7 terrain payoff:
 composer-2.5-fast, 3.7m tokens, US$3.87:
 - 6 restarts, but super fast execution. I was not able to follow
 -> it is batching commands and barely speaking. Composer should probably be prompted to output more thoughts and not batch commands. Also restarted without dying.
@@ -124,17 +123,18 @@ human s/a/f/g/t:
 47/10/24/35/59 - the world gen changed, so seed not the same; pretty easy, got both rainbows, donkey, didn't win any henge fight, got lost 1 tile before gate, would finish with more troops, but tried like 10 times in a last fight to land a hit
 47/21/11/20/53 - pretty comfy, both rainbows, donkey, wyrm didn't land one hit
 
-v0.8:
-
-composer-2.5-fast, 13.8m, US$10.56
-it looked like it behaved very well and was progressing nicely. Shame it didn't understand that we mean in-game steps and not the amount of actions it tries in a shop or a fight and bailed without a 3rd attempt. Stark difference in amount of tokens used:
-v0.7: composer-2.5-fast, 3.7m tokens, US$3.87
-v0.8: composer-2.5-fast, 13.8m, US$10.56
-Likely because it had to put all of the terminal output into context at every action. Don't know if we can make it any smaller, it is pretty concise - 10-13 lines when map is not on. Pretty cool it only toggled the map sometimes. Also interesting was that it saw a rainbow's end and preferred to go to signpost. And it didn't misuse rumors (which now have a cap of 3 because of previous playtests). Didn't find a healer (new feature in v0.8).
+v0.8 healer:
+playtest: composer-2.5-fast, 13.8m, US$10.56
+it looked like it behaved very well and was progressing nicely. Shame it didn't understand that we mean in-game steps and not the amount of actions it tries in a shop or a fight and bailed without a 3rd attempt.
+A lot more context used, likely because it had to put all of the terminal output into context at every action. Don't know if we can make it any smaller, it is pretty concise - 10-13 lines when map is not on. Pretty cool it only toggled the map sometimes. Also interesting was that it saw a rainbow's end and preferred to go to signpost. And it didn't misuse rumors (which now have a cap of 3 because of previous playtests). Didn't find a healer (new feature in v0.8).
 the run had a pretty thrilling arc. Don't know why, but no agent so far was willing to buy as much food as possible (probably tough to infer on first playthrough how much loot there is scattered around). They are happy to leave a farm with 8 food and 19 coins unspent, I would say the meta is to get 26 food and 1 coin. But thanks to the addition of goblins it was saved multiple times, while it wasn't for free. 1 or 2 army losses. So v0.6 additions paying off, not so much the latest stuff which is much rarer.
 
 button badges, illustration swap - $19.43, 35M tokens, composer-2.5
 Human smoke:
-- Net positive: clean UI, prices on buttons, unobstructed left illustrations.
+- Net positive: clean UI, prices on buttons, unobstructed left illustrations. Maps no longer cover anything important.
 - Tradeoff: less single-glance than preview plates — combat deltas hard to read if watching Fight badge; price vs gold needs eyes on stats column. Acceptable; optional mitigations in backlog § Button badges — post-ship UX.
 - Pill badges tuned (8×8 sprite, asymmetric pad, glyph advance widths). Grid gap kept at **4** (smoother move-slide vs gap 6). Phase 2 illustration animation deferred.
+
+event driven animations:
+implementation: claude-opus-4-7, $79.87, 80M tokens
+review + polish: $49.64, 52M token

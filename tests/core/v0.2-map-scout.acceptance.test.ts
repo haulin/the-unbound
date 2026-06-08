@@ -60,7 +60,8 @@ function makeState(world: World): State {
     run: { stepCount: 0, hasWon: false, isGameOver: false, knowsPosition: false, path: [], lostBufferStartIndex: null },
     resources: makeResources({ food: INITIAL_FOOD, gold: 0, armySize: 5 }),
     encounter: null,
-    ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+    ui: { message: '', leftPanel: { kind: 'auto' } },
+    pendingEvents: [],
   }
 }
 
@@ -79,7 +80,7 @@ describe('v0.2 map+scout acceptance', () => {
     expect(onto.encounter?.kind).toBe('camp')
 
     const ignored = processAction(onto, { type: ACTION_MOVE, dx: 1, dy: 0 })!
-    expect(ignored).toBe(onto)
+    expect(ignored).toEqual({ ...onto, pendingEvents: [] })
 
     const left = processAction(onto, { type: ACTION_CAMP_LEAVE })!
     expect(left.encounter).toBe(null)

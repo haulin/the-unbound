@@ -36,7 +36,8 @@ function makeState(centerCell: Cell, encounter: Encounter | null, resourceOverri
     run: { stepCount: 1, hasWon: false, isGameOver: false, knowsPosition: true, path: [], lostBufferStartIndex: null },
     resources: makeResources({ food: 10, gold: 50, armySize: 5, ...resourceOverrides }),
     encounter,
-    ui: { message: '', leftPanel: { kind: 'auto' }, clock: { frame: 0 }, anim: { nextId: 1, active: [] } },
+    ui: { message: '', leftPanel: { kind: 'auto' } },
+    pendingEvents: [],
   }
 }
 
