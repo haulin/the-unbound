@@ -55,6 +55,7 @@ describe('v0.8 healer + slots acceptance', () => {
       armyAtCombatStart: 10,
       sourceCellId: 1,
       restoreMessage: '',
+      boarVolleyFired: false,
     }
     const res = makeResources({ armySize: 7, party: ['healer'] })
     const mended = applyHealerMend(res, enc)
@@ -69,11 +70,28 @@ describe('v0.8 healer + slots acceptance', () => {
       armyAtCombatStart: 5,
       sourceCellId: 1,
       restoreMessage: '',
+      boarVolleyFired: false,
     }
     const afterRounds = makeResources({ armySize: 4, party: ['healer'] })
     expect(applyHealerMend(afterRounds, enc).armySize).toBe(5)
     const afterFleeArmy = afterRounds.armySize - 1
     expect(afterFleeArmy).toBe(3)
+  })
+
+  it('healer mends round losses on brigand recruit (before recruited troops count)', () => {
+    const enc: CombatEncounter = {
+      kind: 'combat',
+      enemyArmySize: 3,
+      initialSpawn: 10,
+      armyAtCombatStart: 10,
+      sourceCellId: 1,
+      restoreMessage: '',
+      boarVolleyFired: false,
+    }
+    const afterRecruit = makeResources({ armySize: 10, party: ['healer'] })
+    const mended = applyHealerMend({ ...afterRecruit, armySize: afterRecruit.armySize - enc.enemyArmySize }, enc)
+    expect(mended.armySize).toBe(9)
+    expect(mended.armySize + enc.enemyArmySize).toBe(12)
   })
 
   it('healer mends round losses when paying after fighting', () => {
@@ -84,6 +102,7 @@ describe('v0.8 healer + slots acceptance', () => {
       armyAtCombatStart: 10,
       sourceCellId: 1,
       restoreMessage: '',
+      boarVolleyFired: false,
     }
     const afterFighting = makeResources({ armySize: 7, party: ['healer'] })
     expect(applyHealerMend(afterFighting, enc).armySize).toBe(9)
@@ -94,6 +113,10 @@ describe('v0.8 healer + slots acceptance', () => {
     const onto = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     expect(onto.resources.gold).toBe(5 - HEALER_UPKEEP_GOLD)
     expect(onto.encounter?.kind).toBe('town')
+    expect(onto.pendingEvents).toContainEqual({
+      kind: 'iconHighlighted',
+      target: { band: 'party', id: 'healer' },
+    })
   })
 
   it('rumor cap per town visit', () => {
@@ -108,7 +131,7 @@ describe('v0.8 healer + slots acceptance', () => {
   })
 
   it('party full refuses hire with stable line and no gold spent', () => {
-    const fullParty = ['scout', 'beast', 'captain']
+    const fullParty = ['scout', 'mule', 'captain']
     const s0 = makeState(baseTown, makeResources({ gold: 20, armySize: 5, party: fullParty }))
     const inTown = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     const refused = processAction(inTown, { type: ACTION_TOWN_HIRE_HEALER })!

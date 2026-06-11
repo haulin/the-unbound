@@ -17,8 +17,8 @@ Mechanics index (keep this list current):
 
 - Slots
   - Up to 3 held at once, from a roster of 7. Bought at PoIs, sold at The Crossing for half price.
-  - Mule (animal) - +50 food carry cap; -1 food per Camp Search. Cannot coexist with Boar.
-  - Boar (animal) - opening volley kills ~25% of enemy army at combat start. Cannot coexist with Mule.
+  - Mule (animal) - +50 food carry cap. Cannot coexist with Boar.
+  - Boar (animal) - opening volley on first Fight press per combat (~25% of enemy army, rounded up). Cannot coexist with Mule.
   - Scout (person) - halves woods/swamp lost chance; when oriented, reveals farms/camps/henges globally on the map (gate/locksmith/lair remain gated by mapping).
   - Healer (person) - mends up to 2 round-losses after combat; -1 gold per town enter while held.
   - Captain (person, banner-bearer) - +10% combat odds; +X% ambush in woods and mountains.
@@ -118,7 +118,7 @@ export const BARKEEP_TIPS = {
     "The cave with the long wind - that's where it sleeps.",
   ],
   mule: [
-    "A mule carries fifty more rations, but takes some at every camp.",
+    "A mule carries fifty more rations. Worth the feed on a long march.",
     "Sell a tired mule at a Crossing if you can. Half what you paid is fair.",
   ],
   healer: [
@@ -330,10 +330,10 @@ export const TOWN_NAME_POOL = [
 export const CROSSING_NAME_POOL = [
   "Salt",
   "Brass",
-  "Three-Lane",
-  "Big Oak",
   "Stoneford",
   "Pilgrim's",
+  "Low Bridge",
+  "Mason's Span",
 ] as const;
 
 export const GATE_NAME = 'The Gate'
@@ -444,7 +444,8 @@ export const TOWN_BUY_LINES = [
   "No ceremony. Just trade.",
 ] as const;
 
-export const TOWN_NO_GOLD_LINES = [
+/** Generic gold shortfall on any purchase/hire (town, farm, camp, locksmith pay-gold). */
+export const NO_GOLD_LINES = [
   "Not enough to pay.",
   "Your purse is light.",
 ] as const;
@@ -599,13 +600,13 @@ export const MAGPIE_SELL_LINES = [
 // The Crossing
 // ----------------------------
 export const CROSSING_ENTER_LINES = [
-  "Three roads meet under an old oak. Drovers, factors, smiths - someone is always buying.",
+  "A stone bridge over slow water. Drovers pause here; coin changes hands.",
   "Trades in what walks. Companies arrive heavy and leave lighter. Coin runs the other way.",
 ] as const;
 
 export const CROSSING_EMPTY_LINES = [
-  "You have nothing to leave behind. The Crossing watches you pass.",
-  "A drover lifts his hat to you. \"Light company. Nothing to trade, then?\" He returns to his fire.",
+  "You have nothing to leave behind. Bridge traffic passes you by.",
+  "A drover on the span lifts his hat. \"Light company. Nothing to trade, then?\" He walks on.",
 ] as const;
 
 // ----------------------------
@@ -770,3 +771,7 @@ export const GAME_OVER_LINES = [
   "You came with an army. You leave with nothing.\nThe gate remains closed.",
   "Alone now. The road goes on without you.",
 ] as const;
+
+// TIC-80 cart quote-parity workaround — see design doc § Lore pass. Remove when TIC ships a fix.
+const TIC_QUOTE_PARITY_FIX = `"`;
+(globalThis as unknown as { TIC_QUOTE_PARITY_FIX: string }).TIC_QUOTE_PARITY_FIX = TIC_QUOTE_PARITY_FIX;

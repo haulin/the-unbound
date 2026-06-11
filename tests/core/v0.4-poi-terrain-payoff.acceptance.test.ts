@@ -10,7 +10,7 @@ import {
   RAINBOW_END_SPENT_LINES,
 } from '../../src/core/constants'
 import {
-  ACTION_FARM_BUY_BEAST,
+  ACTION_FARM_BUY_MULE,
   ACTION_FARM_BUY_FOOD,
   ACTION_FARM_LEAVE,
 } from '../../src/core/mechanics/defs/farm'
@@ -155,7 +155,7 @@ describe('v0.4 farm modal', () => {
         kind: 'farm',
         id: 4,
         name: 'Greyfield',
-        offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'],
+        offers: ['FARM_BUY_FOOD', 'FARM_BUY_MULE'],
         companionHireGold: 10,
       })
     const s0 = makeState(w)
@@ -175,7 +175,7 @@ describe('v0.4 farm modal', () => {
         kind: 'farm',
         id: 4,
         name: 'Greyfield',
-        offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'],
+        offers: ['FARM_BUY_FOOD', 'FARM_BUY_MULE'],
         companionHireGold: 10,
       })
     const s0 = makeState(w)
@@ -204,19 +204,23 @@ describe('v0.4 farm modal', () => {
         kind: 'farm',
         id: 4,
         name: 'Greyfield',
-        offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'],
+        offers: ['FARM_BUY_FOOD', 'FARM_BUY_MULE'],
         companionHireGold: 10,
       })
     const s0 = makeState(w)
     s0.resources.gold = 10
 
     const onto = processAction(s0, { type: ACTION_MOVE, dx: 0, dy: 1 })!
-    const beast = processAction(onto, { type: ACTION_FARM_BUY_BEAST })!
-    expect(beast.resources.party).toContain('beast')
-    expect(beast.resources.gold).toBe(0)
+    const withMule = processAction(onto, { type: ACTION_FARM_BUY_MULE })!
+    expect(withMule.resources.party).toContain('mule')
+    expect(withMule.resources.gold).toBe(0)
+    expect(withMule.pendingEvents).toContainEqual({
+      kind: 'iconHighlighted',
+      target: { band: 'stats', id: 'food' },
+    })
 
-    const again = processAction(beast, { type: ACTION_FARM_BUY_BEAST })!
-    expect(again.resources.party).toContain('beast')
+    const again = processAction(withMule, { type: ACTION_FARM_BUY_MULE })!
+    expect(again.resources.party).toContain('mule')
     expect(again.ui.message.length).toBeGreaterThan(0)
   })
 })

@@ -50,7 +50,7 @@ Pairing rules and the activation-flash convention for any current or future slot
 - Positive-only slots are allowed when the 1-of-3 slot opportunity cost is enough balance.
 - Aim for unique negatives across active slots. Duplicates should be reviewed.
 
-**Sprite-flash on activation.** For any slot whose effect fires at a discrete event, pulse the slot's button-strip icon for 200–400 ms. One animation primitive, shared by every event-triggered P or N. Makes the cause visible to the player.
+**Icon highlight on activation.** For any slot or stat whose effect fires at a discrete event, pulse its icon for 200–400 ms (`iconHighlighted` domain event; TIC `slotHighlight` frames). One animation primitive, shared by party strip, inventory, and hero stats. v0.9 ships highlights for: mule hire → food stat; mule cap-save (base-cap crossing only) and carry-full army; no-gold → gold stat; mule/boar hire refusal and duplicate hire; boar volley; healer mend and town upkeep.
 
 The unallocated effect pool and parked slot ideas all live in [`backlog.md`](./backlog.md) under *Slot system — deferred (post-demo)*.
 
@@ -126,7 +126,7 @@ This means action constants, action union types, encounter shapes, signpost rank
 
 **TIC-80 text:** player-visible strings in `lore.ts` (and UI copy) must be **ASCII-only** — use `-` not em dash `—`, straight quotes `"` `'` not curly. TIC fonts cannot render many Unicode punctuation marks; garbled glyphs read as bugs.
 
-**Lore line selection (shop + encounter copy):** not a gameplay pillar — a pacing rule. Within one PoI visit, **denials and routine purchases** (no gold, carry full, buy food/troops, farm food, hire refusals) use `encounterStableLine` so button-mashing does not drain the pool. **Rumors** and **one-shot outcomes** (combat flee/victory/pay success) may advance `copyCursors` for variety. Revisit per pool when adding a mechanic; default to per-visit stable unless fiction wants a fresh line each press.
+**Lore line selection (shop + encounter copy):** not a gameplay pillar — a pacing rule. Within one PoI visit, **denials and routine purchases** (no gold, carry full, buy food/troops, farm food, hire refusals) use `encounterStableLine` so button-mashing does not drain the pool. **Rumors** and **one-shot outcomes** (combat flee/victory/pay success) may advance `copyCursors` for variety. Revisit per pool when adding a mechanic; default to per-visit stable unless fiction wants a fresh line each press. **Directness vs mystery by pool** (barkeep tips vs ambient copy, companion buy lines, code slot ids vs in-fiction names) lives in [`lore-and-tone.md`](./lore-and-tone.md).
 
 **Lore-cycling audit (v0.8 and after):** for every random outcome, document *what it is keyed from*. v0.8 fixed **copy** (fail lines per encounter, split buy tags, no stream spend on flavor). **Combat hits** and **world placement** still used the legacy global tape — that was wrong relative to the product rule *“buying a scout must not change the fight waiting at D4”* and *“the wyrm fight script must not depend on how many ambushes you took earlier.”* Wyrm **enter lore** is keyed (`perMoveLine` / `stableLine`); wyrm **FIGHT rounds** are not — they consume `world.rngState` like any other combat.
 

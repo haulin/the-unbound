@@ -6,16 +6,18 @@ Tentative milestones plus ideas in other sections below. Each milestone should c
 
 - **Registry kind-coverage validation.** A mechanic declaring `moveEventPolicyByKind: { foo: { ambushPercent: 100 } }` without a matching `combatVariantByKind[foo]` falls through to the preview placeholder silently. Add a registry-time check (`docs/backlog.md` already tracks this in the broader registry hardening task).
 - **Recruit helper coupling (henge → mountain).** `henge.ts` imports `brigandRecruitCost` / `brigandRecruitEligibility` / `brigandRecruitLootScale` from `mountain.ts` because both use the same recruitable-bandit math. That ties a PoI encounter to a terrain file and makes brigand tuning silently affect henge. Extract neutral shared helpers (e.g. `recruitableBandit.ts` or combat-layer recruit utilities) when a third recruitable source appears—or sooner if recruit rules diverge per variant.
+- **Offer table types.** Camp/farm/town/locksmith each declare a local `*ActionSpec` (`spriteId: number`, `reduce`, optional `badge` / `category`); combat uses `GridActionRow & { reduce }` for `gridActionCell`. Unify on one row shape (e.g. `GridActionRow & { reduce, category? }`) so every mechanic's action table matches the helper contract.
+- **Companion registry.** Centralize per-slot metadata (sprite, sell lines, pool membership, pairing rules, combat hooks like boar volley / healer mend) so adding Captain/Magpie/Fisherman does not touch crossing maps, `CombatEncounter` flags, and lore scatter. Replace `SELL_LINES_BY_SLOT`, `boarVolleyFired` on every fixture, and hire refusal one-offs.
+- **`FEATURE_KINDS` / `TERRAIN` / `FEATURES` in `constants.ts`.** Render and teleport infrastructure still centralizes per-kind sprite lookup and empty terrain lore switches; crossing extended the pattern. Collapse into mechanic-owned tables or align `CellKind` names with `SPRITES` keys (e.g. `lair` vs `cave`) so new PoIs do not grow three parallel switches.
 
 ## Issues
 - Arriving in a farm with 1 food gives food, but game over as well.
-- Food delta UX: consider collapsing `-1` + `+N` into a single animated net delta when both occur on the same move.
 - Two signposts should not point to the same PoI?
 - Staggered delta popups jump mid-animation. When multiple deltas for the same target run concurrently (e.g. spam-buying food), `drawDeltaOverlays` packs them left-to-right based on the *currently-active* anim list, so as soon as the leftmost one expires the survivors shift left into its column. Pre-existing — became more visible with multi-beat moves. Desired behavior: each delta holds its column for its full lifetime; new deltas pick the leftmost free column (so a finished slot 0 gets re-used before slot N+1). Likely fix: stamp a stable `slot` index on the `DeltaAnim` at translation time (lowest free integer among same-target deltas with `endFrame > phaseCursor`) and render at `anchor.x + slot * fixedSlotWidth` instead of the running cursor.
 
 ## Polish for demo:
 - Balance pass: town prices, scout cost, combat gold drops...
-- Wyrm balance: combat tuning, Blood/payment economy.
+- Wyrm balance: combat tuning, Blood/payment economy. Wyrm keeps health like henges.
 - Hide debug stuff, pick seed for new game randomly
 - title screen, about screen, back to menu, resume, controls
 - animations for left panel — illustration transitions (modal enter/leave, overworld move), lore line stagger. **Spec:** `docs/plans/2026-06-05-button-badges-design.md` § Phase 2 pointer + addendum 2026-06-05.
@@ -44,22 +46,20 @@ Tentative milestones plus ideas in other sections below. Each milestone should c
 - different types of enemies (magic/strength) or different loot drops
 - companion that allows you to recruit goblins (goblin chief?)
 - companion that shows combat hit odds (strategist?)
+- companion that allows to recruit during combat (remove default behavior)
+- companion that doesn't take a spot
+- legendary companion variants - boar hits harder, mule carries more, scout shows special pois, healer heals more for no upkeep
+- starting character with more/less spots
+- starting character with different fight algo
 - Camp local map — see *Camp local map* in Deferred backlog.
 - maybe adjust worldgen as it feels like swamps & mountains are too common
 - When I accidentally leave a town I cannot return, have to step out and back. Consider 5 action buttons with middle leave/reenter.
 - PoI leave lines (camp/farm farewell)
 - increased difficulty after first win
+- Food delta UX: consider collapsing `-1` + `+N` into a single animated net delta when both occur on the same move.
+- Camp `requiredOnEveryPoi: [CAMP_SEARCH]` so Search is always left grid slot (like farm food).
+- Army stat highlight when a food **gain** is clamped at carry cap (today: highlight only on buy refusal at cap).
 
-
-**v0.9 — Slot System: Trading & Farm Animals**
-
-See `docs/2026-05-27-slot-system-design.md` for the full design.
-
-- The Crossing PoI: new sell-only PoI. Buttons show held slots' sprites; tapping sells that slot for half its purchase price. Instance name pool: Salt Crossing, Brass, Three-Lane, Big Oak, Stoneford, Pilgrim's. Worldgen: 1–2 per map.
-- Sprite-flash animation primitive: pulse slot icon when event-triggered effect fires. Shared by all slots with event-driven P or N.
-- Boar specialty added to Farm pool. P3' opening volley (~25% of enemy army at combat start) + N15 bidirectional Mule exclusion. New 16×16 sprite (low body, bristled back, tusks). Lore lines for `BOAR_*` and `*_REFUSED_LINES` already in `lore.ts`.
-- Mule update (paired with Boar): wire Mule end of the bidirectional exclusion. Mule N1 (-1 food per Camp Search) gets the sprite-flash treatment in passing. Also implement mule negative. Mule upside is not communicated well enough. Only one lore line spells it out.
-- Lore pass.
 
 **v0.10 — Random Encounters & World Texture**
 
@@ -81,7 +81,7 @@ See `docs/2026-05-27-slot-system-design.md` for the full design.
 - Tavern flavor text pool (warmer, unreliable narrator register)
 - Tavern rumors may reveal which Town carries which specialty hire (Scout / Healer / Fisherman).
 - Collectibles to find. Maybe just getting one of each creatures (healer/scout/beast) - shows on home page instead of question marks.
-- Achievements - challenge icons - not using a map the whole run. Pacifist run - do not land a hit the whole run. Open gate with increased difficulty.
+- Achievements - challenge icons - not using a map the whole run. Pacifist run - do not land a hit the whole run. Open gate with increased difficulty. Visit every PoI in a world.
 
 **v0.13 — Second Gate (Silver)**
 - Silver keyholder, silver gate, silver border
@@ -165,6 +165,31 @@ Button badges freed the left panel; art is still 16×16 scaled 4×. Upgrade path
 - Not on current roadmap; revisit with v0.14 sprite audit / bank reshuffle.
 
 ## After demo wishlist
+
+### Player feedback (lore + highlights)
+
+Archive of v0.9 design discussion — not scheduled for demo; current `feedbackChange` helper is the thin first slice (purchase shortfall only).
+
+**Mental model:** Action → reducer → `Change` with `message` (words) + optional `events` (motion/highlights). Lore does not need its own event bus; terminal reads `message`, TIC translates `events`.
+
+**Layers:**
+- **Mechanic** — picks lore pool + RNG mode (`stableLine` per tile/action, `perMoveLine` per step, caller success string). Local tables in def files (`townGoldShortfall`, variant `failLines`); import shared pools (`NO_GOLD_LINES`) when teaching is generic.
+- **`feedbackChange(spec)`** — mechanic supplies formatted `message`; core derives `iconHighlighted` from `reason` only (today: `shortfall` → gold/food stat).
+- **Platform** — unchanged; `iconHighlighted` → pulse.
+
+**`FeedbackSpec` shape (target):** `{ action, category: 'purchase' | …, outcome: 'success' | 'failure', reason?, message }`. `action` is identity/salt (`town.buyFood`), not a global lore lookup key.
+
+**Phased expansion (do not big-bang):**
+1. ✓ Purchase shortfall (`buy()` → `shortfall` + highlights) — locksmith food/gold, combat pay `noFunds`.
+2. Carry-cap refusal (`capacityBlocked` → army highlight); loot clamp highlight.
+3. Hire blocked (pairing, duplicate, party full).
+4. Companion effect highlights on success (mend, volley, cap-save) — same delivery, different reason table.
+5. Optional `{ kind: 'feedback', spec }` domain event for replay/logging; never reactive chaining.
+
+**Lore parity rules (to document when implementing phase 2+):** per-tile stable (same cell → same refusal line), per-step (`perMoveLine`), per-action salt (`encounterStableLine` with `action` key). Specific pools per purchase are intentional — teach mechanics, not generic “purse is light” everywhere.
+
+**Anti-pattern:** `MechanicDef.reduceLoreLine(action)` global hook — action keys cross mechanics (`hire.mule` on farm and town); action `reduce` already is the hook.
+
 - Map size presets (example): quick 7×7, normal 10×10, epic 15×15.
 - Reach three gates with three keys to win.
 - Replay of the steps at game end.

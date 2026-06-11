@@ -99,6 +99,7 @@ describe('rightGrid badges', () => {
         armyAtCombatStart: 5,
         sourceCellId: 4,
         restoreMessage: '',
+        boarVolleyFired: false,
       },
       { gold: 100 },
     )
@@ -131,6 +132,7 @@ describe('rightGrid badges', () => {
         armyAtCombatStart: 5,
         sourceCellId: 4,
         restoreMessage: '',
+        boarVolleyFired: false,
       },
       { gold: 100 },
     )
@@ -149,7 +151,7 @@ describe('rightGrid badges', () => {
       kind: 'farm',
       id: 4,
       name: 'Greyfield',
-      offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'],
+      offers: ['FARM_BUY_FOOD', 'FARM_BUY_MULE'],
       companionHireGold: 17,
     }
     const s = makeState(farm, { kind: 'farm', sourceCellId: 4, restoreMessage: '' })
@@ -159,9 +161,10 @@ describe('rightGrid badges', () => {
   })
 
   it('preview sentinel combat grid is total (sourceCellId: -1)', () => {
-    const previewEncounter = MECHANIC_INDEX.previewEncounterByEncounterKind.combat?.()
+    const s = makeState({ kind: 'grass' }, null)
+    const previewEncounter = MECHANIC_INDEX.previewEncounterByEncounterKind.combat?.(s)
     expect(previewEncounter).toBeDefined()
-    const s = makeState({ kind: 'grass' }, previewEncounter ?? null)
+    s.encounter = previewEncounter ?? null
     const grid = rightGrid('combat')
     expect(grid(s, 1, 1)).toEqual({ tilePreview: { kind: 'relativeToPlayer', dx: 0, dy: 0 }, action: null })
     expect(grid(s, 1, 0).badge).toBeUndefined()

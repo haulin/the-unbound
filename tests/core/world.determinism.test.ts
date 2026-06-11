@@ -40,6 +40,8 @@ function cellSignature(cell: Cell): string {
       return `fishingLake:${cell.id}:ready=${cell.nextReadyStep}`
     case 'rainbowEnd':
       return `rainbowEnd:${cell.id}:paid=${cell.hasPaidOut}`
+    case 'crossing':
+      return `crossing:${cell.id}:${cell.name}`
   }
 }
 

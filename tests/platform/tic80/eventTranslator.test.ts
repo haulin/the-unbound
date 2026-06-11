@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { DomainEvent } from '../../../src/core/types'
+import type { DomainEvent, HighlightTarget } from '../../../src/core/types'
 import {
   FOOD_DELTA_FRAMES,
   GRID_TRANSITION_STEP_FRAMES,
+  ICON_HIGHLIGHT_FRAMES,
   MOVE_SLIDE_FRAMES,
 } from '../../../src/platform/tic80/uiConstants'
 import {
@@ -118,6 +119,34 @@ describe('translatePendingEvents — single-event scheduling', () => {
       durationFrames: GRID_TRANSITION_FRAMES,
       blocksInput: true,
       params: { from: 'overworld', to: 'camp' },
+    })
+  })
+
+  it('iconHighlighted → non-blocking iconHighlight at phaseCursor', () => {
+    const anims = run(
+      [{ kind: 'iconHighlighted', target: { band: 'party', id: 'mule' } }],
+      12,
+    )
+    expect(anims).toHaveLength(1)
+    expect(anims[0]).toMatchObject({
+      kind: 'iconHighlight',
+      startFrame: 12,
+      durationFrames: ICON_HIGHLIGHT_FRAMES,
+      blocksInput: false,
+      params: { target: { band: 'party', id: 'mule' } },
+    })
+  })
+
+  it.each([
+    { band: 'stats' as const, id: 'army' as const },
+    { band: 'party' as const, id: 'scout' },
+    { band: 'inventory' as const, id: 'bloodVial' },
+    { band: 'meta' as const, id: 'position' as const },
+  ] as const satisfies readonly HighlightTarget[])('iconHighlighted schedules $band/$id', (target) => {
+    const anims = run([{ kind: 'iconHighlighted', target }], 0)
+    expect(anims[0]).toMatchObject({
+      kind: 'iconHighlight',
+      params: { target },
     })
   })
 

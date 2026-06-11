@@ -13,7 +13,7 @@ import {
   POI_MIN_OFFERS,
 } from '../../constants'
 import { cellIdForPos, getCellAt, setCellAt } from '../../cells'
-import { applyFoodCapOnGain } from '../../foodCarry'
+import { applyFoodCapOnGainWithEvents } from '../../foodCarry'
 import type { Change } from '../../reducer'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
@@ -152,11 +152,12 @@ function reduceCampSearch(state: State): Change {
   const nextCampCell: CampCell = { ...campCell, nextReadyStep: stepCount + CAMP_COOLDOWN_MOVES }
   const nextWorld = setCellAt(state.world, state.player.position, nextCampCell)
   const gained: Resources = { ...prevRes, food: prevRes.food + CAMP_FOOD_GAIN, armySize: prevRes.armySize + armyGain }
-  const nextResources = applyFoodCapOnGain(prevRes, gained)
+  const capped = applyFoodCapOnGainWithEvents(prevRes, gained)
 
   return {
     world: nextWorld,
-    resources: nextResources,
+    resources: capped.resources,
+    ...(capped.events.length ? { events: capped.events } : {}),
     message: loreMessage(title, rnd.perMoveLine(CAMP_RECRUIT_LINES, { cellId: campCell.id })),
   }
 }

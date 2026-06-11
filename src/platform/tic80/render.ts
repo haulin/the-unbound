@@ -17,6 +17,7 @@ import {
   LEFT_PANEL_KIND_MINIMAP,
   LEFT_PANEL_KIND_SPRITE,
   type DeltaAnimTarget,
+  type HighlightTarget,
   type State,
 } from '../../core/types'
 import type { Tic80UiState } from './anim'
@@ -54,6 +55,13 @@ const FONT_CHAR_PX = 6
 const HERO_STATS_X = 84
 const HERO_STATS_Y = 12
 const HERO_STAT_ROW_PX = 19 // 16px icon + 3px row gap
+
+const HIGHLIGHT_SPRITES = [
+  SPRITES.ui.slotHighlight0,
+  SPRITES.ui.slotHighlight1,
+  SPRITES.ui.slotHighlight2,
+  SPRITES.ui.slotHighlight3,
+] as const
 
 // ----------------------------
 // Pure rendering helpers
@@ -152,6 +160,142 @@ function deltaAnchorsFromGridSpecs(
 function drawHeroStat(x: number, y: number, spriteId: number, text: string, color: number) {
   spr(spriteId, x, y, -1, 1, 0, 0, 2, 2)
   print(text, x + 19, y + 5, color) // 16px icon + 3px label gap; 5px text baseline
+}
+
+type StatItem = { iconSpriteId: number; value: string }
+
+function rightStatsBandIconOrigin(s: State, itemIndex: number): { x: number; y: number } | null {
+  const items: StatItem[] = [
+    { iconSpriteId: SPRITES.small.seed, value: `${s.world.seed}` },
+    { iconSpriteId: SPRITES.small.position, value: formatPositionLabel(s) },
+    { iconSpriteId: SPRITES.small.steps, value: `${s.run.stepCount}` },
+  ]
+  if (itemIndex < 0 || itemIndex >= items.length) return null
+
+  const iconSize = UI.UI_STATUS_ICON_SIZE
+  const iconValueGap = UI.UI_STATS_BAND_ICON_VALUE_GAP_PX
+  const itemGap = UI.UI_STATS_BAND_ITEM_GAP_PX
+
+  let contentW = 0
+  for (let i = 0; i < items.length; i++) {
+    contentW += iconSize + iconValueGap + items[i]!.value.length * FONT_CHAR_PX
+  }
+  contentW += (items.length - 1) * itemGap
+
+  const bandY = Layout.RIGHT_PANEL_TOP_BAND_Y
+  const iconY = bandY + Math.floor((Layout.RIGHT_PANEL_TOP_BAND_H - iconSize) / 2) - 1
+  let x = Layout.RIGHT_PANEL_INNER_X + Math.floor((Layout.RIGHT_PANEL_INNER_W - contentW) / 2)
+  for (let i = 0; i < itemIndex; i++) {
+    const item = items[i]!
+    x += iconSize + iconValueGap + item.value.length * FONT_CHAR_PX + itemGap
+  }
+  return { x, y: iconY }
+}
+
+// 16×16 sheet sprites (ids 324–330); spr w/h are tiles at scale 1, not a 2× scale factor.
+const HIGHLIGHT_SPRITE_TILES = 2
+const HIGHLIGHT_DISPLAY_PX = HIGHLIGHT_SPRITE_TILES * 8
+
+function highlightOriginForIconTopLeft(
+  iconX: number,
+  iconY: number,
+  iconDisplayPx: number,
+): { x: number; y: number } {
+  return {
+    x: iconX + Math.floor(iconDisplayPx / 2) - Math.floor(HIGHLIGHT_DISPLAY_PX / 2),
+    y: iconY + Math.floor(iconDisplayPx / 2) - Math.floor(HIGHLIGHT_DISPLAY_PX / 2),
+  }
+}
+
+function highlightRectForTarget(s: State, target: HighlightTarget): { x: number; y: number } | null {
+  switch (target.band) {
+    case 'stats': {
+      const row = target.id === 'army' ? 0 : target.id === 'food' ? 1 : target.id === 'gold' ? 2 : -1
+      if (row < 0) return null
+      return highlightOriginForIconTopLeft(
+        HERO_STATS_X,
+        HERO_STATS_Y + row * HERO_STAT_ROW_PX,
+        HIGHLIGHT_DISPLAY_PX,
+      )
+    }
+    case 'party': {
+      const origin = heldBandIconOrigin(s, (id) => id === target.id, 'party')
+      return origin ? highlightOriginForIconTopLeft(origin.x, origin.y, 16) : null
+    }
+    case 'inventory': {
+      const origin = heldBandIconOrigin(s, (id) => id === target.id, 'inventory')
+      return origin ? highlightOriginForIconTopLeft(origin.x, origin.y, 16) : null
+    }
+    case 'meta': {
+      const itemIndex = target.id === 'steps' ? 2 : target.id === 'position' || target.id === 'oriented' ? 1 : -1
+      const origin = rightStatsBandIconOrigin(s, itemIndex)
+      return origin ? highlightOriginForIconTopLeft(origin.x, origin.y, UI.UI_STATUS_ICON_SIZE) : null
+    }
+    default:
+      return null
+  }
+}
+
+function heldBandIconOrigin(
+  s: State,
+  matches: (id: string) => boolean,
+  band: 'party' | 'inventory',
+): { x: number; y: number } | null {
+  const iconSize = 16
+  const iconGap = UI.UI_HELD_BAND_ICON_GAP_PX
+  const heldIcons = heldStatusIcons(s)
+  if (heldIcons.length === 0) return null
+
+  let iconIndex = -1
+  let cursor = 0
+  for (let i = 0; i < INVENTORY_STATUS_ORDER.length; i++) {
+    const id = INVENTORY_STATUS_ORDER[i]!
+    if (!s.resources.inventory.includes(id)) continue
+    if (band === 'inventory' && matches(id)) {
+      iconIndex = cursor
+      break
+    }
+    cursor++
+  }
+  if (band === 'party') {
+    for (let i = 0; i < s.resources.party.length; i++) {
+      if (matches(s.resources.party[i]!)) {
+        iconIndex = cursor + i
+        break
+      }
+    }
+  }
+  if (iconIndex < 0) return null
+
+  const contentW = heldIcons.length * iconSize + (heldIcons.length - 1) * iconGap
+  const bandY = Layout.RIGHT_PANEL_BOTTOM_BAND_Y
+  const iconY = bandY + Math.floor((Layout.RIGHT_PANEL_BOTTOM_BAND_H - iconSize) / 2)
+  const x = Layout.RIGHT_PANEL_INNER_X + Math.floor((Layout.RIGHT_PANEL_INNER_W - contentW) / 2) + iconIndex * (iconSize + iconGap)
+  return { x, y: iconY }
+}
+
+function drawIconHighlightOverlays(
+  ui: Tic80UiState,
+  s: State,
+  bands: readonly HighlightTarget['band'][],
+) {
+  const allowed = new Set(bands)
+  const anims = ui.anim.active
+  const frame = ui.clock.frame
+  for (let i = 0; i < anims.length; i++) {
+    const a = anims[i]!
+    if (a.kind !== 'iconHighlight') continue
+    if (!allowed.has(a.params.target.band)) continue
+    if (frame < a.startFrame || frame >= a.startFrame + a.durationFrames) continue
+    const rect = highlightRectForTarget(s, a.params.target)
+    if (!rect) continue
+    const t = frame - a.startFrame
+    const spriteIndex = Math.min(
+      HIGHLIGHT_SPRITES.length - 1,
+      Math.floor((t * HIGHLIGHT_SPRITES.length) / a.durationFrames),
+    )
+    spr(HIGHLIGHT_SPRITES[spriteIndex]!, rect.x, rect.y, 0, 1, 0, 0, HIGHLIGHT_SPRITE_TILES, HIGHLIGHT_SPRITE_TILES)
+  }
 }
 
 function drawDeltaOverlays(
@@ -288,6 +432,7 @@ function drawLeftPanel({ state: s, ui }: RenderContext) {
   const gold = { x: HERO_STATS_X, y: statY }
   drawHeroStat(gold.x, gold.y, SPRITES.inventory.gold, `${s.resources.gold}`, UI.UI_COLOR_TEXT)
   drawDeltaOverlays(ui, { army, food, gold })
+  drawIconHighlightOverlays(ui, s, ['stats'])
 
   const statusBottomY = gold.y + 16 + 2
   const headerBottomY = Math.max(headerBandBottomY, statusBottomY)
@@ -321,6 +466,7 @@ function drawRightPanel(ctx: RenderContext) {
   drawCombatHitOddsDebug(s)
   drawRightStatsBand(s)
   drawRightHeldBand(s)
+  drawIconHighlightOverlays(ui, s, ['party', 'inventory', 'meta'])
   drawRightPanelDividers()
   drawRightPanelFrame(s)
 
@@ -343,8 +489,6 @@ function drawRightPanelFrame(s: State) {
     fallbackBorderColor: UI.UI_COLOR_DIM,
   })
 }
-
-type StatItem = { iconSpriteId: number; value: string }
 
 function drawRightStatsBand(s: State) {
   const items: StatItem[] = [
@@ -395,9 +539,17 @@ function drawRightHeldBand(s: State) {
   }
 }
 
-// 7x7 art centered on the line (8x8 sprite, colorkey 8). Vertical: 90° CW + 1 px left.
+// 7x7 art centered on the line (8x8 chrome sprite). Vertical: 90° CW + 1 px left.
 function stampDividerGem(x: number, y: number, vertical: boolean) {
-  spr(SPRITES.ui.dividerGem, x - 3 + (vertical ? -1 : 0), y - 3, 8, 1, 0, vertical ? 1 : 0)
+  spr(
+    SPRITES.ui.dividerGem,
+    x - 3 + (vertical ? -1 : 0),
+    y - 3,
+    UI.UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR,
+    1,
+    0,
+    vertical ? 1 : 0,
+  )
 }
 
 // Inclusive endpoints; two gems at center ± gemOffset, empty middle.
@@ -423,7 +575,7 @@ function drawDivider(x0: number, y0: number, x1: number, y1: number, gemOffset: 
 function drawRightPanelDividers() {
   const x = Layout.RIGHT_PANEL_INNER_X
   const x1 = x + Layout.RIGHT_PANEL_INNER_W - 1
-  const c = UI.UI_COLOR_RIGHT_PANEL_DIVIDER
+  const c = UI.UI_COLOR_PANEL_DIVIDER
   drawDivider(x, Layout.RIGHT_PANEL_TOP_DIVIDER_Y, x1, Layout.RIGHT_PANEL_TOP_DIVIDER_Y, 14, c)
   drawDivider(x, Layout.RIGHT_PANEL_BOTTOM_DIVIDER_Y, x1, Layout.RIGHT_PANEL_BOTTOM_DIVIDER_Y, 14, c)
 }
@@ -432,7 +584,7 @@ function drawRightPanelDividers() {
 function drawLeftPanelDividers(illX: number, illY: number, illSize: number, horizontalY: number) {
   const verticalX = illX + illSize + Math.floor(UI.UI_LEFT_PANEL_INNER_GAP / 2)
   const verticalH = Math.max(0, horizontalY - illY - UI.UI_LEFT_PANEL_DIVIDER_GAP_PX)
-  const c = UI.UI_COLOR_LEFT_PANEL_DIVIDER
+  const c = UI.UI_COLOR_PANEL_DIVIDER
   if (verticalH > 0) {
     drawDivider(verticalX, illY, verticalX, illY + verticalH - 1, Math.floor(verticalH / 6.4), c)
   }

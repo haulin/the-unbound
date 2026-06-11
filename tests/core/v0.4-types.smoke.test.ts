@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ACTION_FARM_BUY_BEAST,
+  ACTION_FARM_BUY_MULE,
   ACTION_FARM_BUY_FOOD,
   ACTION_FARM_LEAVE,
 } from '../../src/core/mechanics/defs/farm'
@@ -31,13 +31,13 @@ describe('v0.4 types smoke', () => {
 
   it('farm and locksmith Action variants use constants', () => {
     const buyFood: Action = { type: ACTION_FARM_BUY_FOOD }
-    const buyBeast: Action = { type: ACTION_FARM_BUY_BEAST }
+    const buyMule: Action = { type: ACTION_FARM_BUY_MULE }
     const farmLeave: Action = { type: ACTION_FARM_LEAVE }
     const payGold: Action = { type: ACTION_LOCKSMITH_PAY_GOLD }
     const payFood: Action = { type: ACTION_LOCKSMITH_PAY_FOOD }
     const lockLeave: Action = { type: ACTION_LOCKSMITH_LEAVE }
     expect(buyFood.type).toBe(ACTION_FARM_BUY_FOOD)
-    expect(buyBeast.type).toBe(ACTION_FARM_BUY_BEAST)
+    expect(buyMule.type).toBe(ACTION_FARM_BUY_MULE)
     expect(farmLeave.type).toBe(ACTION_FARM_LEAVE)
     expect(payGold.type).toBe(ACTION_LOCKSMITH_PAY_GOLD)
     expect(payFood.type).toBe(ACTION_LOCKSMITH_PAY_FOOD)

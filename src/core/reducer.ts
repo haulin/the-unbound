@@ -15,7 +15,7 @@ import {
 import { gameOverMessage, applyArmyZeroGameOver } from './gameOver'
 import { SPRITES } from './spriteIds'
 import { generateWorld } from './world'
-import { onEnterDefaultTerrain } from './mechanics/encounterHelpers'
+import { iconHighlighted, onEnterDefaultTerrain } from './mechanics/encounterHelpers'
 import { MECHANIC_INDEX } from './mechanics'
 import type { TileEnterResult } from './mechanics/types'
 import {
@@ -267,6 +267,17 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
   // encounter-open transition. Splitting cost and arrival also keeps the
   // two food deltas as separate popups instead of collapsing into a single
   // net diff.
+  const arrivalEvents: DomainEvent[] = [...(outcome.events ?? [])]
+  if (nextEncounter && !isGameOver) {
+    arrivalEvents.push({ kind: 'encounterOpened', encounterKind: nextEncounter.kind })
+  }
+  if (!isGameOver) {
+    if (teleported) {
+      arrivalEvents.push(iconHighlighted({ band: 'meta', id: 'position' }))
+    } else if (!prevState.run.knowsPosition && finalKnowsPosition) {
+      arrivalEvents.push(iconHighlighted({ band: 'meta', id: 'position' }))
+    }
+  }
   const beats: Change[] = [
     { resources: baseResources },
     { player: { position: landingPos }, events: [moveEvent] },
@@ -285,9 +296,7 @@ function reduceMove(prevState: State, dx: number, dy: number): State {
       encounter: nextEncounter,
       message,
       leftPanel: clearSpriteFocusIfAny(prevState.ui),
-      ...(nextEncounter && !isGameOver
-        ? { events: [{ kind: 'encounterOpened', encounterKind: nextEncounter.kind }] }
-        : {}),
+      ...(arrivalEvents.length ? { events: arrivalEvents } : {}),
     },
   ]
 

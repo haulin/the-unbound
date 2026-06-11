@@ -5,6 +5,7 @@ import type {
   CellKind,
   CombatEncounter,
   DeltaAnimTarget,
+  DomainEvent,
   Encounter,
   EncounterKind,
   Resources,
@@ -71,6 +72,7 @@ export type TileEnterResult = {
   // false from here — only `teleportTo` clears the player's known position.
   knowsPosition?: boolean
   teleportTo?: Vec2 | null
+  events?: readonly DomainEvent[]
 }
 
 export type OnEnterTile = (ctx: TileEnterCtx) => TileEnterResult
@@ -102,7 +104,7 @@ export type DeltaAnchorSpec = {
 // Placeholder encounter used by `rightGridRenderPlan` to synthesize "what the
 // cross would look like with this encounter open" for grid transitions. Never
 // reduced over — only fed to the right-grid sprite resolver.
-export type PreviewEncounterProvider = () => Encounter
+export type PreviewEncounterProvider = (state: State) => Encounter
 
 // The encounter a mechanic owns end-to-end. Nested under `MechanicDef.encounter`
 // so the type system enforces "any of these hooks can only exist alongside the

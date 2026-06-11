@@ -3,11 +3,13 @@
 // built from defs that import this file).
 
 import {
+  BOAR_MULE_REFUSED_LINES,
   COMPANION_ALREADY_LINES,
   LOST_FLAVOR_LINES,
   MAX_PARTY_SLOTS,
+  MULE_BOAR_REFUSED_LINES,
   PARTY_FULL_LINES,
-  TOWN_NO_GOLD_LINES,
+  NO_GOLD_LINES,
   terrainLoreLinesForKind,
 } from '../constants'
 import { cellIdForPos } from '../cells'
@@ -16,10 +18,13 @@ import { pickTeleportDestination } from '../teleport'
 import type { Change } from '../reducer'
 import type { MoveEvent, MoveEventPolicy, MoveEventSource, TileEnterCtx, TileEnterResult } from './types'
 import { SPRITES } from '../spriteIds'
+import { FOOD_CARRY_FULL_MESSAGE } from '../foodCarry'
 import type {
   Action,
+  DomainEvent,
   Encounter,
   EncounterKind,
+  HighlightTarget,
   Resources,
   State,
   Vec2,
@@ -36,13 +41,14 @@ export type CellBadge = { variant: 'price' | 'left'; text: string }
 // encounters is always loreMessage(title, enterBody) so combat outcomes can
 // recover the title via loreTitleFromRestore.
 
-export type PoiTitleSuffix = 'Town' | 'Farm' | 'Camp' | 'Henge'
+export type PoiTitleSuffix = 'Town' | 'Farm' | 'Camp' | 'Henge' | 'Crossing'
 
 const POI_TITLE_FALLBACK: Record<PoiTitleSuffix, string> = {
   Town: 'A Town',
   Farm: 'A Farm',
   Camp: 'A Camp',
   Henge: 'A Henge',
+  Crossing: 'A Crossing',
 }
 
 /** Display title from worldgen name + kind suffix (e.g. "Stonebridge Town"). */
@@ -112,17 +118,78 @@ export function setEncounterMessage(title: string, line: string): Change {
   return setLoreMessage(title, line)
 }
 
-// Standard "you don't have enough gold" response: picks a per-move line from the shared
-// TOWN_NO_GOLD_LINES pool (used today by town/farm/locksmith — the same lore is reused
-// across all three since the player-facing concept is the same). No resource changes.
+export type FeedbackReason = { kind: 'shortfall'; resource: 'gold' | 'food' }
+
+export type FeedbackSpec = {
+  action: string
+  category: 'purchase'
+  outcome: 'success' | 'failure'
+  reason?: FeedbackReason
+  message: string
+}
+
+/** Mechanic supplies `message` (pools + RNG stay in def files); highlights derive from `reason`. */
+export function feedbackChange(_state: State, spec: FeedbackSpec): Change {
+  const events = highlightsForReason(spec.reason)
+  return {
+    message: spec.message,
+    ...(events.length ? { events } : {}),
+  }
+}
+
+function highlightsForReason(reason: FeedbackReason | undefined): readonly DomainEvent[] {
+  if (!reason) return []
+  if (reason.kind === 'shortfall') {
+    return [iconHighlighted({ band: 'stats', id: reason.resource })]
+  }
+  return []
+}
+
+/** @deprecated Prefer `feedbackChange` with mechanic-owned message + `action` key. */
 export function noGoldResponse(state: State, prefix: string): Change {
-  return setEncounterMessage(prefix, encounterStableLine(state, 'noGold', TOWN_NO_GOLD_LINES))
+  return feedbackChange(state, {
+    action: 'purchase.shortfall',
+    category: 'purchase',
+    outcome: 'failure',
+    reason: { kind: 'shortfall', resource: 'gold' },
+    message: loreMessage(prefix, encounterStableLine(state, 'noGold', NO_GOLD_LINES)),
+  })
 }
 
 export function encounterStableLine(state: State, tag: string, pool: readonly string[]): string {
   const enc = state.encounter
   const salt = enc ? `${enc.kind}.${enc.sourceCellId}.${tag}` : tag
   return RNG.createRunCopyRandom(state).stableLine(pool, { salt })
+}
+
+export function iconHighlighted(target: HighlightTarget): DomainEvent {
+  return { kind: 'iconHighlighted', target }
+}
+
+// Mule and boar cannot share a party — refusal highlights the held blocker.
+export function refuseAnimalPairing(state: State, prefix: string, slotId: string): Change | null {
+  const party = state.resources.party
+  if (slotId === 'boar' && party.includes('mule')) {
+    return {
+      ...setEncounterMessage(prefix, encounterStableLine(state, 'refuse.boarWithMule', BOAR_MULE_REFUSED_LINES)),
+      events: [iconHighlighted({ band: 'party', id: 'mule' })],
+    }
+  }
+  if (slotId === 'mule' && party.includes('boar')) {
+    return {
+      ...setEncounterMessage(prefix, encounterStableLine(state, 'refuse.muleWithBoar', MULE_BOAR_REFUSED_LINES)),
+      events: [iconHighlighted({ band: 'party', id: 'boar' })],
+    }
+  }
+  return null
+}
+
+/** Carry-cap refusal — army stat carries the limit. */
+export function foodCarryFullResponse(title: string): Change {
+  return {
+    ...setEncounterMessage(title, FOOD_CARRY_FULL_MESSAGE),
+    events: [iconHighlighted({ band: 'stats', id: 'army' })],
+  }
 }
 
 // Returns null when the slot is hireable (caller proceeds with the buy).
@@ -133,10 +200,13 @@ export function refuseCompanionHire(state: State, prefix: string, slot: string):
     return setEncounterMessage(prefix, encounterStableLine(state, 'party.full', PARTY_FULL_LINES))
   }
   if (party.includes(slot)) {
-    return setEncounterMessage(
-      prefix,
-      encounterStableLine(state, `companion.already.${slot}`, COMPANION_ALREADY_LINES),
-    )
+    return {
+      ...setEncounterMessage(
+        prefix,
+        encounterStableLine(state, `companion.already.${slot}`, COMPANION_ALREADY_LINES),
+      ),
+      events: [iconHighlighted({ band: 'party', id: slot })],
+    }
   }
   return null
 }
@@ -170,7 +240,7 @@ export type BuyGain = Partial<{
 
 export type BuyResult =
   | { outcome: 'ok'; resources: Resources }
-  | { outcome: 'noFunds' }
+  | { outcome: 'shortfall'; resource: 'gold' | 'food' }
 
 // Pure transactional primitive: check funds, deduct, apply gain.
 // Does NOT touch lore, messages, RNG, food-carry clamping, or events —
@@ -182,7 +252,8 @@ export function buy(
 ): BuyResult {
   const goldCost = spec.gold ?? 0
   const foodCost = spec.food ?? 0
-  if (resources.gold < goldCost || resources.food < foodCost) return { outcome: 'noFunds' }
+  if (resources.gold < goldCost) return { outcome: 'shortfall', resource: 'gold' }
+  if (resources.food < foodCost) return { outcome: 'shortfall', resource: 'food' }
 
   const gain = spec.gain
   const foodGain = gain.food ?? 0
@@ -215,11 +286,26 @@ export function hireCompanion(
 ): Change {
   const refused = refuseCompanionHire(state, args.prefix, args.slotId)
   if (refused) return refused
+  const pairing = refuseAnimalPairing(state, args.prefix, args.slotId)
+  if (pairing) return pairing
   const result = buy(state.resources, { gold: args.goldCost, gain: { party: [args.slotId] } })
-  if (result.outcome === 'noFunds') return noGoldResponse(state, args.prefix)
+  if (result.outcome === 'shortfall') {
+    return feedbackChange(state, {
+      action: `hire.${args.slotId}`,
+      category: 'purchase',
+      outcome: 'failure',
+      reason: { kind: 'shortfall', resource: result.resource },
+      message: loreMessage(args.prefix, encounterStableLine(state, 'noGold', NO_GOLD_LINES)),
+    })
+  }
+  const events =
+    args.slotId === 'mule'
+      ? [iconHighlighted({ band: 'stats', id: 'food' })]
+      : undefined
   return {
     resources: result.resources,
     message: loreMessage(args.prefix, args.successLine),
+    ...(events ? { events } : {}),
   }
 }
 
@@ -324,8 +410,8 @@ type SimpleEncounterKind = Exclude<EncounterKind, 'combat'>
 
 export function previewEncounterProvider<K extends SimpleEncounterKind>(
   kind: K,
-): () => Extract<Encounter, { kind: K }> {
-  return () => ({ kind, sourceCellId: -1, restoreMessage: '' }) as Extract<Encounter, { kind: K }>
+): (state: State) => Extract<Encounter, { kind: K }> {
+  return (_state) => ({ kind, sourceCellId: -1, restoreMessage: '' }) as Extract<Encounter, { kind: K }>
 }
 
 // ---- Default tile enter + move-event roll --------------------------------------

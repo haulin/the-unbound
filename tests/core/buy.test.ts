@@ -41,14 +41,19 @@ describe('buy()', () => {
     expect(r.resources.gold).toBe(6)
   })
 
-  it('noFunds: insufficient gold returns noFunds outcome and no resource change', () => {
+  it('shortfall: insufficient gold returns gold shortfall', () => {
     const r = buy(makeResources({ food: 10, gold: 2, armySize: 5 }), { gold: 5, gain: { inventory: ['bronzeKey'] } })
-    expect(r.outcome).toBe('noFunds')
+    expect(r).toEqual({ outcome: 'shortfall', resource: 'gold' })
   })
 
-  it('noFunds: insufficient food returns noFunds outcome', () => {
+  it('shortfall: insufficient food returns food shortfall', () => {
     const r = buy(makeResources({ food: 2, gold: 10, armySize: 5 }), { food: 7, gain: { inventory: ['bronzeKey'] } })
-    expect(r.outcome).toBe('noFunds')
+    expect(r).toEqual({ outcome: 'shortfall', resource: 'food' })
+  })
+
+  it('shortfall: gold checked before food when both costs apply', () => {
+    const r = buy(makeResources({ food: 0, gold: 0, armySize: 5 }), { gold: 5, food: 5, gain: { inventory: ['bronzeKey'] } })
+    expect(r).toEqual({ outcome: 'shortfall', resource: 'gold' })
   })
 
   it('zero-cost zero-gain: resources unchanged', () => {
@@ -62,14 +67,14 @@ describe('buy()', () => {
   })
 
   it('does not overwrite unrelated party slots', () => {
-    const r = buy(makeResources({ food: 10, gold: 10, armySize: 5, party: ['scout', 'beast'] }), {
+    const r = buy(makeResources({ food: 10, gold: 10, armySize: 5, party: ['scout', 'mule'] }), {
       gold: 3,
       gain: { inventory: ['bronzeKey'] },
     })
     expect(r.outcome).toBe('ok')
     if (r.outcome !== 'ok') return
     expect(r.resources.party).toContain('scout')
-    expect(r.resources.party).toContain('beast')
+    expect(r.resources.party).toContain('mule')
     expect(r.resources.inventory).toContain('bronzeKey')
   })
 })

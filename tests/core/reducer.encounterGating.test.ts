@@ -33,6 +33,7 @@ function makeState(): State {
       armyAtCombatStart: 10,
       sourceCellId: 4,
       restoreMessage: 'X',
+      boarVolleyFired: false,
     },
     ui: { message: '', leftPanel: { kind: 'auto' } },
     pendingEvents: [],

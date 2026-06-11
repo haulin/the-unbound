@@ -4,13 +4,14 @@ import {
   leaveEncounter,
   loreMessage,
   loreTitleFromRestore,
+  feedbackChange,
   noGoldResponse,
   openNamedPoiEncounter,
   poiTitleFor,
   setEncounterLoreBody,
   setEncounterMessage,
 } from '../../src/core/mechanics/encounterHelpers'
-import { TOWN_NO_GOLD_LINES } from '../../src/core/constants'
+import { NO_GOLD_LINES } from '../../src/core/constants'
 import type { Resources, State, Ui } from '../../src/core/types'
 import { makeResources } from './_helpers/makeResources'
 
@@ -75,7 +76,7 @@ describe('encounterHelpers', () => {
   describe('setEncounterLoreBody', () => {
     it('preserves title from encounter.restoreMessage', () => {
       const s = makeMinimalState({
-        encounter: { kind: 'combat', sourceCellId: 1, restoreMessage: 'Old Henge\nArrival line', enemyArmySize: 3, armyAtCombatStart: 5, initialSpawn: 3 },
+        encounter: { kind: 'combat', sourceCellId: 1, restoreMessage: 'Old Henge\nArrival line', enemyArmySize: 3, armyAtCombatStart: 5, initialSpawn: 3, boarVolleyFired: false },
         ui: { ...baseUi, message: 'Old Henge\nArrival line' },
       })
       const change = setEncounterLoreBody(s, 'You paid them off.')
@@ -86,14 +87,14 @@ describe('encounterHelpers', () => {
   describe('combatLoreMessage', () => {
     it('preserves titled restoreMessage for combat outcomes', () => {
       const s = makeMinimalState({
-        encounter: { kind: 'combat', sourceCellId: 1, restoreMessage: 'Old Henge\nArrival line', enemyArmySize: 3, armyAtCombatStart: 5, initialSpawn: 3 },
+        encounter: { kind: 'combat', sourceCellId: 1, restoreMessage: 'Old Henge\nArrival line', enemyArmySize: 3, armyAtCombatStart: 5, initialSpawn: 3, boarVolleyFired: false },
       })
       expect(combatLoreMessage(s, 'Victory.')).toBe('Old Henge\nVictory.')
     })
 
     it('returns body only when restoreMessage has no title', () => {
       const s = makeMinimalState({
-        encounter: { kind: 'combat', sourceCellId: 1, restoreMessage: 'Something stirs.', enemyArmySize: 3, armyAtCombatStart: 5, initialSpawn: 3 },
+        encounter: { kind: 'combat', sourceCellId: 1, restoreMessage: 'Something stirs.', enemyArmySize: 3, armyAtCombatStart: 5, initialSpawn: 3, boarVolleyFired: false },
       })
       expect(combatLoreMessage(s, 'Victory.')).toBe('Victory.')
     })
@@ -127,15 +128,30 @@ describe('encounterHelpers', () => {
     })
   })
 
+  describe('feedbackChange', () => {
+    it('highlights food stat on food shortfall', () => {
+      const change = feedbackChange(makeMinimalState(), {
+        action: 'locksmith.payFood',
+        category: 'purchase',
+        outcome: 'failure',
+        reason: { kind: 'shortfall', resource: 'food' },
+        message: 'Locksmith\nNot enough food.',
+      })
+      expect(change.message).toBe('Locksmith\nNot enough food.')
+      expect(change.events).toEqual([{ kind: 'iconHighlighted', target: { band: 'stats', id: 'food' } }])
+    })
+  })
+
   describe('noGoldResponse', () => {
-    it('returns a Change with message picked from TOWN_NO_GOLD_LINES', () => {
+    it('returns a Change with message picked from NO_GOLD_LINES', () => {
       const s = makeMinimalState()
       const change = noGoldResponse(s, 'A Town Town')
       const prefix = 'A Town Town\n'
       expect(change.message?.startsWith(prefix)).toBe(true)
       const line = change.message!.slice(prefix.length)
-      expect(TOWN_NO_GOLD_LINES).toContain(line)
+      expect(NO_GOLD_LINES).toContain(line)
       expect(change.resources).toBeUndefined()
+      expect(change.events).toEqual([{ kind: 'iconHighlighted', target: { band: 'stats', id: 'gold' } }])
     })
   })
 

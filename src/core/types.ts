@@ -9,6 +9,7 @@ import type {
 import type { CombatAction } from './mechanics/defs/combat'
 import type { LocksmithAction } from './mechanics/defs/locksmith'
 import type { CampAction, CampOfferKind } from './mechanics/defs/camp'
+import type { CrossingAction } from './mechanics/defs/crossing'
 import type { FarmAction, FarmOfferKind } from './mechanics/defs/farm'
 import type { TownAction, TownOfferKind } from './mechanics/defs/town'
 
@@ -27,6 +28,7 @@ export type FeatureKind =
   | 'camp'
   | 'henge'
   | 'town'
+  | 'crossing'
   | 'fishingLake'
   | 'rainbowEnd'
 export type CellKind = TerrainKind | FeatureKind
@@ -76,6 +78,12 @@ export type TownCell = {
   bundles: { food: number; troops: number }
 }
 
+export type CrossingCell = {
+  kind: 'crossing'
+  id: number
+  name: string
+}
+
 export type Cell =
   | TerrainCell
   | GateCell
@@ -89,6 +97,7 @@ export type Cell =
   | FishingLakeCell
   | RainbowEndCell
   | TownCell
+  | CrossingCell
 
 export type CellGrid = Cell[][]
 
@@ -125,6 +134,12 @@ export type LeftPanel = LeftPanelBase | LeftPanelMap
 // suffix); treat it as a domain resource id, not a renderer concept.
 export type DeltaAnimTarget = 'food' | 'gold' | 'army' | 'enemyArmy'
 
+export type HighlightTarget =
+  | { band: 'stats'; id: 'food' | 'gold' | 'army' }
+  | { band: 'party'; id: string }
+  | { band: 'inventory'; id: string }
+  | { band: 'meta'; id: 'position' | 'oriented' | 'steps' }
+
 export type Ui = { message: string; leftPanel: LeftPanel }
 
 export type Player = { position: Vec2 }
@@ -160,6 +175,8 @@ export type CombatEncounter = {
   armyAtCombatStart: number
   sourceCellId: number
   restoreMessage: string
+  // Boar opening volley: once per combat encounter (reset when a new fight opens).
+  boarVolleyFired: boolean
 }
 
 export type CampEncounter = {
@@ -187,7 +204,20 @@ export type LocksmithEncounter = {
   restoreMessage: string
 }
 
-export type Encounter = CombatEncounter | CampEncounter | TownEncounter | FarmEncounter | LocksmithEncounter
+export type CrossingEncounter = {
+  kind: 'crossing'
+  sourceCellId: number
+  restoreMessage: string
+  sellGoldBySlot: Readonly<Record<string, number>>
+}
+
+export type Encounter =
+  | CombatEncounter
+  | CampEncounter
+  | TownEncounter
+  | FarmEncounter
+  | LocksmithEncounter
+  | CrossingEncounter
 export type EncounterKind = Encounter['kind']
 
 // Grid-transition source/target. Used by `encounterOpened` / `encounterClosed`
@@ -215,6 +245,7 @@ export type DomainEvent =
       encounterKind: EncounterKind
       outcome: 'leave' | 'victory' | 'flee' | 'paid' | 'recruit' | 'purchase'
     }
+  | { kind: 'iconHighlighted'; target: HighlightTarget }
   | { kind: 'phaseBoundary' }
 
 export type State = {
@@ -240,4 +271,5 @@ export type Action =
   | TownAction
   | FarmAction
   | LocksmithAction
+  | CrossingAction
 

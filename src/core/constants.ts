@@ -7,11 +7,11 @@ import { SPRITES } from './spriteIds'
 // Re-export lore/name pools (defined in `src/core/lore.ts`).
 export * from './lore'
 
-export const SCOUT_GLOBAL_REVEAL_KINDS: readonly CellKind[] = ['farm', 'camp', 'henge', 'town']
+export const SCOUT_GLOBAL_REVEAL_KINDS: readonly CellKind[] = ['farm', 'camp', 'henge', 'town', 'crossing']
 
 export const WORLD_WIDTH = 10
 export const WORLD_HEIGHT = 10
-export const INITIAL_SEED = 47 // Don't go higher than 4 digits because of UI limitations.
+export const INITIAL_SEED = 1 // Don't go higher than 4 digits because of UI limitations.
 /** Debug: show next-round hit % below the Fight button in combat. */
 export const SHOW_COMBAT_HIT_ODDS = true
 
@@ -39,7 +39,7 @@ export const TOWN_PRICE_RUMOR_MAX = 4
 
 export const COMPANION_HIRE_GOLD_MIN = 15
 export const COMPANION_HIRE_GOLD_MAX = 20
-export const HEALER_UPKEEP_GOLD = 1
+export const HEALER_UPKEEP_GOLD = 2
 export const TOWN_RUMORS_PER_VISIT_MAX = 3
 
 // PoI modal buttons (town / camp / farm): 1–3 distinct offers per site.
@@ -63,6 +63,8 @@ export const FOOD_COST_MOUNTAIN = 2
 export const FOOD_WARNING_THRESHOLD = 5
 
 export const FARM_COUNT = 3
+export const CROSSING_COUNT_MIN = 1
+export const CROSSING_COUNT_MAX = 2
 export const FARM_COOLDOWN_MOVES = 3
 
 export const FISHING_LAKE_COUNT = 6
@@ -94,6 +96,7 @@ export const FEATURE_KINDS = [
   'camp',
   'henge',
   'town',
+  'crossing',
   'fishingLake',
   'rainbowEnd',
 ] as const satisfies readonly FeatureKind[]
@@ -116,6 +119,7 @@ export const FEATURES: Record<FeatureKind, { spriteId: number }> = {
   camp: { spriteId: SPRITES.poi.camp },
   henge: { spriteId: SPRITES.poi.henge },
   town: { spriteId: SPRITES.poi.town },
+  crossing: { spriteId: SPRITES.poi.crossing },
   fishingLake: { spriteId: SPRITES.poi.lake },
   rainbowEnd: { spriteId: SPRITES.poi.rainbow },
 }
@@ -137,6 +141,7 @@ export function spriteIdForKind(kind: CellKind): number {
     case 'camp':
     case 'henge':
     case 'town':
+    case 'crossing':
     case 'fishingLake':
     case 'rainbowEnd':
       return FEATURES[kind].spriteId
@@ -160,6 +165,7 @@ export function terrainLoreLinesForKind(kind: CellKind): readonly string[] {
     case 'camp':
     case 'henge':
     case 'town':
+    case 'crossing':
     case 'fishingLake':
     case 'rainbowEnd':
       return []

@@ -15,7 +15,7 @@ function makeWorld(): World {
     mapGenAlgorithm: 'TEST',
     cells: [
       [
-        { kind: 'farm', id: 1, name: 'F', offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'], companionHireGold: 10 },
+        { kind: 'farm', id: 1, name: 'F', offers: ['FARM_BUY_FOOD', 'FARM_BUY_MULE'], companionHireGold: 10 },
         { kind: 'camp', id: 2, name: 'C', nextReadyStep: 0, offers: ['CAMP_SEARCH'], companionHireGold: 15 },
         { kind: 'henge', id: 3, name: 'H', nextReadyStep: 0, currentGroup: null },
         { kind: 'gate' },

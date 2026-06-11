@@ -138,3 +138,9 @@ Human smoke:
 event driven animations:
 implementation: claude-opus-4-7, $79.87, 80M tokens
 review + polish: $49.64, 52M token
+
+v0.9 boar, crossing:
+seed/army/food/gold/turns/party
+1/16/17/25/55/boar+healer - found rainbow, bought boar early, later healer to not lose troops to attrition; gold is limiting resource if you don't hunt for rainbows
+2/0/10/7/66/boar+healer - tried same tactic, lost a lot of men at henge, tried again to cheese with boar, didn't help
+3/32/7/0/75/boar+healer - was a bit tight, found rainbow, bought army, won 2 big henge fights, then rode comfortably

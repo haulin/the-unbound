@@ -43,7 +43,7 @@ export const UI_GRID_ACTION_BORDER_COLORKEY = UI_TEXTURE_OVERLAY_TRANSPARENT_COL
 
 export const UI_GRID_CELL_BORDER_DOUBLE_INSET = 2
 
-export const UI_COLOR_RIGHT_PANEL_DIVIDER = 15
+export const UI_COLOR_PANEL_DIVIDER = 15
 
 export const UI_STATS_BAND_ITEM_GAP_PX = 3
 export const UI_STATS_BAND_ICON_VALUE_GAP_PX = 2
@@ -79,8 +79,6 @@ export const UI_LEFT_PANEL_INNER_GAP = 12
 // Gap above the lore body; must clear the horizontal divider.
 export const UI_LEFT_PANEL_LORE_TOP_GAP = 7
 
-export const UI_COLOR_LEFT_PANEL_DIVIDER = 15
-
 // Vertical divider stops this many px short of the horizontal divider, so the
 // negative space matches the inset the horizontal keeps from the frame.
 export const UI_LEFT_PANEL_DIVIDER_GAP_PX = 5
@@ -96,6 +94,8 @@ export const UI_DELTA_GAP_PX = -4
 // Animation timing (frames).
 export const MOVE_SLIDE_FRAMES = 15
 export const FOOD_DELTA_FRAMES = 36
+export const ICON_HIGHLIGHT_FRAMES = 18
+export const ICON_HIGHLIGHT_CYCLE_FRAMES = 4
 export const GRID_TRANSITION_STEP_FRAMES = 5
 
 // When false, the translator is a no-op and the renderer paints the static

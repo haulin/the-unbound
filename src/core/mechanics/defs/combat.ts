@@ -1,5 +1,5 @@
 import { cellIdForPos, getCellAt, posForCellId } from '../../cells'
-import { applyFoodCapOnGain } from '../../foodCarry'
+import { applyFoodCapOnGain, applyFoodCapOnGainWithEvents } from '../../foodCarry'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
 import type {
@@ -16,6 +16,8 @@ import {
   gridActionCell,
   combatLoreMessage,
   encounterStableLine,
+  feedbackChange,
+  iconHighlighted,
   makeRightGrid,
   type CellBadge,
   type GridActionRow,
@@ -51,6 +53,13 @@ const COMBAT_ACTIONS = {
 export type CombatAction = { type: keyof typeof COMBAT_ACTIONS }
 
 // ---- Pure combat math -------------------------------------------------------------
+
+/** Boar opening volley kills on first Fight press per encounter (before round resolution). */
+export function boarOpeningVolleyKills(enemyArmy: number): number {
+  const n = Math.max(0, Math.floor(enemyArmy))
+  if (n <= 0) return 0
+  return Math.ceil(n * 0.25)
+}
 
 // U[max(2, p-2) .. 2*p]; max(min,…) guards playerArmy ∈ {0,1} where 2*p < min.
 export function spawnEnemyArmy(opts: { rngState: number; playerArmy: number }): { rngState: number; enemyArmy: number } {
@@ -107,6 +116,14 @@ export function fightHitChancePercent(opts: {
 export function combatFightHitOddsPercent(state: State): number | null {
   const enc = state.encounter
   if (!enc || enc.kind !== 'combat' || enc.enemyArmySize <= 0 || state.resources.armySize <= 0) return null
+  // Boar volley is its own fight press — guaranteed enemy damage when it will fire.
+  if (
+    !enc.boarVolleyFired &&
+    state.resources.party.includes('boar') &&
+    boarOpeningVolleyKills(enc.enemyArmySize) > 0
+  ) {
+    return 100
+  }
   const variant = combatVariantForEncounter(state)
   return fightHitChancePercent({
     playerArmy: state.resources.armySize,
@@ -139,6 +156,27 @@ export function applyHealerMend(resources: Resources, enc: CombatEncounter): Res
   const mend = Math.min(2, roundLosses)
   if (mend <= 0) return resources
   return { ...resources, armySize: resources.armySize + mend }
+}
+
+/** Strip recruit troops before mend math — recruits restore enemy count, not round losses. */
+function resourcesForHealerMend(
+  resources: Resources,
+  enc: CombatEncounter,
+  outcome: CombatCloseOutcome,
+): Resources {
+  if (outcome !== 'recruit') return resources
+  return { ...resources, armySize: resources.armySize - enc.enemyArmySize }
+}
+
+function applyHealerMendAtClose(
+  resources: Resources,
+  enc: CombatEncounter,
+  outcome: CombatCloseOutcome,
+): Resources {
+  const forMend = resourcesForHealerMend(resources, enc, outcome)
+  const mended = applyHealerMend(forMend, enc)
+  if (outcome !== 'recruit') return mended
+  return { ...resources, armySize: mended.armySize + enc.enemyArmySize }
 }
 
 // Run the registered post-combat hook (wyrm sets `isBled`, henge starts
@@ -183,7 +221,7 @@ function buildCombatCloseBeat(
     message: string
   },
 ): Change {
-  const mended = applyHealerMend(args.resources, args.encounter)
+  const mended = applyHealerMendAtClose(args.resources, args.encounter, args.outcome)
   const after = applyCombatCloseHook(prev, {
     world: args.world,
     resources: mended,
@@ -191,20 +229,26 @@ function buildCombatCloseBeat(
     encounter: args.encounter,
     outcome: args.outcome,
   })
+  const mendEvents: DomainEvent[] =
+    args.resources.party.includes('healer') && mended.armySize > args.resources.armySize
+      ? [iconHighlighted({ band: 'party', id: 'healer' })]
+      : []
   return {
     world: after.world,
     resources: after.resources,
     run: after.run,
     encounter: null,
     message: args.message,
-    events: [{ kind: 'encounterClosed', encounterKind: 'combat', outcome: args.outcome }],
+    events: [
+      ...mendEvents,
+      { kind: 'encounterClosed', encounterKind: 'combat', outcome: args.outcome },
+    ],
   }
 }
 
 function combatFightBadge(state: State): CellBadge | null {
   const enc = state.encounter
-  if (!enc || enc.kind !== 'combat') return null
-  if (enc.enemyArmySize <= 0) return null
+  if (!enc || enc.kind !== 'combat' || enc.enemyArmySize <= 0) return null
   return { variant: 'left', text: `${enc.enemyArmySize}` }
 }
 
@@ -250,6 +294,15 @@ function reduceCombatPay(prevState: State): CombatActionResult {
     }
     const line = encounterStableLine(prevState, `combat.pay.${eligibility}`, lines)
     const message = combatLoreMessage(prevState, line) || prevState.ui.message
+    if (eligibility === 'noFunds') {
+      return feedbackChange(prevState, {
+        action: 'combat.pay',
+        category: 'purchase',
+        outcome: 'failure',
+        reason: { kind: 'shortfall', resource: 'gold' },
+        message,
+      })
+    }
     return { message }
   }
 
@@ -334,26 +387,62 @@ function reduceCombatReturn(prevState: State): CombatActionResult {
   })
 }
 
-function reduceCombatFight(prevState: State): CombatActionResult {
-  const enc = prevState.encounter
-  if (!enc || enc.kind !== 'combat') return null
+function applyBoarVolley(state: State, enc: CombatEncounter): { enc: CombatEncounter; events: DomainEvent[] } {
+  if (enc.boarVolleyFired || !state.resources.party.includes('boar')) return { enc, events: [] }
+  const kills = boarOpeningVolleyKills(enc.enemyArmySize)
+  if (kills <= 0) return { enc, events: [] }
+  const nextEnemy = Math.max(0, enc.enemyArmySize - kills)
+  return {
+    enc: { ...enc, enemyArmySize: nextEnemy, boarVolleyFired: true },
+    events: [
+      { kind: 'resourceChanged', target: 'enemyArmy', delta: nextEnemy - enc.enemyArmySize },
+      iconHighlighted({ band: 'party', id: 'boar' }),
+    ],
+  }
+}
 
-  const prevEnemy = enc.enemyArmySize
+function combatVictoryAfterFight(
+  prevState: State,
+  enc: CombatEncounter,
+  prefixEvents: readonly DomainEvent[],
+  worldBeforeReward: World,
+): CombatActionResult {
+  const prevRes = prevState.resources
+  const variant = combatVariantForEncounter(prevState)
+  const reward = variant.victoryReward(prevRes, worldBeforeReward.rngState, enc)
+  const { resources: cappedReward, events: capEvents } = applyFoodCapOnGainWithEvents(prevRes, reward.resources)
+  const worldAfterReward: World = { ...worldBeforeReward, rngState: reward.rngState }
+  const victoryPick = RNG.createRunCopyRandom(prevState).advanceCursor('combat.exit.victory', variant.victoryLines)
+  const victoryMessage = combatLoreMessage(prevState, victoryPick.line || '') || prevState.ui.message
+
+  const beat2 = buildCombatCloseBeat(prevState, {
+    world: worldAfterReward,
+    resources: cappedReward,
+    run: victoryPick.nextState.run,
+    encounter: enc,
+    outcome: 'victory',
+    message: victoryMessage,
+  })
+  if (capEvents.length) beat2.events = [...capEvents, ...(beat2.events ?? [])]
+
+  if (prefixEvents.length === 0) return beat2
+  const beat1: Change = { world: worldBeforeReward, events: [...prefixEvents] }
+  return [beat1, beat2]
+}
+
+function resolveCombatRoundBeat(prevState: State, enc: CombatEncounter): CombatActionResult {
   const prevRes = prevState.resources
   const variant = combatVariantForEncounter(prevState)
   const round = resolveFightRound({
     rngState: prevState.world.rngState,
     playerArmy: prevRes.armySize,
-    enemyArmy: prevEnemy,
+    enemyArmy: enc.enemyArmySize,
     playerRollBonus: variant.playerRollBonus,
     enemyRollBonus: variant.enemyRollBonus,
   })
 
   const worldAfterRound: World = { ...prevState.world, rngState: round.rngState }
 
-  // Player hit, enemy survives: encounter stays open with reduced enemy size.
-  // Single beat — explicit `enemyArmy` event (not auto-derived; not a player
-  // resource), no resource diff, no close.
   if (round.outcome === 'playerHit' && round.nextEnemyArmy > 0) {
     const nextEncounter: CombatEncounter = { ...enc, enemyArmySize: round.nextEnemyArmy }
     const events: DomainEvent[] = round.killed
@@ -362,12 +451,10 @@ function reduceCombatFight(prevState: State): CombatActionResult {
     return {
       world: worldAfterRound,
       encounter: nextEncounter,
-      events,
+      ...(events.length ? { events } : {}),
     }
   }
 
-  // Enemy hit: player loses one troop. If army survives, encounter stays open;
-  // if depleted, encounter clears (game-over flips in the dispatcher).
   if (round.outcome === 'enemyHit') {
     const resAfterLoss: Resources = { ...prevRes, armySize: prevRes.armySize - 1 }
     const armyDepleted = resAfterLoss.armySize <= 0
@@ -378,15 +465,8 @@ function reduceCombatFight(prevState: State): CombatActionResult {
     }
   }
 
-  // Player hit, enemy dies → victory close.
-  // Two beats keep round-result and close structurally distinct. Beat 1:
-  // standalone enemy-delta popup. Beat 2: loot diff (auto-derived) +
-  // healer-mend + close hook + `encounterClosed` grid transition; loot
-  // popups float over the transition. The popup in beat 1 is non-blocking,
-  // so in TIC-80 playback both beats start at the same frame — the split
-  // shapes the code, not the timing.
   const reward = variant.victoryReward(prevRes, worldAfterRound.rngState, enc)
-  const cappedReward = applyFoodCapOnGain(prevRes, reward.resources)
+  const { resources: cappedReward, events: capEvents } = applyFoodCapOnGainWithEvents(prevRes, reward.resources)
   const worldAfterReward: World = { ...worldAfterRound, rngState: reward.rngState }
 
   const victoryPick = RNG.createRunCopyRandom(prevState).advanceCursor('combat.exit.victory', variant.victoryLines)
@@ -395,7 +475,7 @@ function reduceCombatFight(prevState: State): CombatActionResult {
   const enemyEvents: DomainEvent[] = round.killed
     ? [{ kind: 'resourceChanged', target: 'enemyArmy', delta: round.enemyDelta }]
     : []
-  const beat1: Change = { world: worldAfterRound, events: enemyEvents }
+  const beat1: Change = { world: worldAfterRound, ...(enemyEvents.length ? { events: enemyEvents } : {}) }
   const beat2 = buildCombatCloseBeat(prevState, {
     world: worldAfterReward,
     resources: cappedReward,
@@ -404,7 +484,24 @@ function reduceCombatFight(prevState: State): CombatActionResult {
     outcome: 'victory',
     message: victoryMessage,
   })
+  if (capEvents.length) beat2.events = [...capEvents, ...(beat2.events ?? [])]
   return [beat1, beat2]
+}
+
+function reduceCombatFight(prevState: State): CombatActionResult {
+  const enc0 = prevState.encounter
+  if (!enc0 || enc0.kind !== 'combat') return null
+
+  const volley = applyBoarVolley(prevState, enc0)
+  if (volley.events.length > 0) {
+    if (volley.enc.enemyArmySize <= 0) {
+      return combatVictoryAfterFight(prevState, volley.enc, volley.events, prevState.world)
+    }
+    // Opening volley is its own fight press; normal rounds follow on later presses.
+    return { encounter: volley.enc, events: volley.events }
+  }
+
+  return resolveCombatRoundBeat(prevState, enc0)
 }
 
 export type EnemySpawn = (rngState: number) => { rngState: number; enemyArmy: number }
@@ -435,6 +532,7 @@ export function startCombatEncounter(args: {
     armyAtCombatStart: Math.max(0, args.playerArmySize),
     sourceCellId: cellIdForPos(nextWorld, args.pos),
     restoreMessage: args.restoreMessage,
+    boarVolleyFired: false,
   }
   return {
     world: nextWorld,
@@ -495,13 +593,14 @@ export const combatMechanic: MechanicDef = {
     illustrationSpriteId: (s) => combatVariantForEncounter(s).illustrationSpriteId,
     reduceAction: reduceCombatAction,
     deltaAnchorsByTarget: { enemyArmy: { row: 1, col: 0, goodSign: -1 } },
-    previewEncounter: (): CombatEncounter => ({
+    previewEncounter: (_state): CombatEncounter => ({
       kind: 'combat',
       enemyArmySize: 0,
       initialSpawn: 0,
       armyAtCombatStart: 0,
       sourceCellId: -1,
       restoreMessage: '',
+      boarVolleyFired: false,
     }),
   },
 }

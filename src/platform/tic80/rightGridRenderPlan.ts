@@ -105,7 +105,7 @@ function synthesizeStateForMode(s: State, mode: Exclude<GridFromKind, 'blank'>):
   if (mode === 'overworld') return { ...s, encounter: null }
   if (s.encounter && s.encounter.kind === mode) return s
   const provider = MECHANIC_INDEX.previewEncounterByEncounterKind[mode]
-  return { ...s, encounter: provider ? provider() : null }
+  return { ...s, encounter: provider ? provider(s) : null }
 }
 
 type CellCategory = 'meta' | 'action' | 'terrain' | 'empty'
@@ -248,7 +248,7 @@ function badgeOpsForCell(row: number, col: number, badge: CellBadge): RightGridR
   const textW = badgeTextWidthPx(badge.text)
   const w = textW + padLeft + padRight
   const topLeft = badgeTopLeftPx(row, col)
-  const spriteId = badge.variant === 'price' ? SPRITES.ui.badgePrice : SPRITES.ui.badgeLeft
+  const spriteId = badge.variant === 'left' ? SPRITES.ui.badgeLeft : SPRITES.ui.badgePrice
   const fg = UI.UI_COLOR_TEXT
 
   return [

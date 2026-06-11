@@ -195,6 +195,7 @@ describe('v0.6 combat balance acceptance', () => {
         armyAtCombatStart: 100,
         sourceCellId,
         restoreMessage: '',
+        boarVolleyFired: false,
       },
     }
 
@@ -244,6 +245,7 @@ describe('v0.6 combat balance acceptance', () => {
         armyAtCombatStart: opts.playerArmy ?? 100,
         sourceCellId,
         restoreMessage: '',
+        boarVolleyFired: false,
       },
     }
   }
@@ -360,6 +362,10 @@ describe('v0.6 combat balance acceptance', () => {
     expect(after.encounter?.kind).toBe('combat')
     expect(after.resources.gold).toBe(goldBefore)
     expect(BRIGAND_RECRUIT_NO_FUNDS_LINES).toContain(after.ui.message)
+    expect(after.pendingEvents).toContainEqual({
+      kind: 'iconHighlighted',
+      target: { band: 'stats', id: 'gold' },
+    })
   })
 
   // Combat badges: fight shows enemy count; pay shows recruit cost when eligible.
@@ -383,6 +389,7 @@ describe('v0.6 combat balance acceptance', () => {
           armyAtCombatStart: 5,
           sourceCellId,
           restoreMessage: '',
+          boarVolleyFired: false,
         },
       }
       expect(grid(probe, 1, 0)).toMatchObject({ badge: { variant: 'left', text: `${enemyArmySize}` } })
@@ -404,6 +411,7 @@ describe('v0.6 combat balance acceptance', () => {
           armyAtCombatStart: 5,
           sourceCellId,
           restoreMessage: '',
+          boarVolleyFired: false,
         },
       }
       expect(grid(probe, 1, 0)).toMatchObject({ badge: { variant: 'left', text: `${enemyArmySize}` } })
@@ -424,6 +432,7 @@ describe('v0.6 combat balance acceptance', () => {
           armyAtCombatStart: 5,
           sourceCellId,
           restoreMessage: '',
+          boarVolleyFired: false,
         },
       }
       expect(grid(probe, 1, 0)).toMatchObject({ badge: { variant: 'left', text: `${initialSpawn}` } })
@@ -449,6 +458,7 @@ describe('v0.6 combat balance acceptance', () => {
         armyAtCombatStart: 5,
         sourceCellId,
         restoreMessage: '',
+        boarVolleyFired: false,
       },
     }
     expect(grid(probe, 0, 1)).toMatchObject({
@@ -474,6 +484,7 @@ describe('v0.6 combat balance acceptance', () => {
         armyAtCombatStart: 5,
         sourceCellId,
         restoreMessage: '',
+        boarVolleyFired: false,
       },
     }
     expect(grid(probe, 0, 1).badge).toBeUndefined()
@@ -520,6 +531,7 @@ describe('v0.6 combat balance acceptance', () => {
         armyAtCombatStart: playerArmy,
         sourceCellId,
         restoreMessage: '',
+        boarVolleyFired: false,
       },
     }
 
@@ -569,6 +581,7 @@ describe('v0.6 combat balance acceptance', () => {
         armyAtCombatStart: playerArmy,
         sourceCellId,
         restoreMessage: '',
+        boarVolleyFired: false,
       },
     }
 
@@ -652,6 +665,7 @@ describe('v0.6 combat balance acceptance', () => {
         armyAtCombatStart: 50,
         sourceCellId,
         restoreMessage: '',
+        boarVolleyFired: false,
       },
     }
     const armyBefore = inFight.resources.armySize

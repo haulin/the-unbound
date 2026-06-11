@@ -22,6 +22,7 @@ function makeEncounter(initialSpawn: number, enemyArmySize = initialSpawn): Comb
     armyAtCombatStart: 10,
     sourceCellId: 0,
     restoreMessage: '',
+    boarVolleyFired: false,
   }
 }
 

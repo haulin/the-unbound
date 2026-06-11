@@ -7,10 +7,11 @@ import {
   FARM_BUY_FOOD_GOLD_COST,
   FARM_COUNT,
   FARM_NAME_POOL,
+  NO_GOLD_LINES,
 } from '../../constants'
 import { cellIdForPos, getCellAt } from '../../cells'
-import { applyFoodCapOnGain, foodCarryCap, FOOD_CARRY_FULL_MESSAGE } from '../../foodCarry'
-import { FARM_BUY_FOOD_LINES, FARM_ENTER_LINES, MULE_BUY_LINES } from '../../lore'
+import { applyFoodCapOnGainWithEvents, foodCarryCap } from '../../foodCarry'
+import { BOAR_BUY_LINES, FARM_BUY_FOOD_LINES, FARM_ENTER_LINES, MULE_BUY_LINES } from '../../lore'
 import type { Change } from '../../reducer'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
@@ -21,14 +22,14 @@ import {
   leaveEncounter,
   loreMessage,
   makeRightGrid,
-  noGoldResponse,
+  feedbackChange,
   gridActionCell,
   openNamedPoiEncounter,
   poiTitleFor,
   previewEncounterProvider,
+  foodCarryFullResponse,
   hireCompanion,
   offersToGridLayout,
-  setEncounterMessage,
   type CellBadge,
 } from '../encounterHelpers'
 import { buildOfferSets, cellId, isTerrainCell, placeNamedFeatureFromSeed } from '../../worldgen'
@@ -41,7 +42,8 @@ import type {
 } from '../types'
 
 export const ACTION_FARM_BUY_FOOD = 'FARM_BUY_FOOD' as const
-export const ACTION_FARM_BUY_BEAST = 'FARM_BUY_BEAST' as const
+export const ACTION_FARM_BUY_MULE = 'FARM_BUY_MULE' as const
+export const ACTION_FARM_BUY_BOAR = 'FARM_BUY_BOAR' as const
 export const ACTION_FARM_LEAVE = 'FARM_LEAVE' as const
 
 type FarmActionSpec = {
@@ -58,10 +60,19 @@ const FARM_OFFERS = {
     reduce: reduceFarmBuyFood,
     badge: () => ({ variant: 'price', text: `-${FARM_BUY_FOOD_GOLD_COST}` }),
   },
-  [ACTION_FARM_BUY_BEAST]: {
+  [ACTION_FARM_BUY_MULE]: {
     category: 'companion_hire',
-    spriteId: SPRITES.inventory.beast,
-    reduce: reduceFarmBuyBeast,
+    spriteId: SPRITES.inventory.mule,
+    reduce: reduceFarmBuyMule,
+    badge: (s) => {
+      const farm = getCellAt(s.world, s.player.position) as FarmCell
+      return { variant: 'price', text: `-${farm.companionHireGold}` }
+    },
+  },
+  [ACTION_FARM_BUY_BOAR]: {
+    category: 'companion_hire',
+    spriteId: SPRITES.inventory.boar,
+    reduce: reduceFarmBuyBoar,
     badge: (s) => {
       const farm = getCellAt(s.world, s.player.position) as FarmCell
       return { variant: 'price', text: `-${farm.companionHireGold}` }
@@ -97,7 +108,8 @@ const reduceFarmAction: ReduceEncounterAction = (state, action) => {
     case ACTION_FARM_LEAVE:
       return leaveEncounter(state, 'farm')
     case ACTION_FARM_BUY_FOOD:
-    case ACTION_FARM_BUY_BEAST: {
+    case ACTION_FARM_BUY_MULE:
+    case ACTION_FARM_BUY_BOAR: {
       const farm = getCellAt(state.world, state.player.position) as FarmCell
       return FARM_OFFERS[action.type].reduce(state, farm)
     }
@@ -106,17 +118,29 @@ const reduceFarmAction: ReduceEncounterAction = (state, action) => {
   }
 }
 
+function farmGoldShortfall(state: State, title: string, action: string): Change {
+  return feedbackChange(state, {
+    action,
+    category: 'purchase',
+    outcome: 'failure',
+    reason: { kind: 'shortfall', resource: 'gold' },
+    message: loreMessage(title, encounterStableLine(state, `${action}.shortfall`, NO_GOLD_LINES)),
+  })
+}
+
 function reduceFarmBuyFood(state: State, farm: FarmCell): Change {
   const title = poiTitleFor(farm.name, 'Farm')
 
   const result = buy(state.resources, { gold: FARM_BUY_FOOD_GOLD_COST, gain: { food: FARM_BUY_FOOD_AMOUNT } })
-  if (result.outcome === 'noFunds') return noGoldResponse(state, title)
+  if (result.outcome === 'shortfall') return farmGoldShortfall(state, title, 'farm.buyFood')
   if (state.resources.food >= foodCarryCap(state.resources)) {
-    return setEncounterMessage(title, FOOD_CARRY_FULL_MESSAGE)
+    return foodCarryFullResponse(title)
   }
 
+  const capped = applyFoodCapOnGainWithEvents(state.resources, result.resources)
   return {
-    resources: applyFoodCapOnGain(state.resources, result.resources),
+    resources: capped.resources,
+    ...(capped.events.length ? { events: capped.events } : {}),
     message: loreMessage(title, encounterStableLine(state, 'farm.buyFood', FARM_BUY_FOOD_LINES)),
   }
 }
@@ -127,6 +151,7 @@ const placeNamedFarms: PlaceWorldProvider = ({ cells, rngState, seed }) => {
     minOffers: POI_MIN_OFFERS,
     maxOffers: POI_MAX_OFFERS,
     pool: FARM_OFFER_POOL,
+    mustCover: [ACTION_FARM_BUY_MULE, ACTION_FARM_BUY_BOAR],
     categoryOf: (offer) => FARM_OFFERS[offer].category,
     requiredOnEveryPoi: [ACTION_FARM_BUY_FOOD],
     rng: RNG.createStreamRandomFromSeed(seed, 'farm.offers'),
@@ -154,14 +179,25 @@ function farmOfferSlot(s: State, slot: keyof ReturnType<typeof offersToGridLayou
   return offer ? gridActionCell(FARM_OFFERS, offer)(s) : null
 }
 
-function reduceFarmBuyBeast(state: State, farm: FarmCell): Change {
+function reduceFarmBuyMule(state: State, farm: FarmCell): Change {
   const title = poiTitleFor(farm.name, 'Farm')
   const rnd = RNG.createRunCopyRandom(state)
   return hireCompanion(state, {
     prefix: title,
-    slotId: 'beast',
+    slotId: 'mule',
     goldCost: farm.companionHireGold,
     successLine: rnd.perMoveLine(MULE_BUY_LINES, { cellId: farm.id }),
+  })
+}
+
+function reduceFarmBuyBoar(state: State, farm: FarmCell): Change {
+  const title = poiTitleFor(farm.name, 'Farm')
+  const rnd = RNG.createRunCopyRandom(state)
+  return hireCompanion(state, {
+    prefix: title,
+    slotId: 'boar',
+    goldCost: farm.companionHireGold,
+    successLine: rnd.perMoveLine(BOAR_BUY_LINES, { cellId: farm.id }),
   })
 }
 
@@ -169,6 +205,7 @@ const farmRightGrid = makeRightGrid({
   leaveAction: { type: ACTION_FARM_LEAVE },
   top: (s) => farmOfferSlot(s, 'top'),
   left: (s) => farmOfferSlot(s, 'left'),
+  bottom: (s) => farmOfferSlot(s, 'bottom'),
 })
 
 export const farmMechanic: MechanicDef = {

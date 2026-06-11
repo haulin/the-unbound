@@ -1,11 +1,12 @@
 // TIC-80 platform animation system: queue + clock + the translator that
 // converts core `DomainEvent`s into queue entries.
 
-import type { DeltaAnimTarget, DomainEvent, GridFromKind, GridToKind, Vec2 } from '../../core/types'
+import type { DeltaAnimTarget, DomainEvent, GridFromKind, GridToKind, HighlightTarget, Vec2 } from '../../core/types'
 import {
   ENABLE_ANIMATIONS,
   FOOD_DELTA_FRAMES,
   GRID_TRANSITION_STEP_FRAMES,
+  ICON_HIGHLIGHT_FRAMES,
   MOVE_SLIDE_FRAMES,
 } from './uiConstants'
 
@@ -34,7 +35,12 @@ export type GridTransitionAnim = BaseAnim & {
   params: { from: GridFromKind; to: GridToKind }
 }
 
-export type Anim = MoveSlideAnim | DeltaAnim | GridTransitionAnim
+export type IconHighlightAnim = BaseAnim & {
+  kind: 'iconHighlight'
+  params: { target: HighlightTarget }
+}
+
+export type Anim = MoveSlideAnim | DeltaAnim | GridTransitionAnim | IconHighlightAnim
 
 export type UiAnim = { active: readonly Anim[] }
 
@@ -65,10 +71,6 @@ export function tickTic80Ui(ui: Tic80UiState): Tic80UiState {
   return { clock: nextClock, anim: { active: kept } }
 }
 
-function pushAnim(ui: Tic80UiState, anim: Anim): Tic80UiState {
-  return { clock: ui.clock, anim: { active: [...ui.anim.active, anim] } }
-}
-
 // Two cursors thread the policy: `phaseCursor` (start of the current phase)
 // stamps non-blocking popups and the first blocking entry; `phaseEnd` tracks
 // the latest end-frame of any blocking entry already in this phase, so
@@ -87,7 +89,7 @@ export function translatePendingEvents(
   let phaseEnd = phaseCursor
 
   const append = (anim: Anim): void => {
-    out = pushAnim(out, anim)
+    out = { clock: ui.clock, anim: { active: [...out.anim.active, anim] } }
     if (anim.blocksInput) {
       const end = anim.startFrame + anim.durationFrames
       if (end > phaseEnd) phaseEnd = end
@@ -159,6 +161,16 @@ export function translatePendingEvents(
           durationFrames: GRID_TRANSITION_FRAMES,
           blocksInput: true,
           params: { from: 'blank', to: 'overworld' },
+        })
+        break
+      }
+      case 'iconHighlighted': {
+        append({
+          kind: 'iconHighlight',
+          startFrame: phaseCursor,
+          durationFrames: ICON_HIGHLIGHT_FRAMES,
+          blocksInput: false,
+          params: { target: event.target },
         })
         break
       }

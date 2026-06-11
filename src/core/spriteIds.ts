@@ -19,6 +19,7 @@ export const SPRITES = {
     henge: 36,
     locksmith: 68,
     signpost: 42,
+    crossing: 44,
     rainbow: 76,
     town: 72,
     camp: 74,
@@ -30,10 +31,11 @@ export const SPRITES = {
   inventory: {
     food: 194,
     bloodVial: 198,
-    beast: 226,
+    mule: 226,
     bronzeKey: 196,
     army: 200,
-    scout: 228,
+    boar: 228,
+    scout: 230,
     healer: 232,
     gold: 204,
   },
@@ -61,6 +63,7 @@ export const SPRITES = {
   flavor: {
     farmBarn: 162,
     locksmithKiln: 164,
+    crossingRider: 172,
     marketStall: 168,
     campfire: 170,
     tombstone: 174,
@@ -81,19 +84,24 @@ export const SPRITES = {
     panelBorderBlood: 261,
     panelBorderBronze: 264,
     gridActionBorder: 267,
-    mapHereMarker: 313,
     mapBackgroundA: 306,
     mapBackgroundB: 307,
     previewGrain: 308,
     badgePrice: 310,
     badgeLeft: 311,
     dividerGem: 312,
+    mapHereMarker: 322,
+    // 16x16 slot-highlight pulse frames (sheet band 324–330); center-drawn over 8x8 targets.
+    slotHighlight0: 324,
+    slotHighlight1: 326,
+    slotHighlight2: 328,
+    slotHighlight3: 330,
   },
 } as const
 
 type InventorySpriteKey = keyof typeof SPRITES.inventory
 
-// Party and inventory slot ids match `SPRITES.inventory` keys (beast, bloodVial, …).
+// Party slot ids match `SPRITES.inventory` keys (mule, boar, scout, healer, …).
 export function inventorySpriteId(slotId: string): number | undefined {
   const key = slotId as InventorySpriteKey
   return SPRITES.inventory[key]

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { processAction } from '../../src/core/processAction'
-import { ACTION_MOVE, FARM_BUY_FOOD_GOLD_COST, INITIAL_FOOD, TOWN_NO_GOLD_LINES } from '../../src/core/constants'
+import { ACTION_MOVE, FARM_BUY_FOOD_GOLD_COST, INITIAL_FOOD, NO_GOLD_LINES } from '../../src/core/constants'
 import { ACTION_FARM_BUY_FOOD, ACTION_FARM_LEAVE } from '../../src/core/mechanics/defs/farm'
 import { FOOD_CARRY_FULL_MESSAGE } from '../../src/core/foodCarry'
 import type { State, World } from '../../src/core/types'
@@ -16,7 +16,7 @@ function makeWorld(): World {
       [{ kind: 'grass' }, { kind: 'grass' }, { kind: 'grass' }],
       [
         { kind: 'grass' },
-        { kind: 'farm', id: 4, name: 'Greyfield', offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'], companionHireGold: 10 },
+        { kind: 'farm', id: 4, name: 'Greyfield', offers: ['FARM_BUY_FOOD', 'FARM_BUY_MULE'], companionHireGold: 10 },
         { kind: 'grass' },
       ],
       [{ kind: 'grass' }, { kind: 'grass' }, { kind: 'grass' }],
@@ -93,6 +93,6 @@ describe('farms + food reducer', () => {
     expect(next.resources.food).toBe(10)
     expect(next.ui.message).not.toContain(FOOD_CARRY_FULL_MESSAGE)
     const line = next.ui.message.split('\n').slice(1).join('\n')
-    expect(TOWN_NO_GOLD_LINES).toContain(line)
+    expect(NO_GOLD_LINES).toContain(line)
   })
 })

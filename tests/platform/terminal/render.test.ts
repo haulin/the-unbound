@@ -49,7 +49,7 @@ describe('renderState — header and resources', () => {
     expect(renderState(noBeast)).toMatch(/food 5\/20 /)
 
     const withBeast = freshState()
-    withBeast.resources = { ...withBeast.resources, armySize: 10, food: 5, party: ['beast'] }
+    withBeast.resources = { ...withBeast.resources, armySize: 10, food: 5, party: ['mule'] }
     // BEAST_CARRY_CAP_BONUS = 50 → cap becomes 70 with army 10 + beast.
     expect(renderState(withBeast)).toMatch(/food 5\/70 /)
   })
@@ -151,6 +151,7 @@ describe('renderState — encounter line', () => {
       armyAtCombatStart: 10,
       sourceCellId,
       restoreMessage: '',
+      boarVolleyFired: false,
     }
     const out = renderState(s)
     expect(out).toContain('encounter: combat [flavor: enemy]')
@@ -165,6 +166,7 @@ describe('renderState — encounter line', () => {
       armyAtCombatStart: 10,
       sourceCellId: 0,
       restoreMessage: '',
+      boarVolleyFired: false,
     }
     s.world.cells[1]![1] = { kind: 'mountain' }
     const out = renderState(s)

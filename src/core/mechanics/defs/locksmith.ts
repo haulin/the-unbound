@@ -2,7 +2,7 @@ import {
   LOCKSMITH_KEY_FOOD_COST,
   LOCKSMITH_KEY_GOLD_COST,
   LOCKSMITH_LAIR_MIN_DISTANCE,
-  TOWN_NO_GOLD_LINES,
+  NO_GOLD_LINES,
 } from '../../constants'
 import { cellIdForPos, findCellByKind } from '../../cells'
 import {
@@ -19,13 +19,13 @@ import { SPRITES } from '../../spriteIds'
 import type { LocksmithEncounter, State } from '../../types'
 import {
   buy,
+  feedbackChange,
   leaveEncounter,
   loreMessage,
   makeRightGrid,
   gridActionCell,
   openNamedPoiEncounter,
   previewEncounterProvider,
-  setEncounterMessage,
   type CellBadge,
 } from '../encounterHelpers'
 import { isTerrainCell, placeFeatureFromSeed } from '../../worldgen'
@@ -104,8 +104,14 @@ const reduceLocksmithAction: ReduceEncounterAction = (state, action) => {
 function reduceLocksmithPayGold(state: State, enc: LocksmithEncounter): Change {
   const rnd = RNG.createRunCopyRandom(state)
   const result = buy(state.resources, { gold: LOCKSMITH_KEY_GOLD_COST, gain: { inventory: ['bronzeKey'] } })
-  if (result.outcome === 'noFunds') {
-    return setEncounterMessage(LOCKSMITH_NAME, rnd.perMoveLine(TOWN_NO_GOLD_LINES, { cellId: enc.sourceCellId }))
+  if (result.outcome === 'shortfall') {
+    return feedbackChange(state, {
+      action: 'locksmith.payGold',
+      category: 'purchase',
+      outcome: 'failure',
+      reason: { kind: 'shortfall', resource: result.resource },
+      message: loreMessage(LOCKSMITH_NAME, rnd.perMoveLine(NO_GOLD_LINES, { cellId: enc.sourceCellId })),
+    })
   }
   return {
     resources: useBloodVial(result.resources),
@@ -130,8 +136,14 @@ const placeLocksmith: PlaceWorldProvider = ({ cells, rngState, seed }) => {
 function reduceLocksmithPayFood(state: State, _enc: LocksmithEncounter): Change {
   const rnd = RNG.createRunCopyRandom(state)
   const result = buy(state.resources, { food: LOCKSMITH_KEY_FOOD_COST, gain: { inventory: ['bronzeKey'] } })
-  if (result.outcome === 'noFunds') {
-    return setEncounterMessage(LOCKSMITH_NAME, rnd.perMoveLine(LOCKSMITH_NO_FOOD_LINES))
+  if (result.outcome === 'shortfall') {
+    return feedbackChange(state, {
+      action: 'locksmith.payFood',
+      category: 'purchase',
+      outcome: 'failure',
+      reason: { kind: 'shortfall', resource: result.resource },
+      message: loreMessage(LOCKSMITH_NAME, rnd.perMoveLine(LOCKSMITH_NO_FOOD_LINES)),
+    })
   }
   return {
     resources: useBloodVial(result.resources),

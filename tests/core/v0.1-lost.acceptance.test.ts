@@ -88,7 +88,7 @@ describe('v0.1 lost acceptance', () => {
           kind: 'farm',
           id: 12,
           name: 'The Stemming',
-          offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'],
+          offers: ['FARM_BUY_FOOD', 'FARM_BUY_MULE'],
           companionHireGold: 10,
         },
       }),
@@ -269,6 +269,10 @@ describe('v0.1 lost acceptance', () => {
     // Landing tile is non-feature terrain, no farm food gain, etc.: message must be a lost flavor line.
     const flavor: readonly string[] = LOST_FLAVOR_LINES
     expect(flavor.includes(next.ui.message)).toBe(true)
+    expect(next.pendingEvents).toContainEqual({
+      kind: 'iconHighlighted',
+      target: { band: 'meta', id: 'position' },
+    })
   })
 
   // S14

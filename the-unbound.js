@@ -1,6 +1,6 @@
-// title:  The Unbound (MVP 0.7.0)
+// title:  The Unbound (MVP 0.9.0)
 // author: haulin
-// desc:   MVP 0.7.0 toward the North Star
+// desc:   MVP 0.9.0 toward the North Star
 // script: js
 // input:  mouse
 
@@ -55,7 +55,7 @@
       "The cave with the long wind - that's where it sleeps."
     ],
     mule: [
-      "A mule carries fifty more rations, but takes some at every camp.",
+      "A mule carries fifty more rations. Worth the feed on a long march.",
       "Sell a tired mule at a Crossing if you can. Half what you paid is fair."
     ],
     healer: [
@@ -223,6 +223,14 @@
     "The Long Return",
     "Market of Ash"
   ];
+  var CROSSING_NAME_POOL = [
+    "Salt",
+    "Brass",
+    "Stoneford",
+    "Pilgrim's",
+    "Low Bridge",
+    "Mason's Span"
+  ];
   var GATE_NAME = "The Gate";
   var LOCKSMITH_NAME = "Locksmith of the Unbound";
   var FARM_ENTER_LINES = [
@@ -291,7 +299,7 @@
     "Coins change hands. You keep moving.",
     "No ceremony. Just trade."
   ];
-  var TOWN_NO_GOLD_LINES = [
+  var NO_GOLD_LINES = [
     "Not enough to pay.",
     "Your purse is light."
   ];
@@ -301,13 +309,26 @@
     `"When you have your bearings, I'll mark what matters."`,
     `"Woods and bog won't steal you as often with me ahead."`
   ];
+  var MULE_SELL_LINES = [
+    "A drover at the Crossing takes the lead-rope without surprise. The mule does not look back.",
+    "Coins back into your purse. The mule joins another company that needed one.",
+    "It walks off as it walked on - patient, unconcerned. A road is a road."
+  ];
   var CAMP_SCOUT_HIRE_LINES = [
     `He spits in the fire. "Aye. I know these woods. Pay's pay."`,
     "She looks you over, then your soldiers. Decides you'll do. Takes her share of the rations."
   ];
+  var SCOUT_SELL_LINES = [
+    `She points down a road you didn't notice was there. "That way's mine." She doesn't wave.`,
+    "He hefts his pay, nods, and is gone before you've folded your map."
+  ];
   var HEALER_BUY_LINES = [
     "She brings her own bag. Wax stopper, dark glass, dried things you don't recognize.",
     "A hedge-healer. The hands are stained with old work. She names her price; you pay it."
+  ];
+  var HEALER_SELL_LINES = [
+    "She goes back to her village. Her bag is heavier than when you found her.",
+    "A farmer's wife needs her more than you do. The trade is quiet."
   ];
   var COMPANION_ALREADY_LINES = [
     "You already have one like that at heel. The road doesn't need two.",
@@ -323,6 +344,30 @@
     `The barkeep turns the cup in his hands. "That's all I've got for you this visit."`,
     `He shakes his head once. "Come back when you've walked off what I told you."`,
     "No more whispers today. The room has heard enough of your coin."
+  ];
+  var BOAR_BUY_LINES = [
+    "The handler unties the rope. The boar follows, low and patient. Tusks the colour of old bone.",
+    `"She'll do once, hard, at the start of any fight. Then sleep the rest off." You pay.`
+  ];
+  var BOAR_SELL_LINES = [
+    "A farrier at the Crossing takes the lead. He'll feed her well; he wants what she's good for.",
+    "Coins back. The boar grunts once at her new handler and follows him without looking at you."
+  ];
+  var BOAR_MULE_REFUSED_LINES = [
+    `The handler shakes her head. "You've a mule already. The boar would gore it before morning."`,
+    `"Mule and boar don't share a road. Pick one." The pen stays latched.`
+  ];
+  var MULE_BOAR_REFUSED_LINES = [
+    'The farmer looks past you at the boar. "My mule will not share a road with that. Pick one."',
+    '"Boar at heel? Then no mule from me. Pens stay shut for mixed company."'
+  ];
+  var CROSSING_ENTER_LINES = [
+    "A stone bridge over slow water. Drovers pause here; coin changes hands.",
+    "Trades in what walks. Companies arrive heavy and leave lighter. Coin runs the other way."
+  ];
+  var CROSSING_EMPTY_LINES = [
+    "You have nothing to leave behind. Bridge traffic passes you by.",
+    'A drover on the span lifts his hat. "Light company. Nothing to trade, then?" He walks on.'
   ];
   var LOST_FLAVOR_LINES = [
     "The road loops. You do not.",
@@ -441,6 +486,8 @@
     "You came with an army. You leave with nothing.\nThe gate remains closed.",
     "Alone now. The road goes on without you."
   ];
+  var TIC_QUOTE_PARITY_FIX = `"`;
+  globalThis.TIC_QUOTE_PARITY_FIX = TIC_QUOTE_PARITY_FIX;
 
   // src/core/spriteIds.ts
   var SPRITES = {
@@ -460,6 +507,7 @@
       henge: 36,
       locksmith: 68,
       signpost: 42,
+      crossing: 44,
       rainbow: 76,
       town: 72,
       camp: 74,
@@ -470,10 +518,11 @@
     inventory: {
       food: 194,
       bloodVial: 198,
-      beast: 226,
+      mule: 226,
       bronzeKey: 196,
       army: 200,
-      scout: 228,
+      boar: 228,
+      scout: 230,
       healer: 232,
       gold: 204
     },
@@ -499,6 +548,7 @@
     flavor: {
       farmBarn: 162,
       locksmithKiln: 164,
+      crossingRider: 172,
       marketStall: 168,
       campfire: 170,
       tombstone: 174
@@ -517,13 +567,18 @@
       panelBorderBlood: 261,
       panelBorderBronze: 264,
       gridActionBorder: 267,
-      mapHereMarker: 313,
       mapBackgroundA: 306,
       mapBackgroundB: 307,
       previewGrain: 308,
       badgePrice: 310,
       badgeLeft: 311,
-      dividerGem: 312
+      dividerGem: 312,
+      mapHereMarker: 322,
+      // 16x16 slot-highlight pulse frames (sheet band 324–330); center-drawn over 8x8 targets.
+      slotHighlight0: 324,
+      slotHighlight1: 326,
+      slotHighlight2: 328,
+      slotHighlight3: 330
     }
   };
   function inventorySpriteId(slotId) {
@@ -532,10 +587,10 @@
   }
 
   // src/core/constants.ts
-  var SCOUT_GLOBAL_REVEAL_KINDS = ["farm", "camp", "henge", "town"];
+  var SCOUT_GLOBAL_REVEAL_KINDS = ["farm", "camp", "henge", "town", "crossing"];
   var WORLD_WIDTH = 10;
   var WORLD_HEIGHT = 10;
-  var INITIAL_SEED = 47;
+  var INITIAL_SEED = 1;
   var SHOW_COMBAT_HIT_ODDS = true;
   var SIGNPOST_COUNT = 6;
   var GATE_LOCKSMITH_MIN_DISTANCE = 7;
@@ -554,7 +609,7 @@
   var TOWN_PRICE_RUMOR_MAX = 4;
   var COMPANION_HIRE_GOLD_MIN = 15;
   var COMPANION_HIRE_GOLD_MAX = 20;
-  var HEALER_UPKEEP_GOLD = 1;
+  var HEALER_UPKEEP_GOLD = 2;
   var TOWN_RUMORS_PER_VISIT_MAX = 3;
   var POI_MIN_OFFERS = 1;
   var POI_MAX_OFFERS = 3;
@@ -571,6 +626,8 @@
   var FOOD_COST_MOUNTAIN = 2;
   var FOOD_WARNING_THRESHOLD = 5;
   var FARM_COUNT = 3;
+  var CROSSING_COUNT_MIN = 1;
+  var CROSSING_COUNT_MAX = 2;
   var FISHING_LAKE_COUNT = 6;
   var FISHING_LAKE_COOLDOWN_MOVES = 3;
   var RAINBOW_END_MIN_DISTANCE = 7;
@@ -594,6 +651,7 @@
     "camp",
     "henge",
     "town",
+    "crossing",
     "fishingLake",
     "rainbowEnd"
   ];
@@ -614,6 +672,7 @@
     camp: { spriteId: SPRITES.poi.camp },
     henge: { spriteId: SPRITES.poi.henge },
     town: { spriteId: SPRITES.poi.town },
+    crossing: { spriteId: SPRITES.poi.crossing },
     fishingLake: { spriteId: SPRITES.poi.lake },
     rainbowEnd: { spriteId: SPRITES.poi.rainbow }
   };
@@ -634,6 +693,7 @@
       case "camp":
       case "henge":
       case "town":
+      case "crossing":
       case "fishingLake":
       case "rainbowEnd":
         return FEATURES[kind].spriteId;
@@ -656,6 +716,7 @@
       case "camp":
       case "henge":
       case "town":
+      case "crossing":
       case "fishingLake":
       case "rainbowEnd":
         return [];
@@ -1115,23 +1176,21 @@
     if (minOffers < 1) throw new Error("minOffers must be >= 1");
     if (maxOffers < minOffers) throw new Error("maxOffers must be >= minOffers");
     const slots = Array.from({ length: poiCount }, () => []);
-    const place = (offer) => {
+    const placeMustCover = (offer) => {
+      for (let t = 0; t < poiCount; t++) {
+        if (slots[t].includes(offer)) return;
+      }
+      const eligible = [];
       for (let t = 0; t < poiCount; t++) {
         const row = slots[t];
-        if (row.length < maxOffers && !row.includes(offer)) {
-          row.push(offer);
-          return;
-        }
+        if (row.length < maxOffers && !row.includes(offer)) eligible.push(t);
       }
-      for (let t = 0; t < poiCount; t++) {
-        const row = slots[t];
-        if (row.length < maxOffers) {
-          row.push(offer);
-          return;
-        }
+      if (eligible.length > 0) {
+        slots[eligible[rng.intExclusive(eligible.length)]].push(offer);
+        return;
       }
+      throw new Error(`buildOfferSets: cannot place must-cover offer "${offer}"; no eligible poi`);
     };
-    for (const offer of mustCover) place(offer);
     for (let t = 0; t < poiCount; t++) {
       const row = slots[t];
       for (const required of requiredOnEveryPoi ?? []) {
@@ -1140,6 +1199,7 @@
         else replaceLastHireWith(row, required, categoryOf);
       }
     }
+    for (const offer of mustCover) placeMustCover(offer);
     for (let t = 0; t < poiCount; t++) {
       ensureNonHireOffer(slots[t], pool, categoryOf, maxOffers);
       const target = rng.intInRange(minOffers, maxOffers);
@@ -1212,12 +1272,44 @@
     return { destination: { x: pick.x, y: pick.y }, rngState: r.rngState };
   }
 
+  // src/core/foodCarry.ts
+  function foodCarryCap(res) {
+    const cap = 2 * Math.max(0, Math.trunc(res.armySize));
+    return res.party.includes("mule") ? cap + BEAST_CARRY_CAP_BONUS : cap;
+  }
+  var FOOD_CARRY_FULL_MESSAGE = "You can't carry more food.";
+  function applyFoodCapOnGain(prev, next) {
+    if (next.food <= prev.food) return next;
+    const cap = foodCarryCap(next);
+    if (next.food <= cap) return next;
+    return { ...next, food: Math.max(prev.food, cap) };
+  }
+  function muleCapSavedEvents(prev, capped) {
+    if (capped.food <= prev.food) return [];
+    if (!prev.party.includes("mule")) return [];
+    const baseCap = 2 * Math.max(0, Math.trunc(prev.armySize));
+    if (prev.food > baseCap) return [];
+    const withoutMule = { ...capped, party: capped.party.filter((slot) => slot !== "mule") };
+    const cappedWithoutMule = applyFoodCapOnGain(prev, withoutMule);
+    const appliedWith = capped.food - prev.food;
+    const appliedWithout = cappedWithoutMule.food - prev.food;
+    if (appliedWith > appliedWithout) {
+      return [{ kind: "iconHighlighted", target: { band: "party", id: "mule" } }];
+    }
+    return [];
+  }
+  function applyFoodCapOnGainWithEvents(prev, next) {
+    const resources = applyFoodCapOnGain(prev, next);
+    return { resources, events: muleCapSavedEvents(prev, resources) };
+  }
+
   // src/core/mechanics/encounterHelpers.ts
   var POI_TITLE_FALLBACK = {
     Town: "A Town",
     Farm: "A Farm",
     Camp: "A Camp",
-    Henge: "A Henge"
+    Henge: "A Henge",
+    Crossing: "A Crossing"
   };
   function poiTitleFor(name, suffix) {
     const trimmed = name?.trim();
@@ -1257,13 +1349,49 @@ ${body}`;
   function setEncounterMessage(title, line) {
     return setLoreMessage(title, line);
   }
-  function noGoldResponse(state2, prefix) {
-    return setEncounterMessage(prefix, encounterStableLine(state2, "noGold", TOWN_NO_GOLD_LINES));
+  function feedbackChange(_state, spec) {
+    const events = highlightsForReason(spec.reason);
+    return {
+      message: spec.message,
+      ...events.length ? { events } : {}
+    };
+  }
+  function highlightsForReason(reason) {
+    if (!reason) return [];
+    if (reason.kind === "shortfall") {
+      return [iconHighlighted({ band: "stats", id: reason.resource })];
+    }
+    return [];
   }
   function encounterStableLine(state2, tag, pool) {
     const enc = state2.encounter;
     const salt = enc ? `${enc.kind}.${enc.sourceCellId}.${tag}` : tag;
     return RNG.createRunCopyRandom(state2).stableLine(pool, { salt });
+  }
+  function iconHighlighted(target) {
+    return { kind: "iconHighlighted", target };
+  }
+  function refuseAnimalPairing(state2, prefix, slotId) {
+    const party = state2.resources.party;
+    if (slotId === "boar" && party.includes("mule")) {
+      return {
+        ...setEncounterMessage(prefix, encounterStableLine(state2, "refuse.boarWithMule", BOAR_MULE_REFUSED_LINES)),
+        events: [iconHighlighted({ band: "party", id: "mule" })]
+      };
+    }
+    if (slotId === "mule" && party.includes("boar")) {
+      return {
+        ...setEncounterMessage(prefix, encounterStableLine(state2, "refuse.muleWithBoar", MULE_BOAR_REFUSED_LINES)),
+        events: [iconHighlighted({ band: "party", id: "boar" })]
+      };
+    }
+    return null;
+  }
+  function foodCarryFullResponse(title) {
+    return {
+      ...setEncounterMessage(title, FOOD_CARRY_FULL_MESSAGE),
+      events: [iconHighlighted({ band: "stats", id: "army" })]
+    };
   }
   function refuseCompanionHire(state2, prefix, slot) {
     const party = state2.resources.party;
@@ -1271,10 +1399,13 @@ ${body}`;
       return setEncounterMessage(prefix, encounterStableLine(state2, "party.full", PARTY_FULL_LINES));
     }
     if (party.includes(slot)) {
-      return setEncounterMessage(
-        prefix,
-        encounterStableLine(state2, `companion.already.${slot}`, COMPANION_ALREADY_LINES)
-      );
+      return {
+        ...setEncounterMessage(
+          prefix,
+          encounterStableLine(state2, `companion.already.${slot}`, COMPANION_ALREADY_LINES)
+        ),
+        events: [iconHighlighted({ band: "party", id: slot })]
+      };
     }
     return null;
   }
@@ -1290,7 +1421,8 @@ ${body}`;
   function buy(resources, spec) {
     const goldCost = spec.gold ?? 0;
     const foodCost = spec.food ?? 0;
-    if (resources.gold < goldCost || resources.food < foodCost) return { outcome: "noFunds" };
+    if (resources.gold < goldCost) return { outcome: "shortfall", resource: "gold" };
+    if (resources.food < foodCost) return { outcome: "shortfall", resource: "food" };
     const gain = spec.gain;
     const foodGain = gain.food ?? 0;
     const armyGain = gain.armySize ?? 0;
@@ -1317,11 +1449,23 @@ ${body}`;
   function hireCompanion(state2, args) {
     const refused = refuseCompanionHire(state2, args.prefix, args.slotId);
     if (refused) return refused;
+    const pairing = refuseAnimalPairing(state2, args.prefix, args.slotId);
+    if (pairing) return pairing;
     const result = buy(state2.resources, { gold: args.goldCost, gain: { party: [args.slotId] } });
-    if (result.outcome === "noFunds") return noGoldResponse(state2, args.prefix);
+    if (result.outcome === "shortfall") {
+      return feedbackChange(state2, {
+        action: `hire.${args.slotId}`,
+        category: "purchase",
+        outcome: "failure",
+        reason: { kind: "shortfall", resource: result.resource },
+        message: loreMessage(args.prefix, encounterStableLine(state2, "noGold", NO_GOLD_LINES))
+      });
+    }
+    const events = args.slotId === "mule" ? [iconHighlighted({ band: "stats", id: "food" })] : void 0;
     return {
       resources: result.resources,
-      message: loreMessage(args.prefix, args.successLine)
+      message: loreMessage(args.prefix, args.successLine),
+      ...events ? { events } : {}
     };
   }
   function appendPartySlot(party, slot) {
@@ -1375,7 +1519,7 @@ ${body}`;
     };
   }
   function previewEncounterProvider(kind) {
-    return () => ({ kind, sourceCellId: -1, restoreMessage: "" });
+    return (_state) => ({ kind, sourceCellId: -1, restoreMessage: "" });
   }
   function onEnterDefaultTerrain(ctx) {
     const { cell, world, pos, stepCount } = ctx;
@@ -1565,8 +1709,14 @@ ${body}`;
   function reduceLocksmithPayGold(state2, enc) {
     const rnd = RNG.createRunCopyRandom(state2);
     const result = buy(state2.resources, { gold: LOCKSMITH_KEY_GOLD_COST, gain: { inventory: ["bronzeKey"] } });
-    if (result.outcome === "noFunds") {
-      return setEncounterMessage(LOCKSMITH_NAME, rnd.perMoveLine(TOWN_NO_GOLD_LINES, { cellId: enc.sourceCellId }));
+    if (result.outcome === "shortfall") {
+      return feedbackChange(state2, {
+        action: "locksmith.payGold",
+        category: "purchase",
+        outcome: "failure",
+        reason: { kind: "shortfall", resource: result.resource },
+        message: loreMessage(LOCKSMITH_NAME, rnd.perMoveLine(NO_GOLD_LINES, { cellId: enc.sourceCellId }))
+      });
     }
     return {
       resources: useBloodVial(result.resources),
@@ -1589,8 +1739,14 @@ ${body}`;
   function reduceLocksmithPayFood(state2, _enc) {
     const rnd = RNG.createRunCopyRandom(state2);
     const result = buy(state2.resources, { food: LOCKSMITH_KEY_FOOD_COST, gain: { inventory: ["bronzeKey"] } });
-    if (result.outcome === "noFunds") {
-      return setEncounterMessage(LOCKSMITH_NAME, rnd.perMoveLine(LOCKSMITH_NO_FOOD_LINES));
+    if (result.outcome === "shortfall") {
+      return feedbackChange(state2, {
+        action: "locksmith.payFood",
+        category: "purchase",
+        outcome: "failure",
+        reason: { kind: "shortfall", resource: result.resource },
+        message: loreMessage(LOCKSMITH_NAME, rnd.perMoveLine(LOCKSMITH_NO_FOOD_LINES))
+      });
     }
     return {
       resources: useBloodVial(result.resources),
@@ -1691,22 +1847,10 @@ ${dir}, ${chosen.d} leagues away.`;
     placeWorld: placeSignposts
   };
 
-  // src/core/foodCarry.ts
-  function foodCarryCap(res) {
-    const cap = 2 * Math.max(0, Math.trunc(res.armySize));
-    return res.party.includes("beast") ? cap + BEAST_CARRY_CAP_BONUS : cap;
-  }
-  var FOOD_CARRY_FULL_MESSAGE = "You can't carry more food.";
-  function applyFoodCapOnGain(prev, next) {
-    if (next.food <= prev.food) return next;
-    const cap = foodCarryCap(next);
-    if (next.food <= cap) return next;
-    return { ...next, food: Math.max(prev.food, cap) };
-  }
-
   // src/core/mechanics/defs/farm.ts
   var ACTION_FARM_BUY_FOOD = "FARM_BUY_FOOD";
-  var ACTION_FARM_BUY_BEAST = "FARM_BUY_BEAST";
+  var ACTION_FARM_BUY_MULE = "FARM_BUY_MULE";
+  var ACTION_FARM_BUY_BOAR = "FARM_BUY_BOAR";
   var ACTION_FARM_LEAVE = "FARM_LEAVE";
   var FARM_OFFERS = {
     [ACTION_FARM_BUY_FOOD]: {
@@ -1715,10 +1859,19 @@ ${dir}, ${chosen.d} leagues away.`;
       reduce: reduceFarmBuyFood,
       badge: () => ({ variant: "price", text: `-${FARM_BUY_FOOD_GOLD_COST}` })
     },
-    [ACTION_FARM_BUY_BEAST]: {
+    [ACTION_FARM_BUY_MULE]: {
       category: "companion_hire",
-      spriteId: SPRITES.inventory.beast,
-      reduce: reduceFarmBuyBeast,
+      spriteId: SPRITES.inventory.mule,
+      reduce: reduceFarmBuyMule,
+      badge: (s) => {
+        const farm = getCellAt(s.world, s.player.position);
+        return { variant: "price", text: `-${farm.companionHireGold}` };
+      }
+    },
+    [ACTION_FARM_BUY_BOAR]: {
+      category: "companion_hire",
+      spriteId: SPRITES.inventory.boar,
+      reduce: reduceFarmBuyBoar,
       badge: (s) => {
         const farm = getCellAt(s.world, s.player.position);
         return { variant: "price", text: `-${farm.companionHireGold}` };
@@ -1747,7 +1900,8 @@ ${dir}, ${chosen.d} leagues away.`;
       case ACTION_FARM_LEAVE:
         return leaveEncounter(state2, "farm");
       case ACTION_FARM_BUY_FOOD:
-      case ACTION_FARM_BUY_BEAST: {
+      case ACTION_FARM_BUY_MULE:
+      case ACTION_FARM_BUY_BOAR: {
         const farm = getCellAt(state2.world, state2.player.position);
         return FARM_OFFERS[action.type].reduce(state2, farm);
       }
@@ -1755,15 +1909,26 @@ ${dir}, ${chosen.d} leagues away.`;
         return null;
     }
   };
+  function farmGoldShortfall(state2, title, action) {
+    return feedbackChange(state2, {
+      action,
+      category: "purchase",
+      outcome: "failure",
+      reason: { kind: "shortfall", resource: "gold" },
+      message: loreMessage(title, encounterStableLine(state2, `${action}.shortfall`, NO_GOLD_LINES))
+    });
+  }
   function reduceFarmBuyFood(state2, farm) {
     const title = poiTitleFor(farm.name, "Farm");
     const result = buy(state2.resources, { gold: FARM_BUY_FOOD_GOLD_COST, gain: { food: FARM_BUY_FOOD_AMOUNT } });
-    if (result.outcome === "noFunds") return noGoldResponse(state2, title);
+    if (result.outcome === "shortfall") return farmGoldShortfall(state2, title, "farm.buyFood");
     if (state2.resources.food >= foodCarryCap(state2.resources)) {
-      return setEncounterMessage(title, FOOD_CARRY_FULL_MESSAGE);
+      return foodCarryFullResponse(title);
     }
+    const capped = applyFoodCapOnGainWithEvents(state2.resources, result.resources);
     return {
-      resources: applyFoodCapOnGain(state2.resources, result.resources),
+      resources: capped.resources,
+      ...capped.events.length ? { events: capped.events } : {},
       message: loreMessage(title, encounterStableLine(state2, "farm.buyFood", FARM_BUY_FOOD_LINES))
     };
   }
@@ -1773,6 +1938,7 @@ ${dir}, ${chosen.d} leagues away.`;
       minOffers: POI_MIN_OFFERS,
       maxOffers: POI_MAX_OFFERS,
       pool: FARM_OFFER_POOL,
+      mustCover: [ACTION_FARM_BUY_MULE, ACTION_FARM_BUY_BOAR],
       categoryOf: (offer) => FARM_OFFERS[offer].category,
       requiredOnEveryPoi: [ACTION_FARM_BUY_FOOD],
       rng: RNG.createStreamRandomFromSeed(seed, "farm.offers")
@@ -1797,20 +1963,31 @@ ${dir}, ${chosen.d} leagues away.`;
     const offer = offersToGridLayout(farm.offers)[slot];
     return offer ? gridActionCell(FARM_OFFERS, offer)(s) : null;
   }
-  function reduceFarmBuyBeast(state2, farm) {
+  function reduceFarmBuyMule(state2, farm) {
     const title = poiTitleFor(farm.name, "Farm");
     const rnd = RNG.createRunCopyRandom(state2);
     return hireCompanion(state2, {
       prefix: title,
-      slotId: "beast",
+      slotId: "mule",
       goldCost: farm.companionHireGold,
       successLine: rnd.perMoveLine(MULE_BUY_LINES, { cellId: farm.id })
+    });
+  }
+  function reduceFarmBuyBoar(state2, farm) {
+    const title = poiTitleFor(farm.name, "Farm");
+    const rnd = RNG.createRunCopyRandom(state2);
+    return hireCompanion(state2, {
+      prefix: title,
+      slotId: "boar",
+      goldCost: farm.companionHireGold,
+      successLine: rnd.perMoveLine(BOAR_BUY_LINES, { cellId: farm.id })
     });
   }
   var farmRightGrid = makeRightGrid({
     leaveAction: { type: ACTION_FARM_LEAVE },
     top: (s) => farmOfferSlot(s, "top"),
-    left: (s) => farmOfferSlot(s, "left")
+    left: (s) => farmOfferSlot(s, "left"),
+    bottom: (s) => farmOfferSlot(s, "bottom")
   });
   var farmMechanic = {
     id: "farm",
@@ -1922,10 +2099,11 @@ ${dir}, ${chosen.d} leagues away.`;
     const nextCampCell = { ...campCell, nextReadyStep: stepCount + CAMP_COOLDOWN_MOVES };
     const nextWorld = setCellAt(state2.world, state2.player.position, nextCampCell);
     const gained = { ...prevRes, food: prevRes.food + CAMP_FOOD_GAIN, armySize: prevRes.armySize + armyGain };
-    const nextResources = applyFoodCapOnGain(prevRes, gained);
+    const capped = applyFoodCapOnGainWithEvents(prevRes, gained);
     return {
       world: nextWorld,
-      resources: nextResources,
+      resources: capped.resources,
+      ...capped.events.length ? { events: capped.events } : {},
       message: loreMessage(title, rnd.perMoveLine(CAMP_RECRUIT_LINES, { cellId: campCell.id }))
     };
   }
@@ -1982,6 +2160,11 @@ ${dir}, ${chosen.d} leagues away.`;
     },
     [ACTION_RETURN]: { spriteId: SPRITES.actions.return, reduce: reduceCombatReturn }
   };
+  function boarOpeningVolleyKills(enemyArmy) {
+    const n = Math.max(0, Math.floor(enemyArmy));
+    if (n <= 0) return 0;
+    return Math.ceil(n * 0.25);
+  }
   function spawnEnemyArmy(opts) {
     const playerArmy = Math.max(0, Math.trunc(opts.playerArmy));
     const min = Math.max(2, playerArmy - 2);
@@ -2012,6 +2195,9 @@ ${dir}, ${chosen.d} leagues away.`;
   function combatFightHitOddsPercent(state2) {
     const enc = state2.encounter;
     if (!enc || enc.kind !== "combat" || enc.enemyArmySize <= 0 || state2.resources.armySize <= 0) return null;
+    if (!enc.boarVolleyFired && state2.resources.party.includes("boar") && boarOpeningVolleyKills(enc.enemyArmySize) > 0) {
+      return 100;
+    }
     const variant = combatVariantForEncounter(state2);
     return fightHitChancePercent({
       playerArmy: state2.resources.armySize,
@@ -2037,6 +2223,16 @@ ${dir}, ${chosen.d} leagues away.`;
     if (mend <= 0) return resources;
     return { ...resources, armySize: resources.armySize + mend };
   }
+  function resourcesForHealerMend(resources, enc, outcome) {
+    if (outcome !== "recruit") return resources;
+    return { ...resources, armySize: resources.armySize - enc.enemyArmySize };
+  }
+  function applyHealerMendAtClose(resources, enc, outcome) {
+    const forMend = resourcesForHealerMend(resources, enc, outcome);
+    const mended = applyHealerMend(forMend, enc);
+    if (outcome !== "recruit") return mended;
+    return { ...resources, armySize: mended.armySize + enc.enemyArmySize };
+  }
   function applyCombatCloseHook(prev, args) {
     const { world, resources, run, encounter, outcome } = args;
     if (isPreviewSentinel(encounter.sourceCellId)) {
@@ -2050,7 +2246,7 @@ ${dir}, ${chosen.d} leagues away.`;
     return { world: after.world, resources: after.resources, run: after.run };
   }
   function buildCombatCloseBeat(prev, args) {
-    const mended = applyHealerMend(args.resources, args.encounter);
+    const mended = applyHealerMendAtClose(args.resources, args.encounter, args.outcome);
     const after = applyCombatCloseHook(prev, {
       world: args.world,
       resources: mended,
@@ -2058,19 +2254,22 @@ ${dir}, ${chosen.d} leagues away.`;
       encounter: args.encounter,
       outcome: args.outcome
     });
+    const mendEvents = args.resources.party.includes("healer") && mended.armySize > args.resources.armySize ? [iconHighlighted({ band: "party", id: "healer" })] : [];
     return {
       world: after.world,
       resources: after.resources,
       run: after.run,
       encounter: null,
       message: args.message,
-      events: [{ kind: "encounterClosed", encounterKind: "combat", outcome: args.outcome }]
+      events: [
+        ...mendEvents,
+        { kind: "encounterClosed", encounterKind: "combat", outcome: args.outcome }
+      ]
     };
   }
   function combatFightBadge(state2) {
     const enc = state2.encounter;
-    if (!enc || enc.kind !== "combat") return null;
-    if (enc.enemyArmySize <= 0) return null;
+    if (!enc || enc.kind !== "combat" || enc.enemyArmySize <= 0) return null;
     return { variant: "left", text: `${enc.enemyArmySize}` };
   }
   function combatPayBadge(state2) {
@@ -2110,6 +2309,15 @@ ${dir}, ${chosen.d} leagues away.`;
       }
       const line = encounterStableLine(prevState, `combat.pay.${eligibility}`, lines);
       const message = combatLoreMessage(prevState, line) || prevState.ui.message;
+      if (eligibility === "noFunds") {
+        return feedbackChange(prevState, {
+          action: "combat.pay",
+          category: "purchase",
+          outcome: "failure",
+          reason: { kind: "shortfall", resource: "gold" },
+          message
+        });
+      }
       return { message };
     }
     const cost = payment.computeCost(enc);
@@ -2174,16 +2382,47 @@ ${dir}, ${chosen.d} leagues away.`;
       message: fleeMessage
     });
   }
-  function reduceCombatFight(prevState) {
-    const enc = prevState.encounter;
-    if (!enc || enc.kind !== "combat") return null;
-    const prevEnemy = enc.enemyArmySize;
+  function applyBoarVolley(state2, enc) {
+    if (enc.boarVolleyFired || !state2.resources.party.includes("boar")) return { enc, events: [] };
+    const kills = boarOpeningVolleyKills(enc.enemyArmySize);
+    if (kills <= 0) return { enc, events: [] };
+    const nextEnemy = Math.max(0, enc.enemyArmySize - kills);
+    return {
+      enc: { ...enc, enemyArmySize: nextEnemy, boarVolleyFired: true },
+      events: [
+        { kind: "resourceChanged", target: "enemyArmy", delta: nextEnemy - enc.enemyArmySize },
+        iconHighlighted({ band: "party", id: "boar" })
+      ]
+    };
+  }
+  function combatVictoryAfterFight(prevState, enc, prefixEvents, worldBeforeReward) {
+    const prevRes = prevState.resources;
+    const variant = combatVariantForEncounter(prevState);
+    const reward = variant.victoryReward(prevRes, worldBeforeReward.rngState, enc);
+    const { resources: cappedReward, events: capEvents } = applyFoodCapOnGainWithEvents(prevRes, reward.resources);
+    const worldAfterReward = { ...worldBeforeReward, rngState: reward.rngState };
+    const victoryPick = RNG.createRunCopyRandom(prevState).advanceCursor("combat.exit.victory", variant.victoryLines);
+    const victoryMessage = combatLoreMessage(prevState, victoryPick.line || "") || prevState.ui.message;
+    const beat2 = buildCombatCloseBeat(prevState, {
+      world: worldAfterReward,
+      resources: cappedReward,
+      run: victoryPick.nextState.run,
+      encounter: enc,
+      outcome: "victory",
+      message: victoryMessage
+    });
+    if (capEvents.length) beat2.events = [...capEvents, ...beat2.events ?? []];
+    if (prefixEvents.length === 0) return beat2;
+    const beat1 = { world: worldBeforeReward, events: [...prefixEvents] };
+    return [beat1, beat2];
+  }
+  function resolveCombatRoundBeat(prevState, enc) {
     const prevRes = prevState.resources;
     const variant = combatVariantForEncounter(prevState);
     const round = resolveFightRound({
       rngState: prevState.world.rngState,
       playerArmy: prevRes.armySize,
-      enemyArmy: prevEnemy,
+      enemyArmy: enc.enemyArmySize,
       playerRollBonus: variant.playerRollBonus,
       enemyRollBonus: variant.enemyRollBonus
     });
@@ -2194,7 +2433,7 @@ ${dir}, ${chosen.d} leagues away.`;
       return {
         world: worldAfterRound,
         encounter: nextEncounter,
-        events
+        ...events.length ? { events } : {}
       };
     }
     if (round.outcome === "enemyHit") {
@@ -2207,12 +2446,12 @@ ${dir}, ${chosen.d} leagues away.`;
       };
     }
     const reward = variant.victoryReward(prevRes, worldAfterRound.rngState, enc);
-    const cappedReward = applyFoodCapOnGain(prevRes, reward.resources);
+    const { resources: cappedReward, events: capEvents } = applyFoodCapOnGainWithEvents(prevRes, reward.resources);
     const worldAfterReward = { ...worldAfterRound, rngState: reward.rngState };
     const victoryPick = RNG.createRunCopyRandom(prevState).advanceCursor("combat.exit.victory", variant.victoryLines);
     const victoryMessage = combatLoreMessage(prevState, victoryPick.line || "") || prevState.ui.message;
     const enemyEvents = round.killed ? [{ kind: "resourceChanged", target: "enemyArmy", delta: round.enemyDelta }] : [];
-    const beat1 = { world: worldAfterRound, events: enemyEvents };
+    const beat1 = { world: worldAfterRound, ...enemyEvents.length ? { events: enemyEvents } : {} };
     const beat2 = buildCombatCloseBeat(prevState, {
       world: worldAfterReward,
       resources: cappedReward,
@@ -2221,7 +2460,20 @@ ${dir}, ${chosen.d} leagues away.`;
       outcome: "victory",
       message: victoryMessage
     });
+    if (capEvents.length) beat2.events = [...capEvents, ...beat2.events ?? []];
     return [beat1, beat2];
+  }
+  function reduceCombatFight(prevState) {
+    const enc0 = prevState.encounter;
+    if (!enc0 || enc0.kind !== "combat") return null;
+    const volley = applyBoarVolley(prevState, enc0);
+    if (volley.events.length > 0) {
+      if (volley.enc.enemyArmySize <= 0) {
+        return combatVictoryAfterFight(prevState, volley.enc, volley.events, prevState.world);
+      }
+      return { encounter: volley.enc, events: volley.events };
+    }
+    return resolveCombatRoundBeat(prevState, enc0);
   }
   function rolledEnemySpawn(playerArmy) {
     return (rngState) => spawnEnemyArmy({ rngState, playerArmy });
@@ -2239,7 +2491,8 @@ ${dir}, ${chosen.d} leagues away.`;
       initialSpawn: spawned.enemyArmy,
       armyAtCombatStart: Math.max(0, args.playerArmySize),
       sourceCellId: cellIdForPos(nextWorld, args.pos),
-      restoreMessage: args.restoreMessage
+      restoreMessage: args.restoreMessage,
+      boarVolleyFired: false
     };
     return {
       world: nextWorld,
@@ -2272,13 +2525,14 @@ ${dir}, ${chosen.d} leagues away.`;
       illustrationSpriteId: (s) => combatVariantForEncounter(s).illustrationSpriteId,
       reduceAction: reduceCombatAction,
       deltaAnchorsByTarget: { enemyArmy: { row: 1, col: 0, goodSign: -1 } },
-      previewEncounter: () => ({
+      previewEncounter: (_state) => ({
         kind: "combat",
         enemyArmySize: 0,
         initialSpawn: 0,
         armyAtCombatStart: 0,
         sourceCellId: -1,
-        restoreMessage: ""
+        restoreMessage: "",
+        boarVolleyFired: false
       })
     }
   };
@@ -2555,7 +2809,8 @@ ${dir}, ${chosen.d} leagues away.`;
     const r = RNG.createTileRandom({ world, stepCount, pos });
     const line = r.stableLine(TOWN_ENTER_LINES, { placeId: town.id });
     let nextResources = resources;
-    if (resources.party.includes("healer") && resources.gold >= HEALER_UPKEEP_GOLD) {
+    const healerUpkeep = resources.party.includes("healer") && resources.gold >= HEALER_UPKEEP_GOLD;
+    if (healerUpkeep) {
       nextResources = { ...resources, gold: resources.gold - HEALER_UPKEEP_GOLD };
     }
     const opened = openNamedPoiEncounter({
@@ -2565,7 +2820,12 @@ ${dir}, ${chosen.d} leagues away.`;
       enterBody: line,
       extra: { rumorsBought: 0 }
     });
-    return { ...opened, knowsPosition: true, resources: nextResources };
+    return {
+      ...opened,
+      knowsPosition: true,
+      resources: nextResources,
+      ...healerUpkeep ? { events: [iconHighlighted({ band: "party", id: "healer" })] } : {}
+    };
   };
   var reduceTownAction = (state2, action) => {
     switch (action.type) {
@@ -2583,22 +2843,33 @@ ${dir}, ${chosen.d} leagues away.`;
         return null;
     }
   };
+  function townGoldShortfall(state2, title, action) {
+    return feedbackChange(state2, {
+      action,
+      category: "purchase",
+      outcome: "failure",
+      reason: { kind: "shortfall", resource: "gold" },
+      message: loreMessage(title, encounterStableLine(state2, `${action}.shortfall`, NO_GOLD_LINES))
+    });
+  }
   function reduceTownBuyFood(state2, town) {
     const title = poiTitleFor(town.name, "Town");
     const result = buy(state2.resources, { gold: town.prices.foodGold, gain: { food: town.bundles.food } });
-    if (result.outcome === "noFunds") return noGoldResponse(state2, title);
+    if (result.outcome === "shortfall") return townGoldShortfall(state2, title, "town.buyFood");
     if (state2.resources.food >= foodCarryCap(state2.resources)) {
-      return setEncounterMessage(title, FOOD_CARRY_FULL_MESSAGE);
+      return foodCarryFullResponse(title);
     }
+    const capped = applyFoodCapOnGainWithEvents(state2.resources, result.resources);
     return {
-      resources: applyFoodCapOnGain(state2.resources, result.resources),
+      resources: capped.resources,
+      ...capped.events.length ? { events: capped.events } : {},
       message: loreMessage(title, encounterStableLine(state2, "town.buyFood", TOWN_BUY_LINES))
     };
   }
   function reduceTownBuyTroops(state2, town) {
     const title = poiTitleFor(town.name, "Town");
     const result = buy(state2.resources, { gold: town.prices.troopsGold, gain: { armySize: town.bundles.troops } });
-    if (result.outcome === "noFunds") return noGoldResponse(state2, title);
+    if (result.outcome === "shortfall") return townGoldShortfall(state2, title, "town.buyTroops");
     return {
       resources: result.resources,
       message: loreMessage(title, encounterStableLine(state2, "town.buyTroops", TOWN_BUY_LINES))
@@ -2609,7 +2880,7 @@ ${dir}, ${chosen.d} leagues away.`;
     const refused = refuseCompanionHire(state2, title, "scout");
     if (refused) return refused;
     const result = buy(state2.resources, { gold: town.prices.companionHireGold, gain: { party: ["scout"] } });
-    if (result.outcome === "noFunds") return noGoldResponse(state2, title);
+    if (result.outcome === "shortfall") return townGoldShortfall(state2, title, "town.hireScout");
     const rnd = RNG.createRunCopyRandom(state2);
     return {
       resources: result.resources,
@@ -2633,7 +2904,7 @@ ${dir}, ${chosen.d} leagues away.`;
       return setEncounterMessage(title, encounterStableLine(state2, "rumor.cap", TOWN_RUMOR_EXHAUSTED_LINES));
     }
     const result = buy(state2.resources, { gold: town.prices.rumorGold, gain: {} });
-    if (result.outcome === "noFunds") return noGoldResponse(state2, title);
+    if (result.outcome === "shortfall") return townGoldShortfall(state2, title, "town.buyRumor");
     const pool = rumorPool();
     const pick = RNG.createRunCopyRandom(state2).advanceCursor(`town.rumor.${town.id}`, pool, { salt: town.id });
     const nextEncounter = { ...enc, rumorsBought: enc.rumorsBought + 1 };
@@ -2706,6 +2977,168 @@ ${dir}, ${chosen.d} leagues away.`;
       previewEncounter: previewEncounterProvider("town"),
       rightGrid: townRightGrid,
       illustrationSpriteId: SPRITES.flavor.marketStall
+    }
+  };
+
+  // src/core/mechanics/defs/crossing.ts
+  var ACTION_CROSSING_SELL = "CROSSING_SELL";
+  var ACTION_CROSSING_LEAVE = "CROSSING_LEAVE";
+  var SELL_LINES_BY_SLOT = {
+    mule: MULE_SELL_LINES,
+    boar: BOAR_SELL_LINES,
+    scout: SCOUT_SELL_LINES,
+    healer: HEALER_SELL_LINES
+  };
+  function crossingSellGold(args) {
+    const min = Math.floor(COMPANION_HIRE_GOLD_MIN / 2);
+    const max = Math.floor(COMPANION_HIRE_GOLD_MAX / 2);
+    return RNG.keyedIntInRange(
+      { seed: args.seed, stepCount: args.stepCount, cellId: args.cellId, salt: `crossing.sell.${args.slotId}` },
+      min,
+      max
+    );
+  }
+  function buildSellGoldBySlot(args) {
+    const out = {};
+    for (let i = 0; i < args.party.length; i++) {
+      const slotId = args.party[i];
+      out[slotId] = crossingSellGold({ ...args, slotId });
+    }
+    return out;
+  }
+  var onEnterCrossing = ({ cell, world, pos, stepCount, resources }) => {
+    if (cell.kind !== "crossing") return {};
+    const crossingCell = getCellAt(world, pos);
+    if (!crossingCell || crossingCell.kind !== "crossing") return {};
+    const title = poiTitleFor(crossingCell.name, "Crossing");
+    const r = RNG.createTileRandom({ world, stepCount, pos });
+    const line = r.stableLine(CROSSING_ENTER_LINES, { placeId: crossingCell.id });
+    if (resources.party.length === 0) {
+      const emptyLine = r.stableLine(CROSSING_EMPTY_LINES, { placeId: crossingCell.id });
+      return { message: loreMessage(title, emptyLine), knowsPosition: true };
+    }
+    const sourceCellId = cellIdForPos(world, pos);
+    return {
+      ...openNamedPoiEncounter({
+        kind: "crossing",
+        sourceCellId,
+        title,
+        enterBody: line,
+        extra: {
+          sellGoldBySlot: buildSellGoldBySlot({
+            seed: world.seed,
+            stepCount,
+            cellId: sourceCellId,
+            party: resources.party
+          })
+        }
+      }),
+      knowsPosition: true
+    };
+  };
+  var reduceCrossingAction = (state2, action) => {
+    switch (action.type) {
+      case ACTION_CROSSING_LEAVE:
+        return leaveEncounter(state2, "crossing");
+      case ACTION_CROSSING_SELL:
+        return reduceCrossingSell(state2, action.slotId);
+      default:
+        return null;
+    }
+  };
+  function reduceCrossingSell(state2, slotId) {
+    const enc = state2.encounter;
+    if (!enc || enc.kind !== "crossing") return {};
+    const crossing = getCellAt(state2.world, state2.player.position);
+    const title = poiTitleFor(crossing.name, "Crossing");
+    if (!state2.resources.party.includes(slotId)) return setEncounterMessage(title, encounterStableLine(state2, "crossing.sell.missing", CROSSING_EMPTY_LINES));
+    const gold = enc.sellGoldBySlot[slotId];
+    if (gold == null) return setEncounterMessage(title, encounterStableLine(state2, "crossing.sell.missing", CROSSING_EMPTY_LINES));
+    const lines = SELL_LINES_BY_SLOT[slotId];
+    if (!lines) return {};
+    const line = encounterStableLine(state2, `crossing.sell.${slotId}`, lines);
+    const nextParty = state2.resources.party.filter((slot) => slot !== slotId);
+    const nextResources = {
+      ...state2.resources,
+      party: nextParty,
+      gold: state2.resources.gold + gold
+    };
+    if (nextParty.length === 0) {
+      return {
+        resources: nextResources,
+        encounter: null,
+        message: loreMessage(title, line),
+        events: [{ kind: "encounterClosed", encounterKind: "crossing", outcome: "purchase" }]
+      };
+    }
+    return {
+      resources: nextResources,
+      message: loreMessage(title, line)
+    };
+  }
+  var placeCrossings = ({ cells, rngState, seed }) => {
+    const countRng = RNG.createStreamRandomFromSeed(seed, "place.crossing.count");
+    const crossingCount = countRng.intInRange(CROSSING_COUNT_MIN, CROSSING_COUNT_MAX);
+    placeNamedFeatureFromSeed(cells, seed, "place.crossing", {
+      count: crossingCount,
+      namePool: CROSSING_NAME_POOL,
+      fallbackName: "A",
+      canPlaceAt: (_x, _y, here) => isTerrainCell(here),
+      buildCell: ({ x, y, name }) => ({ kind: "crossing", id: cellId(x, y), name })
+    });
+    return { rngState };
+  };
+  function crossingSellCell(state2, partyIndex) {
+    const enc = state2.encounter;
+    if (!enc || enc.kind !== "crossing") return null;
+    const slotId = state2.resources.party[partyIndex];
+    if (!slotId) return null;
+    const spriteId = inventorySpriteId(slotId);
+    if (spriteId == null) return null;
+    const gold = enc.sellGoldBySlot[slotId];
+    const action = { type: ACTION_CROSSING_SELL, slotId };
+    if (gold == null) return { spriteId, action };
+    return {
+      spriteId,
+      action,
+      badge: { variant: "price", text: `+${gold}` }
+    };
+  }
+  var crossingRightGrid = makeRightGrid({
+    leaveAction: { type: ACTION_CROSSING_LEAVE },
+    left: (s) => crossingSellCell(s, 0),
+    top: (s) => crossingSellCell(s, 1),
+    bottom: (s) => crossingSellCell(s, 2)
+  });
+  var crossingMechanic = {
+    id: "crossing",
+    kinds: ["crossing"],
+    mapLabel: "X",
+    onEnterTile: onEnterCrossing,
+    poiSignpost: {
+      rank: 35,
+      name: (cell) => `${cell.name || "A"} Crossing`
+    },
+    placeWorld: placeCrossings,
+    encounter: {
+      kind: "crossing",
+      reduceAction: reduceCrossingAction,
+      previewEncounter: (s) => {
+        const cellId2 = cellIdForPos(s.world, s.player.position);
+        return {
+          kind: "crossing",
+          sourceCellId: cellId2,
+          restoreMessage: "",
+          sellGoldBySlot: buildSellGoldBySlot({
+            seed: s.world.seed,
+            stepCount: s.run.stepCount,
+            cellId: cellId2,
+            party: s.resources.party
+          })
+        };
+      },
+      rightGrid: crossingRightGrid,
+      illustrationSpriteId: SPRITES.flavor.crossingRider
     }
   };
 
@@ -2984,6 +3417,7 @@ ${dir}, ${chosen.d} leagues away.`;
     farmMechanic,
     campMechanic,
     townMechanic,
+    crossingMechanic,
     hengeMechanic,
     signpostMechanic,
     fishingLakeMechanic,
@@ -3299,6 +3733,17 @@ ${dir}, ${chosen.d} leagues away.`;
       teleported
     });
     const moveEvent = teleported ? { kind: "teleported", from: prevPos, to: landingPos } : { kind: "positionChanged", from: prevPos, to: nextPos, dx, dy };
+    const arrivalEvents = [...outcome.events ?? []];
+    if (nextEncounter && !isGameOver) {
+      arrivalEvents.push({ kind: "encounterOpened", encounterKind: nextEncounter.kind });
+    }
+    if (!isGameOver) {
+      if (teleported) {
+        arrivalEvents.push(iconHighlighted({ band: "meta", id: "position" }));
+      } else if (!prevState.run.knowsPosition && finalKnowsPosition) {
+        arrivalEvents.push(iconHighlighted({ band: "meta", id: "position" }));
+      }
+    }
     const beats = [
       { resources: baseResources },
       { player: { position: landingPos }, events: [moveEvent] },
@@ -3317,7 +3762,7 @@ ${dir}, ${chosen.d} leagues away.`;
         encounter: nextEncounter,
         message,
         leftPanel: clearSpriteFocusIfAny(prevState.ui),
-        ...nextEncounter && !isGameOver ? { events: [{ kind: "encounterOpened", encounterKind: nextEncounter.kind }] } : {}
+        ...arrivalEvents.length ? { events: arrivalEvents } : {}
       }
     ];
     return applyChanges(prevState, beats);
@@ -3411,7 +3856,7 @@ ${dir}, ${chosen.d} leagues away.`;
   var UI_COLOR_GRID_CELL_BORDER_META = 15;
   var UI_GRID_ACTION_BORDER_COLORKEY = UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR;
   var UI_GRID_CELL_BORDER_DOUBLE_INSET = 2;
-  var UI_COLOR_RIGHT_PANEL_DIVIDER = 15;
+  var UI_COLOR_PANEL_DIVIDER = 15;
   var UI_STATS_BAND_ITEM_GAP_PX = 3;
   var UI_STATS_BAND_ICON_VALUE_GAP_PX = 2;
   var UI_HELD_BAND_ICON_GAP_PX = 2;
@@ -3435,7 +3880,6 @@ ${dir}, ${chosen.d} leagues away.`;
   var UI_LORE_PADDING_X = 9;
   var UI_LEFT_PANEL_INNER_GAP = 12;
   var UI_LEFT_PANEL_LORE_TOP_GAP = 7;
-  var UI_COLOR_LEFT_PANEL_DIVIDER = 15;
   var UI_LEFT_PANEL_DIVIDER_GAP_PX = 5;
   var UI_STATUS_ICON_SIZE = 8;
   var UI_DELTA_OFFSET_X = 2;
@@ -3444,6 +3888,7 @@ ${dir}, ${chosen.d} leagues away.`;
   var UI_DELTA_GAP_PX = -4;
   var MOVE_SLIDE_FRAMES = 15;
   var FOOD_DELTA_FRAMES = 36;
+  var ICON_HIGHLIGHT_FRAMES = 18;
   var GRID_TRANSITION_STEP_FRAMES = 5;
   var ENABLE_ANIMATIONS = true;
 
@@ -3471,9 +3916,6 @@ ${dir}, ${chosen.d} leagues away.`;
     if (kept.length === active.length) return { clock: nextClock, anim: ui.anim };
     return { clock: nextClock, anim: { active: kept } };
   }
-  function pushAnim(ui, anim) {
-    return { clock: ui.clock, anim: { active: [...ui.anim.active, anim] } };
-  }
   function translatePendingEvents(ui, events) {
     if (!ENABLE_ANIMATIONS) return ui;
     if (events.length === 0) return ui;
@@ -3481,7 +3923,7 @@ ${dir}, ${chosen.d} leagues away.`;
     let phaseCursor = ui.clock.frame;
     let phaseEnd = phaseCursor;
     const append = (anim) => {
-      out = pushAnim(out, anim);
+      out = { clock: ui.clock, anim: { active: [...out.anim.active, anim] } };
       if (anim.blocksInput) {
         const end = anim.startFrame + anim.durationFrames;
         if (end > phaseEnd) phaseEnd = end;
@@ -3552,6 +3994,16 @@ ${dir}, ${chosen.d} leagues away.`;
             durationFrames: GRID_TRANSITION_FRAMES,
             blocksInput: true,
             params: { from: "blank", to: "overworld" }
+          });
+          break;
+        }
+        case "iconHighlighted": {
+          append({
+            kind: "iconHighlight",
+            startFrame: phaseCursor,
+            durationFrames: ICON_HIGHLIGHT_FRAMES,
+            blocksInput: false,
+            params: { target: event.target }
           });
           break;
         }
@@ -3750,7 +4202,7 @@ ${dir}, ${chosen.d} leagues away.`;
     if (mode === "overworld") return { ...s, encounter: null };
     if (s.encounter && s.encounter.kind === mode) return s;
     const provider = MECHANIC_INDEX.previewEncounterByEncounterKind[mode];
-    return { ...s, encounter: provider ? provider() : null };
+    return { ...s, encounter: provider ? provider(s) : null };
   }
   function viewFromDef(def, s) {
     if (def.tilePreview && def.tilePreview.kind === "relativeToPlayer") {
@@ -3859,7 +4311,7 @@ ${dir}, ${chosen.d} leagues away.`;
     const textW = badgeTextWidthPx(badge.text);
     const w = textW + padLeft + padRight;
     const topLeft = badgeTopLeftPx(row, col);
-    const spriteId = badge.variant === "price" ? SPRITES.ui.badgePrice : SPRITES.ui.badgeLeft;
+    const spriteId = badge.variant === "left" ? SPRITES.ui.badgeLeft : SPRITES.ui.badgePrice;
     const fg = UI_COLOR_TEXT;
     return [
       {
@@ -4063,6 +4515,12 @@ ${dir}, ${chosen.d} leagues away.`;
   var HERO_STATS_X = 84;
   var HERO_STATS_Y = 12;
   var HERO_STAT_ROW_PX = 19;
+  var HIGHLIGHT_SPRITES = [
+    SPRITES.ui.slotHighlight0,
+    SPRITES.ui.slotHighlight1,
+    SPRITES.ui.slotHighlight2,
+    SPRITES.ui.slotHighlight3
+  ];
   function formatA1(position) {
     const col = String.fromCharCode("A".charCodeAt(0) + position.x);
     const row = String(position.y + 1);
@@ -4126,6 +4584,116 @@ ${dir}, ${chosen.d} leagues away.`;
   function drawHeroStat(x, y, spriteId, text, color) {
     spr(spriteId, x, y, -1, 1, 0, 0, 2, 2);
     print(text, x + 19, y + 5, color);
+  }
+  function rightStatsBandIconOrigin(s, itemIndex) {
+    const items = [
+      { iconSpriteId: SPRITES.small.seed, value: `${s.world.seed}` },
+      { iconSpriteId: SPRITES.small.position, value: formatPositionLabel(s) },
+      { iconSpriteId: SPRITES.small.steps, value: `${s.run.stepCount}` }
+    ];
+    if (itemIndex < 0 || itemIndex >= items.length) return null;
+    const iconSize = UI_STATUS_ICON_SIZE;
+    const iconValueGap = UI_STATS_BAND_ICON_VALUE_GAP_PX;
+    const itemGap = UI_STATS_BAND_ITEM_GAP_PX;
+    let contentW = 0;
+    for (let i = 0; i < items.length; i++) {
+      contentW += iconSize + iconValueGap + items[i].value.length * FONT_CHAR_PX;
+    }
+    contentW += (items.length - 1) * itemGap;
+    const bandY = RIGHT_PANEL_TOP_BAND_Y;
+    const iconY = bandY + Math.floor((RIGHT_PANEL_TOP_BAND_H - iconSize) / 2) - 1;
+    let x = RIGHT_PANEL_INNER_X + Math.floor((RIGHT_PANEL_INNER_W - contentW) / 2);
+    for (let i = 0; i < itemIndex; i++) {
+      const item = items[i];
+      x += iconSize + iconValueGap + item.value.length * FONT_CHAR_PX + itemGap;
+    }
+    return { x, y: iconY };
+  }
+  var HIGHLIGHT_SPRITE_TILES = 2;
+  var HIGHLIGHT_DISPLAY_PX = HIGHLIGHT_SPRITE_TILES * 8;
+  function highlightOriginForIconTopLeft(iconX, iconY, iconDisplayPx) {
+    return {
+      x: iconX + Math.floor(iconDisplayPx / 2) - Math.floor(HIGHLIGHT_DISPLAY_PX / 2),
+      y: iconY + Math.floor(iconDisplayPx / 2) - Math.floor(HIGHLIGHT_DISPLAY_PX / 2)
+    };
+  }
+  function highlightRectForTarget(s, target) {
+    switch (target.band) {
+      case "stats": {
+        const row = target.id === "army" ? 0 : target.id === "food" ? 1 : target.id === "gold" ? 2 : -1;
+        if (row < 0) return null;
+        return highlightOriginForIconTopLeft(
+          HERO_STATS_X,
+          HERO_STATS_Y + row * HERO_STAT_ROW_PX,
+          HIGHLIGHT_DISPLAY_PX
+        );
+      }
+      case "party": {
+        const origin = heldBandIconOrigin(s, (id) => id === target.id, "party");
+        return origin ? highlightOriginForIconTopLeft(origin.x, origin.y, 16) : null;
+      }
+      case "inventory": {
+        const origin = heldBandIconOrigin(s, (id) => id === target.id, "inventory");
+        return origin ? highlightOriginForIconTopLeft(origin.x, origin.y, 16) : null;
+      }
+      case "meta": {
+        const itemIndex = target.id === "steps" ? 2 : target.id === "position" || target.id === "oriented" ? 1 : -1;
+        const origin = rightStatsBandIconOrigin(s, itemIndex);
+        return origin ? highlightOriginForIconTopLeft(origin.x, origin.y, UI_STATUS_ICON_SIZE) : null;
+      }
+      default:
+        return null;
+    }
+  }
+  function heldBandIconOrigin(s, matches, band) {
+    const iconSize = 16;
+    const iconGap = UI_HELD_BAND_ICON_GAP_PX;
+    const heldIcons = heldStatusIcons(s);
+    if (heldIcons.length === 0) return null;
+    let iconIndex = -1;
+    let cursor = 0;
+    for (let i = 0; i < INVENTORY_STATUS_ORDER.length; i++) {
+      const id = INVENTORY_STATUS_ORDER[i];
+      if (!s.resources.inventory.includes(id)) continue;
+      if (band === "inventory" && matches(id)) {
+        iconIndex = cursor;
+        break;
+      }
+      cursor++;
+    }
+    if (band === "party") {
+      for (let i = 0; i < s.resources.party.length; i++) {
+        if (matches(s.resources.party[i])) {
+          iconIndex = cursor + i;
+          break;
+        }
+      }
+    }
+    if (iconIndex < 0) return null;
+    const contentW = heldIcons.length * iconSize + (heldIcons.length - 1) * iconGap;
+    const bandY = RIGHT_PANEL_BOTTOM_BAND_Y;
+    const iconY = bandY + Math.floor((RIGHT_PANEL_BOTTOM_BAND_H - iconSize) / 2);
+    const x = RIGHT_PANEL_INNER_X + Math.floor((RIGHT_PANEL_INNER_W - contentW) / 2) + iconIndex * (iconSize + iconGap);
+    return { x, y: iconY };
+  }
+  function drawIconHighlightOverlays(ui, s, bands) {
+    const allowed = new Set(bands);
+    const anims = ui.anim.active;
+    const frame = ui.clock.frame;
+    for (let i = 0; i < anims.length; i++) {
+      const a = anims[i];
+      if (a.kind !== "iconHighlight") continue;
+      if (!allowed.has(a.params.target.band)) continue;
+      if (frame < a.startFrame || frame >= a.startFrame + a.durationFrames) continue;
+      const rect2 = highlightRectForTarget(s, a.params.target);
+      if (!rect2) continue;
+      const t = frame - a.startFrame;
+      const spriteIndex = Math.min(
+        HIGHLIGHT_SPRITES.length - 1,
+        Math.floor(t * HIGHLIGHT_SPRITES.length / a.durationFrames)
+      );
+      spr(HIGHLIGHT_SPRITES[spriteIndex], rect2.x, rect2.y, 0, 1, 0, 0, HIGHLIGHT_SPRITE_TILES, HIGHLIGHT_SPRITE_TILES);
+    }
   }
   function drawDeltaOverlays(ui, anchors) {
     const anims = ui.anim.active;
@@ -4240,6 +4808,7 @@ ${dir}, ${chosen.d} leagues away.`;
     const gold = { x: HERO_STATS_X, y: statY };
     drawHeroStat(gold.x, gold.y, SPRITES.inventory.gold, `${s.resources.gold}`, UI_COLOR_TEXT);
     drawDeltaOverlays(ui, { army, food, gold });
+    drawIconHighlightOverlays(ui, s, ["stats"]);
     const statusBottomY = gold.y + 16 + 2;
     const headerBottomY = Math.max(headerBandBottomY, statusBottomY);
     drawLeftPanelDividers(illX, illY, illSize, horizontalDividerY);
@@ -4264,6 +4833,7 @@ ${dir}, ${chosen.d} leagues away.`;
     drawCombatHitOddsDebug(s);
     drawRightStatsBand(s);
     drawRightHeldBand(s);
+    drawIconHighlightOverlays(ui, s, ["party", "inventory", "meta"]);
     drawRightPanelDividers();
     drawRightPanelFrame(s);
     const encounterKind = s.encounter?.kind ?? null;
@@ -4324,7 +4894,15 @@ ${dir}, ${chosen.d} leagues away.`;
     }
   }
   function stampDividerGem(x, y, vertical) {
-    spr(SPRITES.ui.dividerGem, x - 3 + (vertical ? -1 : 0), y - 3, 8, 1, 0, vertical ? 1 : 0);
+    spr(
+      SPRITES.ui.dividerGem,
+      x - 3 + (vertical ? -1 : 0),
+      y - 3,
+      UI_TEXTURE_OVERLAY_TRANSPARENT_COLOR,
+      1,
+      0,
+      vertical ? 1 : 0
+    );
   }
   function drawDivider(x0, y0, x1, y1, gemOffset, color) {
     const horiz = y0 === y1;
@@ -4344,14 +4922,14 @@ ${dir}, ${chosen.d} leagues away.`;
   function drawRightPanelDividers() {
     const x = RIGHT_PANEL_INNER_X;
     const x1 = x + RIGHT_PANEL_INNER_W - 1;
-    const c = UI_COLOR_RIGHT_PANEL_DIVIDER;
+    const c = UI_COLOR_PANEL_DIVIDER;
     drawDivider(x, RIGHT_PANEL_TOP_DIVIDER_Y, x1, RIGHT_PANEL_TOP_DIVIDER_Y, 14, c);
     drawDivider(x, RIGHT_PANEL_BOTTOM_DIVIDER_Y, x1, RIGHT_PANEL_BOTTOM_DIVIDER_Y, 14, c);
   }
   function drawLeftPanelDividers(illX, illY, illSize, horizontalY) {
     const verticalX = illX + illSize + Math.floor(UI_LEFT_PANEL_INNER_GAP / 2);
     const verticalH = Math.max(0, horizontalY - illY - UI_LEFT_PANEL_DIVIDER_GAP_PX);
-    const c = UI_COLOR_LEFT_PANEL_DIVIDER;
+    const c = UI_COLOR_PANEL_DIVIDER;
     if (verticalH > 0) {
       drawDivider(verticalX, illY, verticalX, illY + verticalH - 1, Math.floor(verticalH / 6.4), c);
     }
@@ -4504,9 +5082,9 @@ ${dir}, ${chosen.d} leagues away.`;
   globalThis.TIC = TIC;
 })();
 
-// title:  The Unbound (MVP 0.7.0)
+// title:  The Unbound (MVP 0.9.0)
 // author: haulin
-// desc:   MVP 0.7.0 toward the North Star
+// desc:   MVP 0.9.0 toward the North Star
 // script: js
 // input:  mouse
 

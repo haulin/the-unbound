@@ -19,7 +19,7 @@ function makeWorld(rngState = 1): World {
     kind: 'farm',
     id: 23,
     name: 'A Farm',
-    offers: ['FARM_BUY_FOOD', 'FARM_BUY_BEAST'],
+    offers: ['FARM_BUY_FOOD', 'FARM_BUY_MULE'],
     companionHireGold: 10,
   }
   cells[7]![1] = { kind: 'signpost' }

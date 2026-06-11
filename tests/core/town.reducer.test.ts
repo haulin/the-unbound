@@ -3,7 +3,7 @@ import { processAction } from '../../src/core/processAction'
 import {
   BARKEEP_TIPS,
   TOWN_BUY_LINES,
-  TOWN_NO_GOLD_LINES,
+  NO_GOLD_LINES,
   COMPANION_ALREADY_LINES,
   TOWN_SCOUT_HIRE_LINES,
 } from '../../src/core/constants'
@@ -96,7 +96,7 @@ describe('town reducer', () => {
     expect(next.resources.food).toBe(10)
     expect(next.ui.message).not.toContain(FOOD_CARRY_FULL_MESSAGE)
     const line = next.ui.message.split('\n').slice(1).join('\n')
-    expect(TOWN_NO_GOLD_LINES).toContain(line)
+    expect(NO_GOLD_LINES).toContain(line)
   })
 
   it('repeated buy food in the same visit reuses the same success line', () => {
@@ -168,8 +168,14 @@ describe('town reducer', () => {
     const next = processAction(s0, { type: ACTION_TOWN_BUY_TROOPS })!
     expect(next.resources).toEqual(s0.resources)
 
-    const expectedLine = RNG.createRunCopyRandom(s0).perMoveLine(TOWN_NO_GOLD_LINES, { cellId: 4 })
+    const expectedLine = RNG.createRunCopyRandom(s0).stableLine(NO_GOLD_LINES, {
+      salt: 'town.4.town.buyTroops.shortfall',
+    })
     expect(next.ui.message).toBe(`Stonebridge Town\n${expectedLine}`)
+    expect(next.pendingEvents).toContainEqual({
+      kind: 'iconHighlighted',
+      target: { band: 'stats', id: 'gold' },
+    })
   })
 
   it('leave: clears encounter, restores message, and emits encounterClosed event', () => {

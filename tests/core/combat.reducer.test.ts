@@ -12,10 +12,13 @@ import {
 import {
   ACTION_FIGHT,
   ACTION_RETURN,
+  boarOpeningVolleyKills,
+  combatFightHitOddsPercent,
   fightHitChancePercent,
   spawnEnemyArmy,
 } from '../../src/core/mechanics/defs/combat'
 import { hengeCombatVariant } from '../../src/core/mechanics/defs/henge'
+import { goblinCombatVariant } from '../../src/core/mechanics/defs/woods'
 import { RNG } from '../../src/core/rng'
 import type { State, World } from '../../src/core/types'
 import { makeResources } from './_helpers/makeResources'
@@ -140,6 +143,30 @@ describe('combat reducer (v0.0.7)', () => {
     expect(GOBLIN_ENCOUNTER_LINES.includes(next.ui.message as any)).toBe(true)
   })
 
+  it('FIGHT victory highlights healer when mend restores troops', () => {
+    const w = makeWorld({ seed: 1, dstKind: 'henge', rngState: 1 })
+    const s = makeState(w)
+    s.resources.party = ['healer']
+    s.resources.armySize = 7
+    s.encounter = {
+      kind: 'combat',
+      enemyArmySize: 1,
+      initialSpawn: 1,
+      armyAtCombatStart: 10,
+      sourceCellId: 4,
+      restoreMessage: 'X',
+      boarVolleyFired: false,
+    }
+    s.world.rngState = findRngStateForFightOutcome({ playerArmy: 7, enemyArmy: 1, want: 'win' })
+    const next = processAction(s, { type: ACTION_FIGHT })!
+    expect(next.encounter).toBeNull()
+    expect(next.resources.armySize).toBe(9)
+    expect(next.pendingEvents).toContainEqual({
+      kind: 'iconHighlighted',
+      target: { band: 'party', id: 'healer' },
+    })
+  })
+
   it('FIGHT win uses floor-halving (1->0), pays gold via henge variant, and ends combat', () => {
     const w = makeWorld({ seed: 1, dstKind: 'henge', rngState: 1 })
     const s = makeState(w)
@@ -153,6 +180,7 @@ describe('combat reducer (v0.0.7)', () => {
       armyAtCombatStart: 10,
       sourceCellId: 4,
       restoreMessage: 'The Mending Henge\nThe circle remembers old debts.',
+      boarVolleyFired: false,
     }
     s.ui.message = ''
 
@@ -216,6 +244,7 @@ describe('combat reducer (v0.0.7)', () => {
       armyAtCombatStart: 10,
       sourceCellId: 4,
       restoreMessage: 'X',
+      boarVolleyFired: false,
     }
 
     const startRng = findRngStateForFightOutcome({ playerArmy: 2, enemyArmy: 12, want: 'loss' })
@@ -239,6 +268,7 @@ describe('combat reducer (v0.0.7)', () => {
       armyAtCombatStart: 10,
       sourceCellId: 4,
       restoreMessage: 'X',
+      boarVolleyFired: false,
     }
     const beforeRng = s.world.rngState >>> 0
 
@@ -255,6 +285,127 @@ describe('combat reducer (v0.0.7)', () => {
     const s = makeState(w)
     const next = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
     expect(next.encounter?.kind).toBe('combat')
+  })
+})
+
+describe('combatFightHitOddsPercent', () => {
+  it('returns null outside combat', () => {
+    const s = makeState(makeWorld({ seed: 1, dstKind: 'henge', rngState: 123 }))
+    expect(combatFightHitOddsPercent(s)).toBeNull()
+  })
+
+  it('wires henge variant roll bonuses', () => {
+    const s = makeState(makeWorld({ seed: 1, dstKind: 'henge', rngState: 123 }))
+    const combat = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
+    const enc = combat.encounter
+    expect(enc?.kind).toBe('combat')
+    if (!enc || enc.kind !== 'combat') throw new Error('expected combat')
+    expect(combatFightHitOddsPercent(combat)).toBe(
+      fightHitChancePercent({
+        playerArmy: combat.resources.armySize,
+        enemyArmy: enc.enemyArmySize,
+        playerRollBonus: hengeCombatVariant.playerRollBonus,
+        enemyRollBonus: hengeCombatVariant.enemyRollBonus,
+      }),
+    )
+  })
+
+  it.each([
+    [1, 1],
+    [2, 1],
+    [8, 2],
+    [20, 5],
+    [40, 10],
+  ])('boarOpeningVolleyKills(%i) → %i', (enemy, kills) => {
+    expect(boarOpeningVolleyKills(enemy)).toBe(kills)
+  })
+
+  it('boarOpeningVolleyKills returns 0 when enemy army is empty', () => {
+    expect(boarOpeningVolleyKills(0)).toBe(0)
+  })
+
+  it('shows 100% hit odds when boar volley will fire on the next fight press', () => {
+    const s = makeState(makeWorld({ seed: 1, dstKind: 'henge', rngState: 123 }))
+    const combat = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
+    const enc = combat.encounter
+    if (!enc || enc.kind !== 'combat') throw new Error('expected combat')
+    const withBoar = {
+      ...combat,
+      resources: { ...combat.resources, party: ['boar'] },
+    }
+    expect(boarOpeningVolleyKills(enc.enemyArmySize)).toBeGreaterThan(0)
+    expect(combatFightHitOddsPercent(withBoar)).toBe(100)
+  })
+
+  it('FIGHT with boar applies volley only and does not consume fight rng', () => {
+    const w = makeWorld({ seed: 1, dstKind: 'henge', rngState: 4242 })
+    const s = makeState(w)
+    s.resources.party = ['boar']
+    s.encounter = {
+      kind: 'combat',
+      enemyArmySize: 20,
+      initialSpawn: 20,
+      armyAtCombatStart: 5,
+      sourceCellId: 4,
+      restoreMessage: 'X',
+      boarVolleyFired: false,
+    }
+    const next = processAction(s, { type: ACTION_FIGHT })!
+    const enc = next.encounter
+    if (!enc || enc.kind !== 'combat') throw new Error('expected combat')
+    expect(enc.enemyArmySize).toBe(15)
+    expect(enc.boarVolleyFired).toBe(true)
+    expect(next.world.rngState).toBe(4242)
+    expect(next.pendingEvents).toEqual([
+      { kind: 'resourceChanged', target: 'enemyArmy', delta: -5 },
+      { kind: 'iconHighlighted', target: { band: 'party', id: 'boar' } },
+    ])
+  })
+
+  it('boar volley does not fire again on later fight presses in the same encounter', () => {
+    const w = makeWorld({ seed: 1, dstKind: 'henge', rngState: 4242 })
+    const s = makeState(w)
+    s.resources.party = ['boar']
+    s.resources.armySize = 5
+    s.encounter = {
+      kind: 'combat',
+      enemyArmySize: 20,
+      initialSpawn: 20,
+      armyAtCombatStart: 5,
+      sourceCellId: 4,
+      restoreMessage: 'X',
+      boarVolleyFired: false,
+    }
+    const afterVolley = processAction(s, { type: ACTION_FIGHT })!
+    const volleyEnc = afterVolley.encounter
+    if (!volleyEnc || volleyEnc.kind !== 'combat') throw new Error('expected combat')
+    expect(volleyEnc.enemyArmySize).toBe(15)
+
+    const lossRng = findRngStateForFightOutcome({ playerArmy: 5, enemyArmy: 15, want: 'loss' })
+    afterVolley.world.rngState = lossRng
+    const afterRound = processAction(afterVolley, { type: ACTION_FIGHT })!
+    const roundEnc = afterRound.encounter
+    if (!roundEnc || roundEnc.kind !== 'combat') throw new Error('expected combat')
+    expect(roundEnc.enemyArmySize).toBe(15)
+    expect(afterRound.resources.armySize).toBe(4)
+  })
+
+  it('wires goblin variant roll bonuses for woods ambush', () => {
+    const cellId = 1 * 3 + 1
+    const seed = findSeedForAmbush(cellId)
+    const s = makeState(makeWorld({ seed, dstKind: 'woods', rngState: 999 }))
+    const combat = processAction(s, { type: ACTION_MOVE, dx: 0, dy: 1 })!
+    const enc = combat.encounter
+    expect(enc?.kind).toBe('combat')
+    if (!enc || enc.kind !== 'combat') throw new Error('expected combat')
+    expect(combatFightHitOddsPercent(combat)).toBe(
+      fightHitChancePercent({
+        playerArmy: combat.resources.armySize,
+        enemyArmy: enc.enemyArmySize,
+        playerRollBonus: goblinCombatVariant.playerRollBonus,
+        enemyRollBonus: goblinCombatVariant.enemyRollBonus,
+      }),
+    )
   })
 })
 

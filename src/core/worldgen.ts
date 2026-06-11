@@ -143,9 +143,10 @@ export type OfferCategory = 'economy' | 'companion_hire'
 type OfferRng = { intExclusive: (max: number) => number; intInRange: (min: number, max: number) => number }
 
 // Guarantees (when `poiCount * maxOffers >= mustCover.length` and the pool has
-// at least one non-hire offer): every mustCover offer appears on some PoI; each
-// PoI has minOffers..maxOffers distinct offers; each PoI has >=1 non-hire offer.
-// `requiredOnEveryPoi` adds offers without exceeding maxOffers (may swap out a hire).
+// at least one non-hire offer): every mustCover offer appears on some PoI (each
+// placed on a random eligible PoI via `rng`); each PoI has minOffers..maxOffers
+// distinct offers; each PoI has >=1 non-hire offer.
+// `requiredOnEveryPoi` runs before must-cover (per-PoI staples first, then map-wide hires).
 // `mustCover` defaults to the full `pool` (every offer type appears somewhere on the map).
 export function buildOfferSets<T extends string>(args: {
   poiCount: number
@@ -164,24 +165,21 @@ export function buildOfferSets<T extends string>(args: {
 
   const slots: T[][] = Array.from({ length: poiCount }, () => [])
 
-  const place = (offer: T): void => {
+  const placeMustCover = (offer: T): void => {
+    for (let t = 0; t < poiCount; t++) {
+      if (slots[t]!.includes(offer)) return
+    }
+    const eligible: number[] = []
     for (let t = 0; t < poiCount; t++) {
       const row = slots[t]!
-      if (row.length < maxOffers && !row.includes(offer)) {
-        row.push(offer)
-        return
-      }
+      if (row.length < maxOffers && !row.includes(offer)) eligible.push(t)
     }
-    for (let t = 0; t < poiCount; t++) {
-      const row = slots[t]!
-      if (row.length < maxOffers) {
-        row.push(offer)
-        return
-      }
+    if (eligible.length > 0) {
+      slots[eligible[rng.intExclusive(eligible.length)]!]!.push(offer)
+      return
     }
+    throw new Error(`buildOfferSets: cannot place must-cover offer "${offer}"; no eligible poi`)
   }
-
-  for (const offer of mustCover) place(offer)
 
   for (let t = 0; t < poiCount; t++) {
     const row = slots[t]!
@@ -191,6 +189,8 @@ export function buildOfferSets<T extends string>(args: {
       else replaceLastHireWith(row, required, categoryOf)
     }
   }
+
+  for (const offer of mustCover) placeMustCover(offer)
 
   for (let t = 0; t < poiCount; t++) {
     ensureNonHireOffer(slots[t]!, pool, categoryOf, maxOffers)

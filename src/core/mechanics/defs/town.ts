@@ -21,9 +21,10 @@ import {
   TOWN_SCOUT_HIRE_LINES,
   TOWN_TROOPS_BUNDLE,
   HEALER_BUY_LINES,
+  NO_GOLD_LINES,
 } from '../../constants'
 import { cellIdForPos, getCellAt } from '../../cells'
-import { applyFoodCapOnGain, foodCarryCap, FOOD_CARRY_FULL_MESSAGE } from '../../foodCarry'
+import { applyFoodCapOnGainWithEvents, foodCarryCap } from '../../foodCarry'
 import type { Change } from '../../reducer'
 import { RNG } from '../../rng'
 import { SPRITES } from '../../spriteIds'
@@ -34,14 +35,16 @@ import {
   leaveEncounter,
   loreMessage,
   makeRightGrid,
-  noGoldResponse,
+  feedbackChange,
   gridActionCell,
   openNamedPoiEncounter,
   poiTitleFor,
   previewEncounterProvider,
   hireCompanion,
+  iconHighlighted,
   offersToGridLayout,
   refuseCompanionHire,
+  foodCarryFullResponse,
   setEncounterMessage,
   type CellBadge,
 } from '../encounterHelpers'
@@ -137,7 +140,9 @@ const onEnterTown: OnEnterTile = ({ cell, world, pos, stepCount, resources }) =>
   const r = RNG.createTileRandom({ world, stepCount, pos })
   const line = r.stableLine(TOWN_ENTER_LINES, { placeId: town.id })
   let nextResources = resources
-  if (resources.party.includes('healer') && resources.gold >= HEALER_UPKEEP_GOLD) {
+  const healerUpkeep =
+    resources.party.includes('healer') && resources.gold >= HEALER_UPKEEP_GOLD
+  if (healerUpkeep) {
     nextResources = { ...resources, gold: resources.gold - HEALER_UPKEEP_GOLD }
   }
   const opened = openNamedPoiEncounter({
@@ -147,7 +152,12 @@ const onEnterTown: OnEnterTile = ({ cell, world, pos, stepCount, resources }) =>
     enterBody: line,
     extra: { rumorsBought: 0 },
   })
-  return { ...opened, knowsPosition: true, resources: nextResources }
+  return {
+    ...opened,
+    knowsPosition: true,
+    resources: nextResources,
+    ...(healerUpkeep ? { events: [iconHighlighted({ band: 'party', id: 'healer' })] } : {}),
+  }
 }
 
 const reduceTownAction: ReduceEncounterAction = (state, action) => {
@@ -167,17 +177,29 @@ const reduceTownAction: ReduceEncounterAction = (state, action) => {
   }
 }
 
+function townGoldShortfall(state: State, title: string, action: string): Change {
+  return feedbackChange(state, {
+    action,
+    category: 'purchase',
+    outcome: 'failure',
+    reason: { kind: 'shortfall', resource: 'gold' },
+    message: loreMessage(title, encounterStableLine(state, `${action}.shortfall`, NO_GOLD_LINES)),
+  })
+}
+
 function reduceTownBuyFood(state: State, town: TownCell): Change {
   const title = poiTitleFor(town.name, 'Town')
 
   const result = buy(state.resources, { gold: town.prices.foodGold, gain: { food: town.bundles.food } })
-  if (result.outcome === 'noFunds') return noGoldResponse(state, title)
+  if (result.outcome === 'shortfall') return townGoldShortfall(state, title, 'town.buyFood')
   if (state.resources.food >= foodCarryCap(state.resources)) {
-    return setEncounterMessage(title, FOOD_CARRY_FULL_MESSAGE)
+    return foodCarryFullResponse(title)
   }
 
+  const capped = applyFoodCapOnGainWithEvents(state.resources, result.resources)
   return {
-    resources: applyFoodCapOnGain(state.resources, result.resources),
+    resources: capped.resources,
+    ...(capped.events.length ? { events: capped.events } : {}),
     message: loreMessage(title, encounterStableLine(state, 'town.buyFood', TOWN_BUY_LINES)),
   }
 }
@@ -185,7 +207,7 @@ function reduceTownBuyFood(state: State, town: TownCell): Change {
 function reduceTownBuyTroops(state: State, town: TownCell): Change {
   const title = poiTitleFor(town.name, 'Town')
   const result = buy(state.resources, { gold: town.prices.troopsGold, gain: { armySize: town.bundles.troops } })
-  if (result.outcome === 'noFunds') return noGoldResponse(state, title)
+  if (result.outcome === 'shortfall') return townGoldShortfall(state, title, 'town.buyTroops')
 
   return {
     resources: result.resources,
@@ -199,7 +221,7 @@ function reduceTownHireScout(state: State, town: TownCell): Change {
   if (refused) return refused
 
   const result = buy(state.resources, { gold: town.prices.companionHireGold, gain: { party: ['scout'] } })
-  if (result.outcome === 'noFunds') return noGoldResponse(state, title)
+  if (result.outcome === 'shortfall') return townGoldShortfall(state, title, 'town.hireScout')
 
   const rnd = RNG.createRunCopyRandom(state)
   return {
@@ -227,7 +249,7 @@ function reduceTownBuyRumor(state: State, town: TownCell): Change {
   }
 
   const result = buy(state.resources, { gold: town.prices.rumorGold, gain: {} })
-  if (result.outcome === 'noFunds') return noGoldResponse(state, title)
+  if (result.outcome === 'shortfall') return townGoldShortfall(state, title, 'town.buyRumor')
 
   const pool = rumorPool()
   const pick = RNG.createRunCopyRandom(state).advanceCursor(`town.rumor.${town.id}`, pool, { salt: town.id })
